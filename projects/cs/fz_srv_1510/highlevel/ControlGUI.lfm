@@ -1,0 +1,642 @@
+object FZControlGUI: TFZControlGUI
+  Left = 128
+  Height = 496
+  Top = 670
+  Width = 816
+  BorderStyle = bsNone
+  Caption = 'FreeZone - Server Control'
+  ClientHeight = 496
+  ClientWidth = 816
+  Color = clBtnFace
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnMouseDown = FormMouseDown
+  OnMouseMove = FormMouseMove
+  OnMouseUp = FormMouseUp
+  OnShow = FormShow
+  Position = poScreenCenter
+  LCLVersion = '1.6.0.4'
+  object Panel1: TPanel
+    Left = 0
+    Height = 496
+    Top = 0
+    Width = 817
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    BevelInner = bvLowered
+    Caption = 'Panel1'
+    ClientHeight = 496
+    ClientWidth = 817
+    TabOrder = 5
+    OnMouseDown = FormMouseDown
+    OnMouseMove = FormMouseMove
+    OnMouseUp = FormMouseUp
+    object Label3: TLabel
+      Left = 300
+      Height = 20
+      Top = 2
+      Width = 195
+      Caption = 'FreeZone 3.0 Control Panel'
+      Font.Color = clWindowText
+      Font.Height = -17
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object group_chat: TGroupBox
+      Left = 480
+      Height = 467
+      Top = 20
+      Width = 330
+      Anchors = [akTop, akRight, akBottom]
+      Caption = 'Chat'
+      ClientHeight = 449
+      ClientWidth = 326
+      TabOrder = 0
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+      object edit_chatmsg: TEdit
+        Left = 10
+        Height = 21
+        Top = 12
+        Width = 257
+        Font.Color = clWindowText
+        Font.Height = -11
+        Font.Name = 'MS Sans Serif'
+        OnKeyPress = edit_chatmsgKeyPress
+        ParentFont = False
+        TabOrder = 0
+      end
+      object btn_sendmsg: TButton
+        Left = 272
+        Height = 25
+        Top = 12
+        Width = 33
+        Caption = 'Send'
+        OnClick = btn_sendmsgClick
+        TabOrder = 1
+      end
+      object chatlog: TMemo
+        Left = 10
+        Height = 376
+        Top = 40
+        Width = 306
+        Anchors = [akTop, akLeft, akBottom]
+        Font.Color = clWindowText
+        Font.Height = -11
+        Font.Name = 'MS Sans Serif'
+        Lines.Strings = (
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+          '123456789012345678901234567890123456789012345'
+          '67890123456789012345678901234567890'
+        )
+        OnContextPopup = chatlogContextPopup
+        ParentFont = False
+        ReadOnly = True
+        TabOrder = 2
+      end
+      object TrackChat: TTrackBar
+        Left = 283
+        Height = 383
+        Top = 39
+        Width = 33
+        LineSize = 10
+        Max = 0
+        OnChange = TrackChatChange
+        Orientation = trVertical
+        Position = 0
+        TickMarks = tmBoth
+        TickStyle = tsNone
+        Anchors = [akTop, akRight, akBottom]
+        TabOrder = 3
+        Visible = False
+      end
+      object btn_clear_chat: TButton
+        Left = 112
+        Height = 25
+        Top = 420
+        Width = 75
+        Caption = 'Clear chatbox'
+        OnClick = btn_clear_chatClick
+        TabOrder = 4
+      end
+    end
+  end
+  object ListPlayers: TListBox
+    Left = 14
+    Height = 463
+    Top = 27
+    Width = 217
+    Anchors = [akTop, akLeft, akRight, akBottom]
+    ItemHeight = 13
+    OnClick = ListPlayersClick
+    OnDrawItem = ListPlayersDrawItem
+    OnMouseDown = FormMouseDown
+    OnMouseMove = FormMouseMove
+    OnMouseUp = FormMouseUp
+    Style = lbOwnerDrawFixed
+    TabOrder = 0
+  end
+  object group_options: TGroupBox
+    Left = 237
+    Height = 108
+    Top = 382
+    Width = 237
+    Anchors = [akRight, akBottom]
+    Caption = 'Options'
+    ClientHeight = 90
+    ClientWidth = 233
+    TabOrder = 1
+    OnMouseDown = FormMouseDown
+    OnMouseMove = FormMouseMove
+    OnMouseUp = FormMouseUp
+    object Label1: TLabel
+      Left = 8
+      Height = 13
+      Top = 48
+      Width = 32
+      Caption = 'Label1'
+      ParentColor = False
+      Visible = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object Label2: TLabel
+      Left = 9
+      Height = 13
+      Top = 72
+      Width = 32
+      Caption = 'Label2'
+      ParentColor = False
+      Visible = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object Edit1: TEdit
+      Left = 104
+      Height = 21
+      Top = 40
+      Width = 129
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      OnKeyPress = Edit1KeyPress
+      ParentFont = False
+      TabOrder = 0
+      Text = 'Edit1'
+      Visible = False
+    end
+    object Edit2: TEdit
+      Left = 104
+      Height = 21
+      Top = 68
+      Width = 129
+      OnKeyPress = Edit1KeyPress
+      TabOrder = 1
+      Text = 'Edit2'
+      Visible = False
+    end
+    object combo_options: TComboBox
+      Left = 8
+      Height = 21
+      Top = 16
+      Width = 193
+      ItemHeight = 13
+      OnSelect = combo_optionsSelect
+      TabOrder = 2
+      Text = '(Select item)'
+    end
+    object btn_ok: TButton
+      Left = 202
+      Height = 22
+      Top = 14
+      Width = 22
+      Caption = 'OK'
+      OnClick = btn_okClick
+      TabOrder = 3
+    end
+  end
+  object group_info: TGroupBox
+    Left = 237
+    Height = 349
+    Top = 27
+    Width = 237
+    Anchors = [akTop, akRight, akBottom]
+    Caption = 'Info'
+    ClientHeight = 331
+    ClientWidth = 233
+    TabOrder = 2
+    OnMouseDown = FormMouseDown
+    OnMouseMove = FormMouseMove
+    OnMouseUp = FormMouseUp
+    object lbl_id: TLabel
+      Left = 8
+      Height = 13
+      Top = 16
+      Width = 11
+      Caption = 'ID'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_chatmute: TLabel
+      Left = 8
+      Height = 13
+      Top = 144
+      Width = 57
+      Caption = 'Muted chat:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_mutedvotings: TLabel
+      Left = 8
+      Height = 13
+      Top = 160
+      Width = 70
+      Caption = 'Muted votings:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_mutedradio: TLabel
+      Left = 8
+      Height = 13
+      Top = 176
+      Width = 59
+      Caption = 'Muted radio:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_bps: TLabel
+      Left = 8
+      Height = 13
+      Top = 244
+      Width = 24
+      Anchors = [akLeft, akBottom]
+      Caption = 'BPS:'
+      ParentColor = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_retry: TLabel
+      Left = 8
+      Height = 13
+      Top = 276
+      Width = 40
+      Anchors = [akLeft, akBottom]
+      Caption = 'Retried: '
+      ParentColor = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_drop: TLabel
+      Left = 8
+      Height = 13
+      Top = 292
+      Width = 47
+      Anchors = [akLeft, akBottom]
+      Caption = 'Dropped: '
+      ParentColor = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_sent: TLabel
+      Left = 8
+      Height = 13
+      Top = 260
+      Width = 25
+      Anchors = [akLeft, akBottom]
+      Caption = 'Sent:'
+      ParentColor = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_updrate: TLabel
+      Left = 8
+      Height = 13
+      Top = 192
+      Width = 41
+      Caption = 'Updrate:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_money: TLabel
+      Left = 8
+      Height = 13
+      Top = 32
+      Width = 38
+      Caption = 'Money: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object lbl_rank: TLabel
+      Left = 8
+      Height = 13
+      Top = 48
+      Width = 32
+      Caption = 'Rank: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object lbl_team: TLabel
+      Left = 8
+      Height = 13
+      Top = 64
+      Width = 33
+      Caption = 'Team: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object lbl_frags: TLabel
+      Left = 8
+      Height = 13
+      Top = 80
+      Width = 32
+      Caption = 'Frags: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object lbl_selfkills: TLabel
+      Left = 8
+      Height = 13
+      Top = 96
+      Width = 41
+      Caption = 'Selfkills: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object lbl_teamkills: TLabel
+      Left = 8
+      Height = 13
+      Top = 112
+      Width = 50
+      Caption = 'Teamkills: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object lbl_deathes: TLabel
+      Left = 8
+      Height = 13
+      Top = 128
+      Width = 46
+      Caption = 'Deathes: '
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+    end
+    object check_autorefresh: TCheckBox
+      Left = 8
+      Height = 19
+      Top = 308
+      Width = 74
+      Anchors = [akLeft, akBottom]
+      Caption = 'Autorefresh'
+      OnClick = check_autorefreshClick
+      TabOrder = 0
+    end
+  end
+  object btn_minimize: TButton
+    Left = 3
+    Height = 17
+    Top = 3
+    Width = 19
+    Caption = '-'
+    Font.Color = clRed
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = [fsBold]
+    OnClick = btn_minimizeClick
+    ParentFont = False
+    TabOrder = 4
+  end
+  object btn_close: TButton
+    Left = 795
+    Height = 17
+    Top = 3
+    Width = 19
+    Anchors = [akTop, akRight]
+    Caption = 'X'
+    Font.Color = clRed
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = [fsBold]
+    OnClick = btn_closeClick
+    ParentFont = False
+    TabOrder = 3
+  end
+  object ActList: TActionList
+    left = 144
+    top = 32
+    object ActRefresh: TAction
+      Caption = 'Refresh list'
+      OnExecute = ActRefreshExecute
+    end
+    object ActStopServer: TAction
+      Caption = 'Stop the server'
+      OnExecute = ActStopServerExecute
+    end
+    object ActRankUp: TAction
+      Caption = 'Rank Up'
+    end
+    object ActRankDown: TAction
+      Caption = 'Rank Down'
+      OnExecute = ActRankDownExecute
+    end
+    object ActMoneyAdd: TAction
+      Caption = 'Add Money'
+      OnExecute = ActMoneyAddExecute
+    end
+    object ActExperienceAdd: TAction
+      Caption = 'Add Experience'
+    end
+    object ActKick: TAction
+      Caption = 'Kick'
+      OnExecute = ActKickExecute
+    end
+    object ActBan: TAction
+      Caption = 'Ban'
+      OnExecute = ActBanExecute
+    end
+    object ActBanSubnet: TAction
+      Caption = 'Ban subnet'
+    end
+    object ActBugTrap: TAction
+      Caption = 'BugTrap'
+    end
+    object ActKill: TAction
+      Caption = 'Kill player'
+      OnExecute = ActKillExecute
+    end
+    object ActKeyGen: TAction
+      Caption = 'Generate CDKEY'
+      OnExecute = ActKeyGenExecute
+    end
+    object ActMute: TAction
+      Caption = 'Mute chat'
+      OnExecute = ActMuteExecute
+    end
+    object ActCheckCensor: TAction
+      Caption = 'Check censor'
+      OnExecute = ActCheckCensorExecute
+    end
+    object ActCheckSACE_Chat: TAction
+      Caption = 'ActCheckSACE_Chat'
+      OnExecute = ActCheckSACE_ChatExecute
+    end
+    object ActChangeUpdrate: TAction
+      Caption = 'ActChangeUpdrate'
+      OnExecute = ActChangeUpdrateExecute
+    end
+    object ActClosePanel: TAction
+      Caption = 'Close Window'
+      OnExecute = ActClosePanelExecute
+    end
+    object ActCheckSACE_Changename: TAction
+      Caption = 'ActCheckSACE_Changename'
+      OnExecute = ActCheckSACE_ChangenameExecute
+    end
+    object ActBugUpdate: TAction
+      Caption = 'ActBugUpdate'
+      OnExecute = ActBugUpdateExecute
+    end
+    object ActBugSpawn: TAction
+      Caption = 'ActBugSpawn'
+      OnExecute = ActBugSpawnExecute
+    end
+    object ActBugSvconfig: TAction
+      Caption = 'ActBugSvconfig'
+      OnExecute = ActBugSvconfigExecute
+    end
+    object ActTeleport: TAction
+      Caption = 'Teleport'
+      OnExecute = ActTeleportExecute
+    end
+    object ActConsoleCmd: TAction
+      Caption = 'ActConsoleCmd'
+      OnExecute = ActConsoleCmdExecute
+    end
+  end
+  object RefreshTimer: TTimer
+    Interval = 100
+    OnTimer = RefreshTimerTimer
+    left = 192
+    top = 32
+  end
+  object ActOnSelectItems: TActionList
+    left = 168
+    top = 32
+    object ActOptDisableAll: TAction
+      Caption = 'ActOptDisableAll'
+      OnExecute = ActOptDisableAllExecute
+    end
+    object ActOptTimeReason: TAction
+      Caption = 'ActOptTimeReason'
+      OnExecute = ActOptTimeReasonExecute
+    end
+    object ActOptReason: TAction
+      Caption = 'ActOptReason'
+      OnExecute = ActOptReasonExecute
+    end
+    object ActOptTime: TAction
+      Caption = 'ActOptTime'
+      OnExecute = ActOptTimeExecute
+    end
+    object ActOptValue: TAction
+      Caption = 'ActOptValue'
+      OnExecute = ActOptValueExecute
+    end
+    object ActOptInputOutput: TAction
+      Caption = 'ActOptInputOutput'
+      OnExecute = ActOptInputOutputExecute
+    end
+    object ActOptPosDir: TAction
+      OnExecute = ActOptPosDirExecute
+    end
+    object ActOptCommand: TAction
+      Caption = 'ActOptCommand'
+      OnExecute = ActOptCommandExecute
+    end
+  end
+end
