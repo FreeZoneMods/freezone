@@ -10,6 +10,7 @@ FZCacheData = record
   //unlimited_chat_for_dead:boolean; - не нужно тут
 
   is_cdkey_checking_disabled:boolean;
+  is_same_cdkey_validated:boolean;
   servername:string;
 
   ban_for_badpackets:integer;
@@ -155,6 +156,7 @@ begin
   self._data.allow_early_success_in_vote:=FZConfigMgr.Get.GetBool('allow_early_success_in_vote', true);
   self._data.allow_early_fail_in_vote:=FZConfigMgr.Get.GetBool('allow_early_fail_in_vote', true);
   self._data.is_cdkey_checking_disabled:=FZConfigMgr.Get.GetBool('is_cdkey_checking_disabled', true);
+  self._data.is_same_cdkey_validated:=FZConfigMgr.Get.GetBool('is_same_cdkey_validated', true);
   if not FZConfigMgr.Get.GetData('servername', self._data.servername) then self._data.servername:='';
   self._data.ban_for_badpackets:=FZConfigMgr.Get.GetInt('ban_for_badpackets',0);
   self._data.is_strict_filter:=FZConfigMgr.Get.GetBool('is_strict_filter', false);

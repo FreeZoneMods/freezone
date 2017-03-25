@@ -161,8 +161,10 @@ begin
     srcBaseInjection.Create(pointer(xrGame+$337F77), @WriteMapnameToClientRequest, 7, [F_PUSH_EAX, F_PUSH_ECX, F_PUSH_EDX], true, true);
   end;
 
-  //в gcd_authenticate_user правим возможность игры нескольким игрокам с одним ключом на сервере и отключаем отправку пакета с запросом
-  if not srcKit.Get.nop_code(pointer(xrGameSpy+$B1E0),1, CHR($EB)) then exit;
+  //в gcd_authenticate_user правим возможность игры нескольким игрокам с одним ключом на сервере...
+  srcInjectionWithConditionalJump.Create(pointer(xrGameSpy+$B1E2),@IsSameCdKeyValidated,5,[],pointer(xrGameSpy+$B22D), JUMP_IF_TRUE, true, false);
+
+  //...и отключаем отправку пакета с запросом
   srcInjectionWithConditionalJump.Create(pointer(xrGameSpy+$B2B7),@OnAuthSend,8,[F_PUSH_ESI],pointer(xrGameSpy+$B2CA), JUMP_IF_TRUE, true, false);
 
   result:=true;

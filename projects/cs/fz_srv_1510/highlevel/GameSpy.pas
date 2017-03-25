@@ -9,7 +9,7 @@ type gsBufWriter = procedure (buf:pointer; data:PChar); cdecl;
 procedure WriteHostnameToClientRequest(old_hostname:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
 procedure WriteMapnameToClientRequest(old_name:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
 function OnAuthSend(cl:pgsclient_t):boolean; stdcall;
-
+function IsSameCdKeyValidated():boolean; stdcall;
 
 implementation
 uses LogMgr, sysutils, strings, TranslationMgr, ConfigCache, ConfigMgr, ServerStuff;
@@ -31,6 +31,11 @@ begin
     //идем как в оригинале в send_auth_req(prod, client,challenge, response)
     result:=false;
   end;
+end;
+
+function IsSameCdKeyValidated():boolean; stdcall;
+begin
+  result:=FZConfigCache.Get.GetDataCopy.is_same_cdkey_validated;
 end;
 
 procedure WriteHostnameToClientRequest(old_hostname:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
