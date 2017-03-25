@@ -35,7 +35,7 @@ end;
 
 procedure DPNDestroyClient(id:cardinal); stdcall;
 begin
-  FZLogMgr.Get.Write('DPNDestroyClient called for '+inttostr(id));
+  FZLogMgr.Get.Write('DPNDestroyClient called for '+inttostr(id), FZ_LOG_DBG);
   //todo:сделать (IPureServer)->NET->DestroyClient (vtable:0x60)
 end;
 
@@ -70,7 +70,7 @@ begin
     end else begin
       //проверка на размер пакета - должен быть не более $4000 байт
       if pMsg.dwReceiveDataSize>=$4000 then begin
-        FZLogMgr.Get.Write('Packet size = '+inttostr(pMsg.dwReceiveDataSize));
+        FZLogMgr.Get.Write('Packet size = '+inttostr(pMsg.dwReceiveDataSize), FZ_LOG_DBG);
         DPNDestroyClient(pMsg.dpnidSender);
         exit;
       end;
@@ -80,13 +80,13 @@ begin
       //что интересно, контролер при получении пакета с NET_TAG_NONMERGED или отличным размером/включенным сжатием сразу вызывает (IPureServer)->NET->DestroyClient (vtable:0x60)
       if IsCCSMode() then begin
         if (pPacketData.header.tag<>NET_TAG_MERGED) or (pPacketData.header.unpacked_size<>pMsg.dwReceiveDataSize-4) or (pPacketData.compression_byte<>NET_TAG_NONCOMPRESSED) then begin
-          FZLogMgr.Get.Write('-----------------------------------------------------');
-          FZLogMgr.Get.Write('Strict filter detected bad packet from client '+inttostr(pMsg.dpnidSender)+'. Packet parameters:');
-          FZLogMgr.Get.Write('Tag = '+inttohex(pPacketData.header.tag, 2)+', expected: '+inttohex(NET_TAG_MERGED, 2));
-          FZLogMgr.Get.Write('unpacked_size = '+inttostr(pPacketData.header.unpacked_size)+', expected: '+inttostr(pMsg.dwReceiveDataSize-4));
-          FZLogMgr.Get.Write('Compression tag: '+inttohex(pPacketData.compression_byte, 2) + ', expected: '+inttohex(NET_TAG_NONCOMPRESSED,2));
+          FZLogMgr.Get.Write('-----------------------------------------------------', FZ_LOG_DBG);
+          FZLogMgr.Get.Write('Strict filter detected bad packet from client '+inttostr(pMsg.dpnidSender)+'. Packet parameters:', FZ_LOG_DBG);
+          FZLogMgr.Get.Write('Tag = '+inttohex(pPacketData.header.tag, 2)+', expected: '+inttohex(NET_TAG_MERGED, 2), FZ_LOG_DBG);
+          FZLogMgr.Get.Write('unpacked_size = '+inttostr(pPacketData.header.unpacked_size)+', expected: '+inttostr(pMsg.dwReceiveDataSize-4), FZ_LOG_DBG);
+          FZLogMgr.Get.Write('Compression tag: '+inttohex(pPacketData.compression_byte, 2) + ', expected: '+inttohex(NET_TAG_NONCOMPRESSED,2), FZ_LOG_DBG);
           DPNDestroyClient(pMsg.dpnidSender);
-          FZLogMgr.Get.Write('-----------------------------------------------------');
+          FZLogMgr.Get.Write('-----------------------------------------------------', FZ_LOG_DBG);
           exit;
         end;
       end;

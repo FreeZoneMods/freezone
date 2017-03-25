@@ -65,14 +65,14 @@ begin
   if xrAPI<>0 then begin
     @UACInfo:=GetProcAddress(xrAPI, 'GetUACPlayerInfoByID');
   end else begin
-    FZLogMgr.Get.Write('xrAPI module not found.');
+    FZLogMgr.Get.Write('xrAPI module not found.', FZ_LOG_INFO);
   end;
 
   if @UACInfo<>nil then begin
-    FZLogMgr.Get.Write('Anticheat engine found.');
-    FZLogMgr.Get.Write('f = '+inttohex(cardinal(@UACInfo),8));
+    FZLogMgr.Get.Write('Anticheat engine found.', FZ_LOG_INFO);
+    FZLogMgr.Get.Write('SACE fun is '+inttohex(cardinal(@UACInfo),8), FZ_LOG_DBG);
   end else begin
-    FZLogMgr.Get.Write('SACE not found.');
+    FZLogMgr.Get.Write('SACE not found.', FZ_LOG_INFO);
   end;
   result:=true;  
 end;

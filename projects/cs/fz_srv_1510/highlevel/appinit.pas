@@ -28,28 +28,29 @@ begin
 
   if not LogMgr.Init then exit;
 
-  FZLogMgr.Get.Write('Initializing...');
+  FZLogMgr.Get.Write('Initializing...', FZ_LOG_IMPORTANT_INFO);
 {$IFDEF REVO}
-  FZLogMgr.Get.Write('Version info: FreeZone v3.0b Revolution');
+  FZLogMgr.Get.Write('Version info: FreeZone v3.0b Revolution', FZ_LOG_IMPORTANT_INFO);
 {$ELSE}
-  FZLogMgr.Get.Write('Version info: FreeZone v3.0b Evolution');
+  FZLogMgr.Get.Write('Version info: FreeZone v3.0b Evolution', FZ_LOG_IMPORTANT_INFO);
 {$ENDIF}
 
-  FZLogMgr.Get.Write('Build date: ' + {$INCLUDE %DATE} );
+  FZLogMgr.Get.Write('Build date: ' + {$INCLUDE %DATE}, FZ_LOG_IMPORTANT_INFO);
 
   tp:=xrGameDllType();
   if tp = XRGAME_CL_1510 then begin
-    FZLogMgr.Get.Write('xrGame.dll is CL 1.5.10');
+    FZLogMgr.Get.Write('xrGame.dll is CL 1.5.10', FZ_LOG_IMPORTANT_INFO);
   end else if tp = XRGAME_SV_1510 then begin
-    FZLogMgr.Get.Write('xrGame.dll is SV 1.5.10');
+    FZLogMgr.Get.Write('xrGame.dll is SV 1.5.10', FZ_LOG_IMPORTANT_INFO);
   end else begin
-    FZLogMgr.Get.Write('xrGame.dll - UNKNOWN version!', true);
+    FZLogMgr.Get.Write('xrGame.dll - UNKNOWN version!', FZ_LOG_ERROR);
   end;
 
   if not ConfigMgr.Init then exit;
   if not Console.Init then exit;
-  if not Emergency.Init then exit;
   if not ConfigCache.Init then exit;
+
+  if not Emergency.Init then exit;
   if not TranslationMgr.Init then exit;
   if not DownloadMgr.Init then exit;
 

@@ -37,7 +37,7 @@ var
 
 procedure xrGameSpyServer_constructor_reserve_zerogameid(srv:pxrServer); stdcall;
 begin
-  FZLogMgr.Get.Write('Reserving zero game ID');
+  FZLogMgr.Get.Write('Reserving zero game ID', FZ_LOG_INFO);
   CID_Generator__tfGetID.Call([@srv.m_tID_Generator, 0]);
 end;
 
@@ -51,7 +51,7 @@ begin
     exit;
   end;
 
-  fzlogmgr.get.write('Player '+PChar(@target.ps.name[0])+' wants to die');
+  fzlogmgr.get.write('Player '+PChar(@target.ps.name[0])+' wants to die', FZ_LOG_INFO);
   result:=(target.base_IClient.ID.id = senderid);
 end;
 
@@ -66,18 +66,18 @@ begin
   //GAME_EVENT_PLAYER_KILLED имеет право отправлять только локальный клиент!
   cld:=GetServerClient();
   if (cld = nil) or (cld.base_IClient.ID.id <> sender_id) then begin
-    fzlogmgr.get.write('Player id='+inttostr(sender_id)+' tried to send GAME_EVENT_PLAYER_KILLED message!', true);
+    fzlogmgr.get.write('Player id='+inttostr(sender_id)+' tried to send GAME_EVENT_PLAYER_KILLED message!', FZ_LOG_ERROR);
     exit;
   end;
 
   //кроме того, локальный клиент не может быть убийцей либо быть убит!
   killer_id:=pword(@p.B.data[p.r_pos+3])^;
   target_id:=pword(@p.B.data[p.r_pos])^;
-  FZLogMgr.Get.Write('Killer id = '+inttostr(killer_id)+', victim id = '+inttostr(target_id));
+  FZLogMgr.Get.Write('Killer id = '+inttostr(killer_id)+', victim id = '+inttostr(target_id), FZ_LOG_IMPORTANT_INFO);
 
 
   if (cld.ps.GameID = killer_id) or (cld.ps.GameID = target_id) then begin
-    FZLogMgr.Get.Write('Local player cannot be victim or killer!', true);
+    FZLogMgr.Get.Write('Local player cannot be victim or killer!', FZ_LOG_ERROR);
     exit;
   end;
 
@@ -107,7 +107,7 @@ begin
   //GAME_EVENT_PLAYER_HITTED имеет право отправлять только локальный клиент!
   cld:=GetServerClient();
   if (cld = nil) or (cld.base_IClient.ID.id <> sender_id) then begin
-    fzlogmgr.get.write('Player id='+inttostr(sender_id)+' tried to send GAME_EVENT_PLAYER_HITTED message!', true);
+    fzlogmgr.get.write('Player id='+inttostr(sender_id)+' tried to send GAME_EVENT_PLAYER_HITTED message!', FZ_LOG_ERROR);
     exit;
   end;
 
@@ -116,7 +116,7 @@ begin
   target_id:=pword(@p.B.data[p.r_pos])^;
   health_dec:=psingle(@p.B.data[p.r_pos+4])^;
   if (cld.ps.GameID = killer_id) or (cld.ps.GameID = target_id) then begin
-    FZLogMgr.Get.Write('Local player cannot be victim or hitter!', true);
+    FZLogMgr.Get.Write('Local player cannot be victim or hitter!', FZ_LOG_ERROR);
     exit;
   end else begin
     victim:=nil;
@@ -127,7 +127,7 @@ begin
     victim_str := GetNameFromClientdata(victim);
     hitter_str := GetNameFromClientdata(hitter);
 
-    FZLogMgr.Get.Write('Hitter '+hitter_str+' (id='+inttostr(killer_id)+'), victim = '+victim_str+' (id='+inttostr(target_id)+'), health dec = '+floattostr(health_dec));
+    FZLogMgr.Get.Write('Hitter '+hitter_str+' (id='+inttostr(killer_id)+'), victim = '+victim_str+' (id='+inttostr(target_id)+'), health dec = '+floattostr(health_dec), FZ_LOG_IMPORTANT_INFO);
   end;
 
   result:=true;
@@ -148,7 +148,7 @@ begin
 
   cld:=GetServerClient();
   if cld = nil then begin
-    FZLogMgr.Get.Write('No local player in OnHit!', true);
+    FZLogMgr.Get.Write('No local player in OnHit!', FZ_LOG_ERROR);
     result:=true;
     exit;
   end;
@@ -161,12 +161,12 @@ begin
       hitter:=nil;
       ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @src_id, @hitter);
       if hitter=nil then begin
-        FZLogMgr.Get.Write('Hit from unexistent client???', true);
+        FZLogMgr.Get.Write('Hit from unexistent client???', FZ_LOG_ERROR);
         exit;
       end;
 
       if hitter.ps.GameID<>src_id then begin
-        FZLogMgr.Get.Write('Player id='+inttostr(senderid)+' sent not own hit!!!', true);
+        FZLogMgr.Get.Write('Player id='+inttostr(senderid)+' sent not own hit!!!', FZ_LOG_ERROR);
         exit;
       end;
     finally
@@ -178,9 +178,9 @@ begin
   result:= not ((cld.ps.GameID = src_id) or (cld.ps.GameID = dest_id));
   if not result then begin
     if (cld.ps.GameID = src_id) then begin
-      FZLogMgr.Get.Write('Local player makes hit? Rejecting!', true);
+      FZLogMgr.Get.Write('Local player makes hit? Rejecting!', FZ_LOG_ERROR);
     end else if (cld.ps.GameID = dest_id) then begin
-      FZLogMgr.Get.Write('Local player has been hitted? Rejecting!', true);
+      FZLogMgr.Get.Write('Local player has been hitted? Rejecting!', FZ_LOG_ERROR);
     end;
   end else begin
     ReadHitFromPacket(packet, @hit);
@@ -201,7 +201,7 @@ begin
                           ', P='+floattostrf(hit.power, ffFixed,4,2)+
                           ', I='+floattostrf(hit.impulse, ffFixed,4,2)+
                           ', B='+inttostr(hit.boneID)+
-                          ')');
+                          ')', FZ_LOG_INFO);
 
       //todo:анализ хита
     end;
@@ -215,7 +215,7 @@ begin
   _serverstate.mapver:=PChar(@gdd.map_version[0]);
   _serverstate.maplink:=PChar(@gdd.download_url[0]);
   LeaveCriticalSection(_serverstate.lock);
-  FZLogMgr.Get.Write('Mapname updated: '+_serverstate.mapname+', '+_serverstate.mapver);
+  FZLogMgr.Get.Write('Mapname updated: '+_serverstate.mapname+', '+_serverstate.mapver, FZ_LOG_IMPORTANT_INFO);
 end;
 
 procedure GetMapStatus(var name:string; var ver:string; var link:string); stdcall;

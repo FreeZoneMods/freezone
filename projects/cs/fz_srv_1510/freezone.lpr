@@ -110,7 +110,7 @@ procedure Cleanup(); stdcall;
 begin
   //Вызывается на Application::Terminate
   //Вызываем очистку
-  FZLogMgr.Get.Write('Cleanup...');
+  FZLogMgr.Get.Write('Cleanup...', FZ_LOG_INFO);
   appinit.Free;
   srcKit.Finish;
 end;

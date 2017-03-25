@@ -114,7 +114,7 @@ begin
     try
       reset(f);
     except
-      FZLogMgr.Get.Write('Cannot open file '+ fname+' for reading. Check existance!', true);
+      FZLogMgr.Get.Write('Cannot open file '+ fname+' for reading. Check existance!', FZ_LOG_ERROR);
       exit;
     end;
     while not eof(f) do begin
@@ -142,9 +142,9 @@ end;
 
 procedure FZSubnetBanList.ReloadDefaultFile;
 begin
-  FZLogMgr.Get.Write('Loading banned subnets...');
+  FZLogMgr.Get.Write('Loading banned subnets...', FZ_LOG_INFO);
   self.Reload('banned_networks.ini');
-  FZLogMgr.Get.Write('Found '+inttostr(self._list.Count)+' banned subnet(s)');
+  FZLogMgr.Get.Write('Found '+inttostr(self._list.Count)+' banned subnet(s)', FZ_LOG_INFO);
 end;
 
 procedure FZSubnetBanList._freeList;

@@ -393,7 +393,7 @@ begin
     end else begin
       result:=FZCommonHelper.GetTimeDeltaSafe(self._mute_start_time)<self._mute_time_period;
       if not result then begin
-        FZLogMgr.Get.Write('Chat mute of player '+PChar(@self._my_player.name)+' is expired.');
+        FZLogMgr.Get.Write('Chat mute of player '+PChar(@self._my_player.name)+' is expired.', FZ_LOG_IMPORTANT_INFO);
         self._mute_time_period:=0;
       end;
     end;
@@ -411,7 +411,7 @@ begin
     end else begin
       result:=FZCommonHelper.GetTimeDeltaSafe(self._votes_mute_start_time)<self._votes_mute_time_period;
       if not result then begin
-        FZLogMgr.Get.Write('Vote mute of player '+PChar(@self._my_player.name)+' is expired.');
+        FZLogMgr.Get.Write('Vote mute of player '+PChar(@self._my_player.name)+' is expired.', FZ_LOG_IMPORTANT_INFO);
         self._votes_mute_time_period:=0;
       end;
     end;
@@ -433,7 +433,7 @@ begin
     end else begin
       result:=FZCommonHelper.GetTimeDeltaSafe(self._speechmute_start_time)<self._speechmute_time_period;
       if not result then begin
-        FZLogMgr.Get.Write('Speech mute of player '+PChar(@self._my_player.name)+' is expired.');
+        FZLogMgr.Get.Write('Speech mute of player '+PChar(@self._my_player.name)+' is expired.', FZ_LOG_IMPORTANT_INFO);
         self._speechmute_time_period:=0;
       end;
     end;
@@ -475,7 +475,7 @@ begin
         self._chatmutes_count:=self._chatmutes_count+1;
         result:=self._chatmutes_count*_data.chat_mute_time;
         AssignMute(result);
-        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' chat muted for '+inttostr(_chatmutes_count)+' time(s)');
+        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' chat muted for '+inttostr(_chatmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
       end;
     end;
     self._last_chat_message_time:=FZCommonHelper.GetGameTickCount();
@@ -501,7 +501,7 @@ begin
         self._speechmutes_count:=self._speechmutes_count+1;
         result:=self._speechmutes_count*_data.speech_mute_time;
         AssignSpeechMute(result);
-        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' speech messages muted for '+inttostr(_speechmutes_count)+' time(s)');
+        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' speech messages muted for '+inttostr(_speechmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
       end;
     end;
     self._last_speech_message_time:=FZCommonHelper.GetGameTickCount();
@@ -528,7 +528,7 @@ begin
         //Добби должен быть наказан...
         _votemutes_count:=_votemutes_count+1;
         AssignVoteMute(_votemutes_count*_data.vote_first_mute_time);
-        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' votes muted for '+inttostr(_votemutes_count)+' time(s)');
+        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' votes muted for '+inttostr(_votemutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
       end;
     end;
 
@@ -674,7 +674,7 @@ begin
   end;
   if servermaps_cur=helper.m_storage.last then begin
     //нет такого типа игры!
-    FZLogMgr.Get.Write('No gametype in maplist, id='+inttostr(gameid), true);
+    FZLogMgr.Get.Write('No gametype in maplist, id='+inttostr(gameid), FZ_LOG_ERROR);
     exit;
   end;
 
@@ -769,9 +769,9 @@ begin
 
       if not need_dl then begin
         //Контрольная сумма не найдена, просто сообщаем
-        FZLogMgr.Get.Write('No CRC32 for map '+mapname+', ver '+mapver);
+        FZLogMgr.Get.Write('No CRC32 for map '+mapname+', ver '+mapver, FZ_LOG_INFO);
       end else begin
-        FZLogMgr.Get.Write('Send DOWNLOAD packet for '+mapname+', ver.='+mapver);
+        FZLogMgr.Get.Write('Send DOWNLOAD packet for '+mapname+', ver.='+mapver, FZ_LOG_INFO);
         SendSysMessage(@ProcessClientMap, @dlinfo, @SysMsg_SendCallback ,@userdata);
       end;
     end;
@@ -795,7 +795,7 @@ function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdca
 begin
   result:=not FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid;
   if result then begin
-    FZLogMgr.Get.Write('Force removing player state of disconnected client!');
+    FZLogMgr.Get.Write('Force removing player state of disconnected client!', FZ_LOG_INFO);
   end;
 end;
 

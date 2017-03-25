@@ -40,7 +40,7 @@ var
 
 function Init():boolean;
 begin
-  FZLogMgr.Get.Write('Using TRegExpr library ver.'+inttostr(TREgExpr.VersionMajor)+'.'+inttostr(TREgExpr.VersionMinor));
+  FZLogMgr.Get.Write('Using TRegExpr library ver.'+inttostr(TREgExpr.VersionMajor)+'.'+inttostr(TREgExpr.VersionMinor), FZ_LOG_IMPORTANT_INFO);
   _instance:=FZCensor.Create();
   result:=true;
 end;
@@ -78,7 +78,7 @@ begin
       if _re.Exec(msg) then begin
         //Оно в черном списке
         if length(log_message)>0 then begin
-          FZLogMgr.Get.Write(log_message+str);
+          FZLogMgr.Get.Write(log_message+str, FZ_LOG_INFO);
         end;
 
         result:=true;
@@ -138,7 +138,7 @@ begin
     try
       reset(f);
     except
-      FZLogMgr.Get.Write('Cannot open file '+ fname+' for reading. Check existance!', true);
+      FZLogMgr.Get.Write('Cannot open file '+ fname+' for reading. Check existance!', FZ_LOG_ERROR);
       exit;    
     end;
 
@@ -167,10 +167,10 @@ end;
 
 procedure FZCensor.ReloadDefaultFile;
 begin
-  FZLogMgr.Get.Write('Loading banned expressions...');
+  FZLogMgr.Get.Write('Loading banned expressions...', FZ_LOG_INFO);
   Reload('fz_censored.ini');
-  FZLogMgr.Get.Write('Found '+inttostr(self._blacklist.Count)+' banned expression(s)');
-  FZLogMgr.Get.Write('Found '+inttostr(self._whitelist.Count)+' whitelisted expression(s)');    
+  FZLogMgr.Get.Write('Found '+inttostr(self._blacklist.Count)+' banned expression(s)', FZ_LOG_INFO);
+  FZLogMgr.Get.Write('Found '+inttostr(self._whitelist.Count)+' whitelisted expression(s)', FZ_LOG_INFO);
 end;
 
 procedure FZCensor._ReplaceNonLiterals(var str: string);

@@ -36,7 +36,7 @@ begin
     pboolean(pboolworking)^:=true;
 
     newkey:= GenerateRandomKey(true);
-    FZLogMgr.Get.Write('Same key found! Suggest '+newkey);
+    FZLogMgr.Get.Write('Same key found! Suggest '+newkey, FZ_LOG_IMPORTANT_INFO);
     reason:=FZTranslationMgr.Get.TranslateSingle('fz_same_key_exist_use_this')+' '+newkey;
     xrServer__SendConnectResult(pCLevel(g_ppGameLevel^).Server, @checkfor.base_IClient, 0, 3,  PChar(reason));
   end;
@@ -64,15 +64,15 @@ function IPureServer__net_Handler_SubnetBans(ip:ip_address):boolean;  stdcall;
 begin
   result:=FZSubnetBanList.Get.CheckForBan(ip);
   if result then begin
-    FZLogMgr.Get.Write('Banned FZ IP found! '+IpToStr(ip));
+    FZLogMgr.Get.Write('Banned FZ IP found! '+IpToStr(ip), FZ_LOG_IMPORTANT_INFO);
   end else begin
-    FZLogMgr.Get.Write('New player found, IP: '+IpToStr(ip));
+    FZLogMgr.Get.Write('New player found, IP: '+IpToStr(ip), FZ_LOG_IMPORTANT_INFO);
   end;
 end;
 
 function IPureServer__net_Handler_OnBannedByGameIpFound():boolean; stdcall;
 begin
-  FZLogMgr.Get.Write('Warning! The IP is banned, disconnecting!');
+  FZLogMgr.Get.Write('Warning! The IP is banned, disconnecting!', FZ_LOG_IMPORTANT_INFO);
 end;
 
 //TODO:причина банов

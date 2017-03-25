@@ -138,7 +138,7 @@ begin
 
   teamid:=pword(@p.B.data[p.r_pos])^;
   if (teamid<>$FFFF) and (teamid>2) then begin
-    FZLogMgr.Get.Write('Player ID='+inttostr(sender.base_IClient.ID.id)+'sent message to team #'+inttostr(teamid)+'. Dropping.', true);
+    FZLogMgr.Get.Write('Player ID='+inttostr(sender.base_IClient.ID.id)+'sent message to team #'+inttostr(teamid)+'. Dropping.', FZ_LOG_ERROR);
     result:=false;
     exit;    
   end;
@@ -153,7 +153,7 @@ begin
     j:=j+1;
   end;
   if j>MAX_NICK_SIZE then begin
-    FZLogMgr.Get.Write('Nickname in chat packet is TOO long, sender ID='+inttostr(sender.base_IClient.ID.id)+'! Dropping.', true);
+    FZLogMgr.Get.Write('Nickname in chat packet is TOO long, sender ID='+inttostr(sender.base_IClient.ID.id)+'! Dropping.', FZ_LOG_ERROR);
     result:=false;
     exit;
   end;
@@ -169,7 +169,7 @@ begin
     j:=j+1;
   end;
   if j>MAX_MSG_SIZE then begin
-    FZLogMgr.Get.Write('Chat message is TOO long, sender ID='+inttostr(sender.base_IClient.ID.id)+'! Dropping.', true);
+    FZLogMgr.Get.Write('Chat message is TOO long, sender ID='+inttostr(sender.base_IClient.ID.id)+'! Dropping.', FZ_LOG_ERROR);
     result:=false;
     exit;
   end;
@@ -199,7 +199,7 @@ begin
     is_muted:=false;
     ForEachClientDo(CheckPlayerChatForMute, OneIDSearcher, @sender.base_IClient.ID.id, @is_muted);
     if is_muted then begin
-      FZLogMgr.Get.Write('Muted player '+pname+' tries to say "'+pmsg+'"');
+      FZLogMgr.Get.Write('Muted player '+pname+' tries to say "'+pmsg+'"', FZ_LOG_INFO);
       SendChatMessageByFreeZone(@srv.base_IPureServer, sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_your_chat_muted'));
       result:=false;
       exit;
@@ -333,7 +333,7 @@ var
 begin
   pos_del:=pos(' ', args);
   if pos_del=0 then begin
-    FZLogMgr.Get.Write(INV_F);
+    FZLogMgr.Get.Write(INV_F, FZ_LOG_IMPORTANT_INFO);
     exit;
   end;
   t:=@args[pos_del];
@@ -346,7 +346,7 @@ begin
 
   time:=strtointdef(trim(t), 0)*1000;
   if time=0 then begin
-    FZLogMgr.Get.Write(INV_F);
+    FZLogMgr.Get.Write(INV_F, FZ_LOG_IMPORTANT_INFO);
     exit;  
   end;
   if strcomp(args, 'last_printed')=0 then begin
@@ -361,7 +361,7 @@ begin
   end;
 
   if not res then begin
-    FZLogMgr.Get.Write('No such player id: '+inttostr(id.id));
+    FZLogMgr.Get.Write('No such player id: '+inttostr(id.id), FZ_LOG_IMPORTANT_INFO);
   end;
 end;
 ////////////////////////////////////////////

@@ -112,7 +112,7 @@ var
 begin
   cmd:=@cmd[1];
 
-  FZLogMgr.Get.Write('Client '+PChar(@who.base_IClient.name.p_.value)+' is running chat command "'+cmd+'"');
+  FZLogMgr.Get.Write('Client '+PChar(@who.base_IClient.name.p_.value)+' is running chat command "'+cmd+'"', FZ_LOG_INFO);
 
   i:=pos(' ', cmd);
   if i>0 then begin
@@ -128,7 +128,7 @@ begin
     if strcomp(cmd, cmd_smp._name) = 0 then begin
       if cmd_smp._enabled then begin
         if not cmd_smp.Execute(args, who, srv) then begin
-          FZLogMgr.Get.Write('Invalid syntax!');
+          FZLogMgr.Get.Write('Invalid syntax!', FZ_LOG_INFO);
           SendChatMessageByFreeZone(@srv.base_IPureServer, who.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_invalid_command_call'));
         end;
       end else begin
@@ -140,7 +140,7 @@ begin
   end;
 
   if not result then begin
-    FZLogMgr.Get.Write('Unknown command: '+cmd);
+    FZLogMgr.Get.Write('Unknown command: '+cmd, FZ_LOG_INFO);
     SendChatMessageByFreeZone(@srv.base_IPureServer, who.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_unknown_command'));
   end;
 end;

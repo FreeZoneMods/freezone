@@ -91,7 +91,7 @@ begin
   can_start_voting:=true;
   ForEachClientDo(CheckPlayerAllowedStartVoting, OneIDSearcher, @sender_id.id, @can_start_voting);
   if not can_start_voting then begin
-    FZLogMgr.Get.Write('Player '+inttostr(sender_id.id)+' denied to start voting.');
+    FZLogMgr.Get.Write('Player '+inttostr(sender_id.id)+' denied to start voting.', FZ_LOG_IMPORTANT_INFO);
     result:=false;
     exit;
   end;
@@ -152,9 +152,9 @@ begin
   end;
 
   if result then begin
-    FZLogMgr.Get.Write ('Player ID='+inttostr(sender_id.id)+' wants to start voting "'+PChar(@p.B.data[p.r_pos])+'"');    
+    FZLogMgr.Get.Write ('Player ID='+inttostr(sender_id.id)+' wants to start voting "'+PChar(@p.B.data[p.r_pos])+'"', FZ_LOG_IMPORTANT_INFO);
   end else begin
-    FZLogMgr.Get.Write ('Player ID='+inttostr(sender_id.id)+' sent too long or broken vote string! Cracker?', true);
+    FZLogMgr.Get.Write ('Player ID='+inttostr(sender_id.id)+' sent too long or broken vote string! Cracker?', FZ_LOG_ERROR);
   end;
 end;
 
@@ -163,7 +163,7 @@ begin
   result:=false;
   if not FZConfigCache.Get.GetDataCopy.allow_early_success_in_vote then exit;
   result:= (agreed/total_clients)>=c_sv_vote_quota.value^;
-  if result then FZLogMgr.Get.Write('Vote Early Success! Agreed '+inttostr(floor(100*agreed/total_clients))+'% of players');
+  if result then FZLogMgr.Get.Write('Vote Early Success! Agreed '+inttostr(floor(100*agreed/total_clients))+'% of players', FZ_LOG_IMPORTANT_INFO);
 end;
 
 function IsVoteEarlyFail(game:pgame_sv_mp; agreed, against_explicit, total_clients:cardinal):boolean; stdcall;
@@ -174,13 +174,13 @@ begin
 
   if (agreed=0) and (game.fz_vote_started_by_admin=0) then begin //последнее - на случай, если голосование начал сервер;
     result:=true;
-    FZLogMgr.Get.Write('Voting Early Fail - no agreed participants!');
+    FZLogMgr.Get.Write('Voting Early Fail - no agreed participants!', FZ_LOG_IMPORTANT_INFO);
   end else if ((agreed+against_explicit)>=total_clients) and (agreed/total_clients<c_sv_vote_quota.value^) then begin
     result:=true;
-    FZLogMgr.Get.Write('Voting Early Fail - all participants voted!');
+    FZLogMgr.Get.Write('Voting Early Fail - all participants voted!', FZ_LOG_IMPORTANT_INFO);
   end else if (total_clients-against_explicit)/total_clients<c_sv_vote_quota.value^ then begin
     result:=true;
-    FZLogMgr.Get.Write('Voting Early Fail - '+inttostr(floor(100*against_explicit/total_clients))+'% of players disagreed!');
+    FZLogMgr.Get.Write('Voting Early Fail - '+inttostr(floor(100*against_explicit/total_clients))+'% of players disagreed!', FZ_LOG_IMPORTANT_INFO);
   end;
 end;
 
@@ -188,7 +188,7 @@ function IsVoteSuccess(agreed, against_explicit, total_clients:cardinal):boolean
 begin
   if (total_clients=0) or ((agreed=0) and (against_explicit=0)) then begin
     result:=false;
-    FZLogMgr.Get.Write('Voting Failed - No participants');
+    FZLogMgr.Get.Write('Voting Failed - No participants', FZ_LOG_IMPORTANT_INFO);
     exit;
   end;
 
@@ -199,9 +199,9 @@ begin
   end;
 
   if result then begin
-    FZLogMgr.Get.Write('Voting Successfull - '+inttostr(floor(100*agreed/total_clients))+'% agreed, '+inttostr(floor(100*against_explicit/total_clients))+'% disagreed, '+inttostr(floor(100*(total_clients-against_explicit-agreed)/total_clients))+'% not voted' );
+    FZLogMgr.Get.Write('Voting Successfull - '+inttostr(floor(100*agreed/total_clients))+'% agreed, '+inttostr(floor(100*against_explicit/total_clients))+'% disagreed, '+inttostr(floor(100*(total_clients-against_explicit-agreed)/total_clients))+'% not voted', FZ_LOG_IMPORTANT_INFO );
   end else begin
-    FZLogMgr.Get.Write('Voting Failed - '+inttostr(floor(100*agreed/total_clients))+'% agreed, '+inttostr(floor(100*against_explicit/total_clients))+'% disagreed, '+inttostr(floor(100*(total_clients-against_explicit-agreed)/total_clients))+'% not voted' );
+    FZLogMgr.Get.Write('Voting Failed - '+inttostr(floor(100*agreed/total_clients))+'% agreed, '+inttostr(floor(100*against_explicit/total_clients))+'% disagreed, '+inttostr(floor(100*(total_clients-against_explicit-agreed)/total_clients))+'% not voted', FZ_LOG_IMPORTANT_INFO );
   end;
 end;
 
@@ -244,7 +244,7 @@ begin
       //заглушка на случай „ѕ
       assign_string(@game.m_voting_string.p_, 'Ooops! Something gone wrong...');
       assign_string(@game.m_pVoteCommand.p_, 'deadbeef');
-      FZLogMgr.Get.Write('Running voting with unitialized m_pVoteCommand!', true); 
+      FZLogMgr.Get.Write('Running voting with unitialized m_pVoteCommand!', FZ_LOG_ERROR);
       exit;
     end;
     
@@ -292,7 +292,7 @@ begin
   game.fz_vote_started_by_admin:=0;
   ForEachClientDo(OnPlayerStartVote, OneIDSearcher, @senderid.id, @game.fz_vote_started_by_admin);
 
-  FZLogMgr.Get.Write('Voting "'+PChar(@game.m_voting_string.p_.value)+'" is started');
+  FZLogMgr.Get.Write('Voting "'+PChar(@game.m_voting_string.p_.value)+'" is started', FZ_LOG_INFO);
 end;
 
 
@@ -320,7 +320,7 @@ begin
   //был задан некорректный ник дл€ бана/кика
   //если придумаем, как исправить ситуацию и начать голосование - вернуть true
   //но у нас всегда false...
-  FZLogMgr.Get.Write('Voting not started - player id not found by name!', true);
+  FZLogMgr.Get.Write('Voting not started - player id not found by name!', FZ_LOG_ERROR);
   game.m_bVotingActive:=false;
   result:=false;
 end;

@@ -36,7 +36,7 @@ begin
     end;
 
     str:=str+' max string length is '+inttostr(len)+' byte(s), current length is '+inttostr(cnt)+' byte(s)';
-    FZLogMgr.Get.Write(str, true);
+    FZLogMgr.Get.Write(str, FZ_LOG_ERROR);
     if autocorrection then begin
       p.B.data[p.r_pos+len-1]:=0;
       result:=true;
@@ -66,7 +66,7 @@ begin
       str:=str+'MsgID='+inttohex(msgid, 8);
     end;
 
-    FZLogMgr.Get.Write(str, true);
+    FZLogMgr.Get.Write(str, FZ_LOG_ERROR);
     if autocorrection then begin
       p[len-1]:=chr(0);
       result:=true;
@@ -106,7 +106,7 @@ begin
       cmd:='sv_kick_id '+inttostr(cl.ID.id);
     end;
 
-    FZLogMgr.Get.Write(str, true);
+    FZLogMgr.Get.Write(str, FZ_LOG_ERROR);
     InvalidatePacket(p);
     ExecuteConsoleCommand(PAnsiChar(cmd));
   end;

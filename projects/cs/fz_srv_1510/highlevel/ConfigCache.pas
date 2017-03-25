@@ -91,13 +91,13 @@ end;
 procedure ReloadFZConfig_execute(arg:PChar); stdcall;
 begin
   FZConfigCache.Get.Reload;
-  FZLogMgr.Get.Write('Config reloaded.');
+  FZLogMgr.Get.Write('Config reloaded.', FZ_LOG_INFO);
 end;
 
 function Init():boolean; stdcall;
 begin
   AddConsoleCommand('fz_reload_config',@ReloadFZConfig_execute, @ReloadFZConfig_info);
-  _instance:=nil;
+  _instance:=FZConfigCache.Get();
   result:=true;
 end;
 
@@ -207,6 +207,8 @@ begin
 
   self._data.allow_russian_nicknames:=FZConfigMgr.Get.GetBool('allow_russian_nicknames', false);
   self._data.hit_statistics_mode:=FZConfigMgr.Get.GetInt('hit_statistics_mode', 0);
+
+  FZLogMgr.Get.SetTargetSeverityLevel(FZConfigMgr.Get.GetInt('log_severity',FZ_LOG_DEFAULT_SEVERITY));
 
 end;
 

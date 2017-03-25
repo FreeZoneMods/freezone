@@ -2,14 +2,14 @@
 <CONFIG>
   <ProjectSession>
     <PathDelim Value="\"/>
-    <Version Value="9"/>
-    <BuildModes Active="Default"/>
+    <Version Value="10"/>
+    <BuildModes Active="Revo_Release"/>
     <Units Count="80">
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
-        <TopLine Value="106"/>
-        <CursorPos X="151" Y="122"/>
+        <TopLine Value="83"/>
+        <CursorPos X="58" Y="101"/>
         <UsageCount Value="202"/>
         <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
@@ -37,11 +37,10 @@
       <Unit3>
         <Filename Value="..\..\..\shared\TranslationMgr.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="11"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="34"/>
         <CursorPos X="3" Y="51"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit3>
       <Unit4>
@@ -101,11 +100,10 @@
       <Unit10>
         <Filename Value="..\..\..\shared\3rdparty\RegExpr.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="12"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="3678"/>
         <CursorPos X="30" Y="3694"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit10>
       <Unit11>
@@ -215,11 +213,10 @@
       <Unit22>
         <Filename Value="..\..\..\engine_1510\Gametypes.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="48"/>
         <CursorPos X="13" Y="15"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit22>
       <Unit23>
@@ -462,8 +459,7 @@
         <Filename Value="highlevel\ConfigCache.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="143"/>
-        <CursorPos Y="158"/>
+        <CursorPos X="39" Y="156"/>
         <UsageCount Value="202"/>
         <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
@@ -471,10 +467,9 @@
       <Unit49>
         <Filename Value="highlevel\ConfigMgr.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <CursorPos Y="3"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit49>
       <Unit50>
@@ -493,12 +488,10 @@
         <ComponentName Value="FZControlGUI"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <IsVisibleTab Value="True"/>
-        <EditorIndex Value="3"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="611"/>
         <CursorPos X="9" Y="629"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit51>
       <Unit52>
@@ -514,29 +507,29 @@
       <Unit53>
         <Filename Value="highlevel\DownloadMgr.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="56"/>
         <CursorPos X="25" Y="68"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit53>
       <Unit54>
         <Filename Value="highlevel\Emergency.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <CursorPos Y="23"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="3"/>
+        <CursorPos X="10" Y="5"/>
         <UsageCount Value="202"/>
+        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit54>
       <Unit55>
         <Filename Value="highlevel\GameSpy.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="4"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="21"/>
         <CursorPos Y="36"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit55>
       <Unit56>
@@ -559,11 +552,10 @@
       <Unit58>
         <Filename Value="highlevel\Players.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="10"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="737"/>
         <CursorPos X="35" Y="753"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit58>
       <Unit59>
@@ -678,11 +670,10 @@
       <Unit71>
         <Filename Value="lowlevel\fz_injections.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="131"/>
         <CursorPos X="9" Y="151"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit71>
       <Unit72>
@@ -705,9 +696,9 @@
       <Unit74>
         <Filename Value="highlevel\appinit.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="13"/>
-        <TopLine Value="5"/>
-        <CursorPos X="9" Y="32"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="30"/>
+        <CursorPos X="19" Y="51"/>
         <UsageCount Value="193"/>
         <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
@@ -715,21 +706,19 @@
       <Unit75>
         <Filename Value="..\..\..\engine_1510\MapList.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="9"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="19"/>
         <CursorPos X="49" Y="49"/>
         <UsageCount Value="103"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit75>
       <Unit76>
         <Filename Value="private\sysmsgs.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="35"/>
         <CursorPos X="15" Y="70"/>
         <UsageCount Value="21"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit76>
       <Unit77>
@@ -758,75 +747,19 @@
         <UsageCount Value="22"/>
       </Unit79>
     </Units>
-    <JumpHistory Count="17" HistoryIndex="16">
+    <OtherDefines Count="2">
+      <Define0 Value="RELEASE_BUILD"/>
+      <Define1 Value="REVO"/>
+    </OtherDefines>
+    <JumpHistory Count="2" HistoryIndex="1">
       <Position1>
-        <Filename Value="highlevel\DownloadMgr.pas"/>
-        <Caret Line="15" Column="20"/>
+        <Filename Value="freezone.lpr"/>
+        <Caret Line="122" Column="151" TopLine="106"/>
       </Position1>
       <Position2>
-        <Filename Value="highlevel\Players.pas"/>
-        <Caret Line="772" Column="89" TopLine="751"/>
+        <Filename Value="highlevel\appinit.pas"/>
+        <Caret Line="51" Column="19" TopLine="30"/>
       </Position2>
-      <Position3>
-        <Filename Value="highlevel\Players.pas"/>
-        <Caret Line="753" Column="35" TopLine="737"/>
-      </Position3>
-      <Position4>
-        <Filename Value="private\sysmsgs.pas"/>
-        <Caret Line="19" Column="56"/>
-      </Position4>
-      <Position5>
-        <Filename Value="highlevel\ConfigCache.pas"/>
-        <Caret Line="161" Column="13" TopLine="149"/>
-      </Position5>
-      <Position6>
-        <Filename Value="highlevel\ConfigCache.pas"/>
-        <Caret Line="13"/>
-      </Position6>
-      <Position7>
-        <Filename Value="highlevel\ConfigMgr.pas"/>
-        <Caret Line="48" TopLine="17"/>
-      </Position7>
-      <Position8>
-        <Filename Value="highlevel\ControlGUI.pas"/>
-        <Caret Line="256" Column="132" TopLine="119"/>
-      </Position8>
-      <Position9>
-        <Filename Value="highlevel\ControlGUI.pas"/>
-        <Caret Line="311" Column="9" TopLine="293"/>
-      </Position9>
-      <Position10>
-        <Filename Value="highlevel\GameSpy.pas"/>
-        <Caret Line="44" TopLine="26"/>
-      </Position10>
-      <Position11>
-        <Filename Value="highlevel\GameSpy.pas"/>
-        <Caret Line="13"/>
-      </Position11>
-      <Position12>
-        <Filename Value="lowlevel\fz_injections.pas"/>
-        <Caret Line="368" Column="22" TopLine="338"/>
-      </Position12>
-      <Position13>
-        <Filename Value="lowlevel\fz_injections.pas"/>
-        <Caret Line="150" TopLine="131"/>
-      </Position13>
-      <Position14>
-        <Filename Value="highlevel\appinit.pas"/>
-        <Caret Line="14" Column="40"/>
-      </Position14>
-      <Position15>
-        <Filename Value="highlevel\ControlGUI.pas"/>
-        <Caret Line="629" TopLine="611"/>
-      </Position15>
-      <Position16>
-        <Filename Value="highlevel\appinit.pas"/>
-        <Caret Line="30" Column="7" TopLine="5"/>
-      </Position16>
-      <Position17>
-        <Filename Value="highlevel\ControlGUI.pas"/>
-        <Caret Line="311" Column="9" TopLine="293"/>
-      </Position17>
     </JumpHistory>
   </ProjectSession>
   <Debugging>
