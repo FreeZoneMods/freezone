@@ -722,6 +722,7 @@ procedure OnAttachNewClient(srv:pxrServer; cl:pIClient); stdcall;
 var
   dat:FZCacheData;
   dlinfo:FZMapInfo;
+  moddllinfo:FZDllDownloadInfo;
   mapname, mapver, maplink, link, xml:string;
   dl_msg, err_msg:string;
   filename:string;
@@ -739,6 +740,33 @@ begin
 
     if ((cl.flags and ICLIENT_FLAG_LOCAL)<>0) or not CheckForClientExist(srv, cl) then exit;
     dat:=FZConfigCache.Get.GetDataCopy();
+
+    if length(dat.mod_name)>0 then begin
+      filename:=dat.mod_name+'.dll';
+      dl_msg:=FZTranslationMgr.Get().Translate('fz_mod_downloading');
+      err_msg:=FZTranslationMgr.Get().Translate('fz_already_has_download');
+
+      moddllinfo.fileinfo.filename:=PAnsiChar(filename);
+      moddllinfo.fileinfo.url:=PAnsiChar(dat.mod_link);
+      moddllinfo.fileinfo.crc32:=dat.mod_crc32;
+      moddllinfo.fileinfo.progress_msg:=PAnsiChar(dl_msg);
+      moddllinfo.fileinfo.error_already_has_dl_msg:=PAnsiChar(err_msg);
+      moddllinfo.fileinfo.compression:=FZDownloadMgr.GetCompressionTypeByIndex(dat.mod_compression_type);
+      moddllinfo.procname:='ModLoad';
+      moddllinfo.procarg:=PAnsiChar(dat.mod_name);
+      moddllinfo.dsign:=PAnsiChar(dat.mod_dsign);
+
+      moddllinfo.is_reconnect_needed:=dat.mod_is_reconnect_needed;
+      moddllinfo.reconnect_addr.ip:=PAnsiChar(dat.reconnect_ip);
+      moddllinfo.reconnect_addr.port:=dat.reconnect_port;
+
+      if length(dat.mod_dsign)>0 then begin
+        FZLogMgr.Get.Write('Send MODLOAD packet for '+dat.mod_name, FZ_LOG_INFO);
+        SendSysMessage(@ProcessClientModDll, @moddllinfo, @SysMsg_SendCallback ,@userdata);
+      end else begin
+        FZLogMgr.Get.Write('MOD_DSIGN parameter not specified!'+dat.mod_name, FZ_LOG_ERROR);
+      end;
+    end;
 
     GetMapStatus(mapname, mapver, maplink);
     if (length(mapname)=0) or (length(mapver)=0) then exit;
@@ -776,7 +804,7 @@ begin
       end;
     end;
 
-    // TODO: отправл€ть при загрузке
+    // TODO: отправл€ть при загрузке клиента, а не при коннекте (минимизаци€ лагов)
     if dat.enable_maplist_sync then begin
       ExportMapListToClient(@srv.base_IPureServer, cl.ID, srv.game.base_game_GameState.m_type);
     end;

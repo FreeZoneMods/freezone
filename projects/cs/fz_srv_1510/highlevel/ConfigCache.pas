@@ -48,14 +48,11 @@ FZCacheData = record
   reconnect_port:cardinal;
   mod_name:string;
   mod_link:string;
-  mod_CRC32:cardinal;
-  mod_xml:string;
-  mod_team1_color:cardinal;
-  mod_team2_color:cardinal;
-  mod_chat_team1:string;
-  mod_chat_team2:string;
-  mod_patch_butcher:boolean;
-  mod_change_team_color:boolean;
+  mod_crc32:cardinal;
+  mod_dsign:string;
+  mod_compression_type:cardinal;
+  mod_is_reconnect_needed:boolean;
+
   allow_russian_nicknames:boolean;
   hit_statistics_mode:cardinal;
   enable_maplist_sync:boolean;
@@ -189,21 +186,12 @@ begin
 
   if not FZConfigMgr.Get.GetData('mod_crc32', tmp) then tmp:='0';
   self._data.mod_crc32:=FZCommonHelper.HexToInt(tmp);
-
+  self._data.mod_compression_type:=FZConfigMgr.Get.GetInt('mod_compression_type', 0);
   if not FZConfigMgr.Get.GetData('mod_name', self._data.mod_name) then self._data.mod_name:='';
   if not FZConfigMgr.Get.GetData('mod_link', self._data.mod_link) then self._data.mod_link:='';
-  if not FZConfigMgr.Get.GetData('mod_xml', self._data.mod_xml) then self._data.mod_xml:='';
-  self._data.mod_patch_butcher:=FZConfigMgr.Get.GetBool('mod_patch_butcher', true);
+  if not FZConfigMgr.Get.GetData('mod_dsign', self._data.mod_dsign) then self._data.mod_dsign:='';
 
-  if not FZConfigMgr.Get.GetData('mod_team1_color', tmp) then tmp:='0';
-  self._data.mod_team1_color:=FZCommonHelper.HexToInt(tmp);
-  if not FZConfigMgr.Get.GetData('mod_team2_color', tmp) then tmp:='0';
-  self._data.mod_team2_color:=FZCommonHelper.HexToInt(tmp);
-
-
-  self._data.mod_change_team_color:=FZConfigMgr.Get.GetBool('mod_change_team_color', true);
-  if not FZConfigMgr.Get.GetData('mod_chat_team1', self._data.mod_chat_team1) then self._data.mod_chat_team1:='';
-  if not FZConfigMgr.Get.GetData('mod_chat_team2', self._data.mod_chat_team2) then self._data.mod_chat_team2:='';
+  self._data.mod_is_reconnect_needed:=FZConfigMgr.Get.GetBool('mod_is_reconnect_needed', false);
 
   self._data.allow_russian_nicknames:=FZConfigMgr.Get.GetBool('allow_russian_nicknames', false);
   self._data.hit_statistics_mode:=FZConfigMgr.Get.GetInt('hit_statistics_mode', 0);

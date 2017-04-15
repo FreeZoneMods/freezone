@@ -18,6 +18,8 @@ type
    destructor Destroy(); override;
    function GetCompressionType(map:string; ver:string):FZArchiveCompressionType;
    function IsSaceFakeNeeded(map: string; ver: string):boolean;
+
+   class function GetCompressionTypeByIndex(i:longint):FZArchiveCompressionType;
   end;
 
 function Init():boolean; stdcall;
@@ -99,12 +101,7 @@ var
 begin
   s:='%compression_'+map+'_'+ver+'%';
   s:=self.GetString(s,'');
-
-  case strtointdef(s, 0) of
-    1: result:=LZO_COMPRESSION;
-  else
-    result:=NO_COMPRESSION
-  end;
+  result:=GetCompressionTypeByIndex(strtointdef(s, 0));
 end;
 
 function FZDownloadMgr.IsSaceFakeNeeded(map: string; ver: string): boolean;
@@ -114,6 +111,15 @@ begin
   s:='%sacedldisable_'+map+'_'+ver+'%';
   s:=self.GetString(s,'');
   result:=(strtointdef(s, 0) <> 0);
+end;
+
+class function FZDownloadMgr.GetCompressionTypeByIndex(i: longint): FZArchiveCompressionType;
+begin
+  case i of
+    1: result:=LZO_COMPRESSION;
+  else
+    result:=NO_COMPRESSION
+  end;
 end;
 
 end.

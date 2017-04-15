@@ -33,6 +33,16 @@ FZMapInfo = record
 end;
 pFZMapInfo = ^FZMapInfo;
 
+FZDllDownloadInfo = record
+  fileinfo:FZFileDownloadInfo;
+  procname:PAnsiChar;
+  procarg:PAnsiChar;
+  dsign:PAnsiChar;
+  reconnect_addr:FZReconnectInetAddrData;
+  is_reconnect_needed:boolean;
+end;
+pFZDllDownloadInfo = ^FZDllDownloadInfo;
+
 FZClientVotingElement = record
   mapname:PAnsiChar;
   mapver:PAnsiChar;
@@ -67,5 +77,8 @@ external 'sysmsgs.dll' name 'FZSysMsgsProcessClientMap';
 
 procedure ProcessClientVotingMaplist(var buf:string; addrs:pFZClAddrDescription; args:pointer=nil); stdcall;
 external 'sysmsgs.dll' name 'FZSysMsgsProcessClientVotingMaplist';
+procedure ProcessClientModDll(var buf:string; addrs:pFZClAddrDescription; args:pointer=nil); stdcall;
+external 'sysmsgs.dll' name 'FZSysMsgsProcessClientModDll';
+
 implementation
 end.

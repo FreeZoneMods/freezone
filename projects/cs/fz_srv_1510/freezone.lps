@@ -8,8 +8,9 @@
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
         <TopLine Value="83"/>
-        <CursorPos X="58" Y="101"/>
+        <CursorPos X="25" Y="89"/>
         <UsageCount Value="202"/>
         <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
@@ -458,10 +459,9 @@
       <Unit48>
         <Filename Value="highlevel\ConfigCache.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="1"/>
+        <EditorIndex Value="-1"/>
         <CursorPos X="39" Y="156"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit48>
       <Unit49>
@@ -516,11 +516,9 @@
       <Unit54>
         <Filename Value="highlevel\Emergency.pas"/>
         <IsPartOfProject Value="True"/>
-        <IsVisibleTab Value="True"/>
-        <EditorIndex Value="3"/>
-        <CursorPos X="10" Y="5"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="56" Y="9"/>
         <UsageCount Value="202"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit54>
       <Unit55>
@@ -696,11 +694,10 @@
       <Unit74>
         <Filename Value="highlevel\appinit.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="30"/>
         <CursorPos X="19" Y="51"/>
         <UsageCount Value="193"/>
-        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit74>
       <Unit75>
@@ -751,15 +748,11 @@
       <Define0 Value="RELEASE_BUILD"/>
       <Define1 Value="REVO"/>
     </OtherDefines>
-    <JumpHistory Count="2" HistoryIndex="1">
+    <JumpHistory Count="1">
       <Position1>
         <Filename Value="freezone.lpr"/>
         <Caret Line="122" Column="151" TopLine="106"/>
       </Position1>
-      <Position2>
-        <Filename Value="highlevel\appinit.pas"/>
-        <Caret Line="51" Column="19" TopLine="30"/>
-      </Position2>
     </JumpHistory>
   </ProjectSession>
   <Debugging>
