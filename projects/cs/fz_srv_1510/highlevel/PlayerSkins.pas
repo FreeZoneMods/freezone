@@ -7,7 +7,7 @@ function OnSetPlayerSkin(e:pCSE_Abstract; team:cardinal; skin:cardinal): boolean
 function OnActorItemSpawn_ChangeItemSection(game:pgame_sv_mp; actorID:word; N:PChar; Addons:byte):PChar; stdcall;
 
 implementation
-uses ConfigMgr, SysUtils, dynamic_caster, BaseDefs, LogMgr, Clients, ConfigCache;
+uses ConfigMgr, SysUtils, Clients, ConfigCache;
 
 function OnSetPlayerSkin(e:pCSE_Abstract; team:cardinal; skin:cardinal): boolean; stdcall;
 var

@@ -2,9 +2,13 @@ unit CommonHelper;
 {$mode delphi}
 interface
 
-uses strutils, sysutils, windows;
+uses sysutils, windows;
 
-type FZCommonHelper = class
+type
+
+{ FZCommonHelper }
+
+ FZCommonHelper = class
   public
     class function GetGameTickCount():cardinal;
     class function GetEnglishUppercaseChar(low:char):char;
@@ -17,8 +21,9 @@ type FZCommonHelper = class
     class function GetCurDate():string;
     class function GetVolSN():string;
     class function HexToInt(hex:string; default:cardinal=0):cardinal;
-
+    class function TryHexToInt(hex:string; var out_val:cardinal):boolean;
 end;
+
 const
 fz_protocol_ver:string='FZ3.0';
 
@@ -75,6 +80,8 @@ var
   VolumeSerialNo : DWord;
   MaxComponentLength, FileSystemFlags : dword;
 begin
+  MaxComponentLength:=0;
+  FileSystemFlags:=0;
   GetVolumeInformation(nil,
       VolumeName,
       MAX_PATH,
@@ -100,6 +107,7 @@ class function FZCommonHelper.GetCurTime():string;
 var
   st:_SYSTEMTIME;
 begin
+  FillMemory(@st, sizeof(st), 0);
   GetLocalTime(st);
   if st.wHour<10 then result:='0' else result:='';
   result:=result+inttostr(st.wHour)+'-';
@@ -113,6 +121,7 @@ class function FZCommonHelper.GetCurDate():string;
 var
   st:_SYSTEMTIME;
 begin
+  FillMemory(@st, sizeof(st), 0);
   GetLocalTime(st);
   if st.wDay<10 then result:='0' else result:='';
   result:=result+inttostr(st.wDay)+'.';
@@ -238,13 +247,28 @@ end;
 
 class function FZCommonHelper.HexToInt(hex: string; default:cardinal=0): cardinal;
 var
-  i, r : integer;
+  i: integer; //err code
+  r: Int64;   //result
 begin
   val('$'+trim(hex),r, i);
   if i<>0 then
     result := default
   else
-    result := r;
+    result := cardinal(r);
+end;
+
+class function FZCommonHelper.TryHexToInt(hex: string; var out_val: cardinal): boolean;
+var
+  i: integer; //err code
+  r: Int64;   //result
+begin
+  val('$'+trim(hex),r, i);
+  if i<>0 then begin
+    result := false;
+  end else begin
+    result := true;
+    out_val:=cardinal(r);
+  end;
 end;
 
 end.

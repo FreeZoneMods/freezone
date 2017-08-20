@@ -129,7 +129,7 @@ begin
 
     _AssembleWrapper(@code[0], args);
 
-    result.VInteger:=srcKit.LowLevelCall(@code[0]);
+    result.VInteger:=integer(srcKit.LowLevelCall(@code[0]));
 
     if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': result='+inttostr(result.VInteger));
   finally
@@ -182,8 +182,17 @@ var
 begin
   for i:= high(args) downto low(args) do begin
     if args[i].VType=vtString then begin
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(cardinal(PChar(args[i].VString)), 8), false);
       pos:=srcKit.WritePushDword(pos, cardinal(PChar(args[i].VString)))
+    end else if args[i].VType = vtBoolean then begin
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': bool arg #'+inttostr(i)+' is '+booltostr(args[i].VBoolean, true), false);
+      if (args[i].VBoolean) then begin
+        pos:=srcKit.WritePushDword(pos, 1);
+      end else begin
+        pos:=srcKit.WritePushDword(pos, 0);
+      end;
     end else begin
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg #'+inttostr(i)+' is '+inttohex(cardinal(args[i].VInteger), 8), false);
       pos:=srcKit.WritePushDword(pos, args[i].VInteger)
     end;
   end;
@@ -274,8 +283,17 @@ var
 begin
   for i:= high(args) downto low(args)+1 do begin
     if args[i].VType=vtString then begin
-      pos:=srcKit.WritePushDword(pos, cardinal(PChar(args[i].VString)))
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(cardinal(PChar(args[i].VString)), 8), false);
+      pos:=srcKit.WritePushDword(pos, cardinal(PChar(args[i].VString)));
+    end else if args[i].VType = vtBoolean then begin
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': bool arg #'+inttostr(i)+' is '+booltostr(args[i].VBoolean, true), false);
+      if (args[i].VBoolean) then begin
+        pos:=srcKit.WritePushDword(pos, 1);
+      end else begin
+        pos:=srcKit.WritePushDword(pos, 0);
+      end;
     end else begin
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg #'+inttostr(i)+' is '+inttohex(cardinal(args[i].VInteger), 8), false);
       pos:=srcKit.WritePushDword(pos, args[i].VInteger)
     end;
   end;
@@ -300,17 +318,31 @@ end;
 
 function srcESICallFunctionWEAXArg._ArgsInit(args: array of const;
   pos: pointer): pointer;
+var
+  val:cardinal;
 begin
-
   if args[low(args)+1].VType=vtString then begin
     (PByte(pos))^:=MOV_EAX_DWORD;
     pos:=pointer(cardinal(pos)+1);
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg is '+inttohex(cardinal(PChar(args[low(args)+1].VString)), 8), false);
     (PCardinal(pos))^:=cardinal(PChar(args[low(args)+1].VString));
     pos:=pointer(cardinal(pos)+4);
   end else begin
+    if args[low(args)+1].VType=vtBoolean then begin
+      if args[low(args)+1].VBoolean then begin
+        val:=1;
+      end else begin
+        val:=0;
+      end;
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': bool arg is '+booltostr(args[low(args)+1].VBoolean), false);
+    end else begin
+      val:=args[low(args)+1].VInteger;
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg is '+inttohex(val, 8), false);
+    end;
+
     (PByte(pos))^:=MOV_EAX_DWORD;
     pos:=pointer(cardinal(pos)+1);
-    (PCardinal(pos))^:=args[low(args)+1].VInteger;
+    (PCardinal(pos))^:=val;
     pos:=pointer(cardinal(pos)+4);
   end;
 

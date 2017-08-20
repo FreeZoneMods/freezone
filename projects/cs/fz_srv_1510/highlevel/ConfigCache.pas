@@ -42,11 +42,11 @@ FZCacheData = record
   ping_warnings_max_interval:cardinal;
   auto_update_rate:boolean;
   can_player_change_name:boolean;
-  enable_map_downloader:boolean;
-  clean_download_mode:boolean;
+  enable_map_downloader:boolean;  
   reconnect_ip:string;
   reconnect_port:cardinal;
   mod_name:string;
+  mod_params:string;
   mod_link:string;
   mod_crc32:cardinal;
   mod_dsign:string;
@@ -181,13 +181,13 @@ begin
   self._data.enable_map_downloader:=FZConfigMgr.Get.GetBool('enable_map_downloader', false);
   self._data.enable_maplist_sync:=FZConfigMgr.Get.GetBool('enable_maplist_sync', false);
   if not FZConfigMgr.Get.GetData('reconnect_ip', self._data.reconnect_ip) then self._data.reconnect_ip:='';
-  self._data.reconnect_port:=FZConfigMgr.Get.GetInt('reconnect_port', 0);
-  self._data.clean_download_mode:=FZConfigMgr.Get.GetBool('clean_download_mode', false);
+  self._data.reconnect_port:=FZConfigMgr.Get.GetInt('reconnect_port', 0);  
 
   if not FZConfigMgr.Get.GetData('mod_crc32', tmp) then tmp:='0';
   self._data.mod_crc32:=FZCommonHelper.HexToInt(tmp);
   self._data.mod_compression_type:=FZConfigMgr.Get.GetInt('mod_compression_type', 0);
   if not FZConfigMgr.Get.GetData('mod_name', self._data.mod_name) then self._data.mod_name:='';
+  if not FZConfigMgr.Get.GetData('mod_params', self._data.mod_params) then self._data.mod_params:='';
   if not FZConfigMgr.Get.GetData('mod_link', self._data.mod_link) then self._data.mod_link:='';
   if not FZConfigMgr.Get.GetData('mod_dsign', self._data.mod_dsign) then self._data.mod_dsign:='';
 

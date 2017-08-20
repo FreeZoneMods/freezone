@@ -5,7 +5,7 @@ interface
 function Init():boolean; stdcall;
 
 implementation
-uses ShellAPI, Windows, Console, Sysutils, ConfigMgr;
+uses Windows, Console, Sysutils;
 
 procedure reboot_cmd_info(arg:PChar); stdcall;
 begin

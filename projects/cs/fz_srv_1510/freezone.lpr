@@ -23,7 +23,6 @@ uses
   fz_injections in 'tools\src_data\fz_injections.pas',
 
 
-  dynamic_caster in 'tools\src_data\dynamic_caster.pas',
 
   CommonHelper in 'shared\CommonHelper.pas',
 

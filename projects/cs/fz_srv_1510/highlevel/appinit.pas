@@ -36,6 +36,7 @@ begin
 {$ENDIF}
 
   FZLogMgr.Get.Write('Build date: ' + {$INCLUDE %DATE}, FZ_LOG_IMPORTANT_INFO);
+  FZLogMgr.Get.Write('Sysmsgs module info: ' + sysmsgs.GetModuleVer(), FZ_LOG_IMPORTANT_INFO);
 
   tp:=xrGameDllType();
   if tp = XRGAME_CL_1510 then begin

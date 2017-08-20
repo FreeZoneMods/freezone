@@ -4,7 +4,7 @@ interface
 function Init():boolean; stdcall;
 
 implementation
-uses srcBase, basedefs, GameSpy, srcInjections, Voting, Console, BasicProtection, Chat, Players, ConfigMgr, LogMgr, Bans, PacketFilter, PlayerSkins, UpdateRate, ControlGUI, Servers, ServerStuff, misc_stuff, global_functions, SACE_hacks;
+uses srcBase, basedefs, GameSpy, srcInjections, Voting, Console, BasicProtection, Chat, Players, ConfigMgr, LogMgr, Bans, PacketFilter, PlayerSkins, UpdateRate, ControlGUI, Servers, ServerStuff, misc_stuff, SACE_hacks, xrstrings;
 
 function PatchBanSystem():boolean;
 begin
@@ -13,7 +13,7 @@ begin
 	//P->r_stringZ	(secondary_cdkey);
   //Если второе (хеш от нижнего регистра) и ладно, пусть будет
   //То вот первый у нас дублируется с полученным и проверенным геймспаем во время CHALLENGE_RESPOND
-  //Клиент тут может нам отослать все, что ему заблагорассудится, и чего не окажется в банлисте... непорядок.
+  //[bug]Клиент тут может нам отослать все, что ему заблагорассудится, и чего не окажется в банлисте... непорядок.
   //делаем так, чтобы в xrCL->m_cdkey_digest оказался полученный в CHALLENGE_RESPOND хеш
   if xrGameDllType()=XRGAME_SV_1510 then begin
     srcBaseInjection.Create(pointer(xrGame+$307AC7), @xrServer__ProcessClientDigest_ProtectFromKeyChange, 5,[F_RMEM+F_PUSH_EBP+$0C], false, false);
@@ -262,8 +262,6 @@ begin
 end;
 
 function Init():boolean; stdcall;
-var
-  addr:pcardinal;
 begin
 
   result:=false;
@@ -293,7 +291,7 @@ begin
   end;
 
   //переделка названия логфайла
-  RenameGameLog(PChar(xrCore+$3F438), 520);
+  RenameGameLog(PChar(xrCore+$3F438), sizeof(string_path));
 
   if not PatchVoting() then exit;
   if not PatchConsole() then exit;

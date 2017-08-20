@@ -1,7 +1,7 @@
 unit Gametypes;
 {$mode delphi}
 interface
-uses BaseClasses, Servers, Packets, Items, xrstrings, Vector, Players, srcCalls;
+uses BaseClasses, Servers, Packets, Items, xrstrings, Vector, srcCalls;
 function Init():boolean; stdcall;
 
 type

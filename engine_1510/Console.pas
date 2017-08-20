@@ -144,6 +144,8 @@ begin
 end;
 
 function Init():boolean; stdcall;
+var
+  ptr:pointer;
 begin
   if xrGameDllType()=XRGAME_SV_1510 then begin
     c_sv_timelimit:=pointer(xrGame+$5EB0A0);
@@ -161,12 +163,20 @@ begin
     last_printed_id:=pointer(xrGame+$6069c4);
   end;
   c_sv_dedicated_server_update_rate:=pointer(xrEngine+$91144);
-  g_ppConsole:=pointer(xrEngine+$909f4);
+  g_ppConsole:= GetProcAddress(xrEngine, '?Console@@3PAVCConsole@@A');
+  if g_ppConsole = nil then exit;
 
+  ptr:= GetProcAddress(xrEngine, '?ExecuteCommand@CConsole@@QAEXPBD_N@Z');
+  if ptr = nil then exit;
+  CConsole__ExecuteCommand:=srcECXCallFunction.Create(ptr,[vtPointer, vtPChar, vtBoolean], 'ExecuteCommand', 'CConsole');
 
-  CConsole__ExecuteCommand:=srcECXCallFunction.Create(pointer(xrEngine+$41490),[vtPointer, vtPChar, vtBoolean], 'ExecuteCommand', 'CConsole');
-  CConsole__AddCommand:=srcECXCallFunction.Create(pointer(xrEngine+$412D0),[vtPointer, vtPointer], 'AddCommand', 'CConsole');
-  CCC_Integer__CCC_Integer:=srcECXCallFunction.Create(pointer(xrEngine+$7900),[vtPointer, vtPChar, vtPointer, vtInteger, vtInteger], 'CCC_Integer', 'CCC_Integer');
+  ptr:= GetProcAddress(xrEngine, '?AddCommand@CConsole@@QAEXPAVIConsole_Command@@@Z');
+  if ptr = nil then exit;
+  CConsole__AddCommand:=srcECXCallFunction.Create(ptr,[vtPointer, vtPointer], 'AddCommand', 'CConsole');
+
+  ptr:= GetProcAddress(xrEngine, '??0CCC_Integer@@QAE@PBDPAHHH@Z');
+  if ptr = nil then exit;
+  CCC_Integer__CCC_Integer:=srcECXCallFunction.Create(ptr,[vtPointer, vtPChar, vtPointer, vtInteger, vtInteger], 'CCC_Integer', 'CCC_Integer');
 
   result:=true;
 end;

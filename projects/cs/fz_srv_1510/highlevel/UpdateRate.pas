@@ -10,7 +10,7 @@ function xrServer__Process_event_change_shooting_packets_proority():cardinal;std
 function Init():boolean;
 
 implementation
-uses LogMgr, sysutils, Players, dynamic_caster, basedefs, ConfigCache, Packets, Console, ConfigMgr, math;
+uses sysutils, Players, dynamic_caster, basedefs, ConfigCache, Packets, Console;
 
 
 var

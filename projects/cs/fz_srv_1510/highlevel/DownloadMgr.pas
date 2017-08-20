@@ -117,6 +117,7 @@ class function FZDownloadMgr.GetCompressionTypeByIndex(i: longint): FZArchiveCom
 begin
   case i of
     1: result:=LZO_COMPRESSION;
+    2: result:=CAB_COMPRESSION;
   else
     result:=NO_COMPRESSION
   end;

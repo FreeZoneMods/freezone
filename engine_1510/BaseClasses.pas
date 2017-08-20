@@ -46,6 +46,26 @@ pureFrame = packed record
   vftable:pointer;
 end;
 
+pureAppStart = packed record
+  vftable:pointer;
+end;
+
+pureAppEnd = packed record
+  vftable:pointer;
+end;
+
+pureAppActivate = packed record
+  vftable:pointer;
+end;
+
+pureAppDeactivate = packed record
+  vftable:pointer;
+end;
+
+pureDeviceReset = packed record
+  vftable:pointer;
+end;
+
 IEventReceiver = packed record
   vftable:pointer;
 end;

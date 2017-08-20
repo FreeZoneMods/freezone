@@ -12,7 +12,7 @@ function OnAuthSend(cl:pgsclient_t):boolean; stdcall;
 function IsSameCdKeyValidated():boolean; stdcall;
 
 implementation
-uses LogMgr, sysutils, strings, TranslationMgr, ConfigCache, ConfigMgr, ServerStuff;
+uses sysutils, TranslationMgr, ConfigCache, ServerStuff;
 
 function IsClientAuthNotRequired:boolean; stdcall;
 begin

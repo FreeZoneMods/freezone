@@ -36,7 +36,7 @@ const
   XRGAME_UNKNOWN:cardinal = $FFFFFFFF;
 
 implementation
-uses Windows, global_functions, LogMgr, ConfigMgr, Console, fz_injections, Packets, BaseClasses, Clients, Time, xrstrings, PureServer, CSE, Vector, MatVectors, GameMessages, misc_stuff, Servers, Items, Games, Banned, Objects, PacketFilter, Gametypes, Bans, ControlGUI, SubnetBanList, ConfigCache, Emergency, SACE_Interface, Level, ChatCommands, Censor, Chat, UpdateRate, DownloadMgr, TranslationMgr, ServerStuff, dynamic_caster, sysmsgs, Compressor, SACE_Hacks;
+uses Windows;
 
 function xrGameDllType():cardinal;
 var

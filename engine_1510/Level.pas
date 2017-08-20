@@ -215,11 +215,11 @@ function Init():boolean; stdcall;
 
 implementation
 
-uses basedefs;
+uses basedefs, windows;
 function Init():boolean; stdcall;
 begin
-  g_ppGameLevel:=pointer(xrEngine+$909C8);
-  result:=true;
+  g_ppGameLevel:=GetProcAddress(xrEngine, '?g_pGameLevel@@3PAVIGame_Level@@A');
+  result:=(g_ppGameLevel<>nil);
 end;
 
 end.

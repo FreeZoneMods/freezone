@@ -79,6 +79,9 @@ procedure xrServer__SendConnectResult(this:pxrServer; CL:pIClient; res:byte; res
 
 function CheckForClientExist(srv:pxrServer; cl:pIClient):boolean; stdcall; //doesn't enter critical section! You MUST enter it manually before calls!
 
+const
+  xrServer__ErrNoErr:cardinal=2;
+
 implementation
 uses basedefs, Packets, Level, dynamic_caster;
 
@@ -123,7 +126,7 @@ end;
 
 function CheckForClientExist(srv:pxrServer; cl:pIClient):boolean; stdcall;
 begin
-  CheckForClientOnline_LL(@srv.base_IPureServer.net_players, cl);
+  result:=CheckForClientOnline_LL(@srv.base_IPureServer.net_players, cl);
 end;
 
 function CurPlayersCount:cardinal; stdcall;

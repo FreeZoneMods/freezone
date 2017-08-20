@@ -44,7 +44,7 @@ pWeaponUsageStatistic=^WeaponUsageStatistic;
 
 game_cl_GameState = packed record
   base_game_GameState:game_GameState;
-  base_ISheduled:IScheduled;
+  base_IScheduled:IScheduled;
   m_game_type_name:shared_str;
   m_game_ui_custom:pCUIGameCustom;
   m_u16VotingEnabled:word;

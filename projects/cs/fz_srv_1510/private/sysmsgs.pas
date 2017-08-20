@@ -7,7 +7,7 @@ pFZClAddrDescription = pointer;
 FZSysmsgPayloadWriter = procedure(var buf:string; addrs:pFZClAddrDescription; args:pointer=nil); stdcall;
 FZSysMsgSender = procedure(msg:pointer; len:cardinal; userdata:pointer); stdcall;
 
-FZArchiveCompressionType = (NO_COMPRESSION, LZO_COMPRESSION);
+FZArchiveCompressionType = (NO_COMPRESSION, LZO_COMPRESSION, CAB_COMPRESSION);
 
 FZFileDownloadInfo = record
   filename:PAnsiChar;
@@ -36,7 +36,8 @@ pFZMapInfo = ^FZMapInfo;
 FZDllDownloadInfo = record
   fileinfo:FZFileDownloadInfo;
   procname:PAnsiChar;
-  procarg:PAnsiChar;
+  procarg1:PAnsiChar;
+  procarg2:PAnsiChar; 
   dsign:PAnsiChar;
   reconnect_addr:FZReconnectInetAddrData;
   is_reconnect_needed:boolean;
@@ -68,6 +69,9 @@ FZDownloadFinishCallback = function (addrs:pFZClAddrDescription; reconnect_addr:
 
 function Init():boolean; stdcall;
 external 'sysmsgs.dll' name 'FZSysMsgsInit';
+
+function GetModuleVer():PChar; stdcall; 
+external 'sysmsgs.dll' name 'FZSysMsgsGetModuleVer';
 
 procedure SendSysMessage(payload:FZSysmsgPayloadWriter; pay_args:pointer; send_callback:FZSysMsgSender; userdata:pointer); stdcall;
 external 'sysmsgs.dll' name 'FZSysMsgsSendSysMessage';

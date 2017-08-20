@@ -742,7 +742,7 @@ begin
     dat:=FZConfigCache.Get.GetDataCopy();
 
     if length(dat.mod_name)>0 then begin
-      filename:=dat.mod_name+'.dll';
+      filename:=dat.mod_name+'.mod';
       dl_msg:=FZTranslationMgr.Get().Translate('fz_mod_downloading');
       err_msg:=FZTranslationMgr.Get().Translate('fz_already_has_download');
 
@@ -753,7 +753,8 @@ begin
       moddllinfo.fileinfo.error_already_has_dl_msg:=PAnsiChar(err_msg);
       moddllinfo.fileinfo.compression:=FZDownloadMgr.GetCompressionTypeByIndex(dat.mod_compression_type);
       moddllinfo.procname:='ModLoad';
-      moddllinfo.procarg:=PAnsiChar(dat.mod_name);
+      moddllinfo.procarg1:=PAnsiChar(dat.mod_name);
+      moddllinfo.procarg2:=PAnsiChar(dat.mod_params);
       moddllinfo.dsign:=PAnsiChar(dat.mod_dsign);
 
       moddllinfo.is_reconnect_needed:=dat.mod_is_reconnect_needed;

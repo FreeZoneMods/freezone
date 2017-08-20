@@ -27,7 +27,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="G:\stalker\stcs\freezone\bin\dedicated\freezone"/>
+            <Filename Value="..\..\..\release\cs_1510\bins\freezone"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -114,7 +114,7 @@
       <local>
         <FormatVersion Value="1"/>
         <HostApplicationFilename Value="G:\stalker\stcs\freezone\bin\dedicated\xrEngine.exe"/>
-        <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_2012cs/tdm/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
+        <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_pool/tdm/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
         <WorkingDirectory Value="G:\stalker\stcs\freezone\bin"/>
       </local>
     </RunParams>
@@ -126,7 +126,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="77">
+    <Units Count="76">
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -395,50 +395,45 @@
         <IsPartOfProject Value="True"/>
       </Unit65>
       <Unit66>
-        <Filename Value="lowlevel\basedefs.pas"/>
+        <Filename Value="lowlevel\Compressor.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit66>
       <Unit67>
-        <Filename Value="lowlevel\Compressor.pas"/>
+        <Filename Value="lowlevel\ControllerParams.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit67>
       <Unit68>
-        <Filename Value="lowlevel\ControllerParams.pas"/>
+        <Filename Value="lowlevel\fz_injections.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit68>
       <Unit69>
-        <Filename Value="lowlevel\dynamic_caster.pas"/>
+        <Filename Value="lowlevel\global_functions.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit69>
       <Unit70>
-        <Filename Value="lowlevel\exploits_orig.pas"/>
+        <Filename Value="highlevel\SACE_hacks.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="exploits"/>
       </Unit70>
       <Unit71>
-        <Filename Value="lowlevel\fz_injections.pas"/>
+        <Filename Value="highlevel\appinit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit71>
       <Unit72>
-        <Filename Value="lowlevel\global_functions.pas"/>
+        <Filename Value="..\..\..\engine_1510\MapList.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit72>
       <Unit73>
-        <Filename Value="highlevel\SACE_hacks.pas"/>
+        <Filename Value="private\sysmsgs.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit73>
       <Unit74>
-        <Filename Value="highlevel\appinit.pas"/>
+        <Filename Value="..\..\..\engine_1510\basedefs.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit74>
       <Unit75>
-        <Filename Value="..\..\..\engine_1510\MapList.pas"/>
+        <Filename Value="..\..\..\engine_1510\dynamic_caster.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit75>
-      <Unit76>
-        <Filename Value="private\sysmsgs.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit76>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
