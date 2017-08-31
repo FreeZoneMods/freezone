@@ -110,7 +110,7 @@ var
 begin
   s:='%sacedldisable_'+map+'_'+ver+'%';
   s:=self.GetString(s,'');
-  result:=(strtointdef(s, 0) <> 0);
+  result:=(strtointdef(s, 1) <> 0);
 end;
 
 class function FZDownloadMgr.GetCompressionTypeByIndex(i: longint): FZArchiveCompressionType;
