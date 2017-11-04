@@ -757,7 +757,11 @@ begin
       moddllinfo.procarg2:=PAnsiChar(dat.mod_params);
       moddllinfo.dsign:=PAnsiChar(dat.mod_dsign);
 
-      moddllinfo.is_reconnect_needed:=dat.mod_is_reconnect_needed;
+      if dat.mod_is_reconnect_needed then begin
+        moddllinfo.is_reconnect_needed:=1;
+      end else begin
+        moddllinfo.is_reconnect_needed:=0;
+      end;
       moddllinfo.reconnect_addr.ip:=PAnsiChar(dat.reconnect_ip);
       moddllinfo.reconnect_addr.port:=dat.reconnect_port;
 
