@@ -72,6 +72,7 @@ ip_address = packed record
   a3:byte;
   a4:byte;
 end;
+pip_address = ^ip_address;
 
 NET_Buffer = packed record
   data: array[0..16383] of Byte;
@@ -122,7 +123,10 @@ procedure InvalidatePacket(p:pNET_Packet); stdcall;
 
 var
   pCompressor:pNET_Compressor;
-  Decompress:srcECXCallFunction;
+  NET_Compressor__Decompress:srcECXCallFunction;
+  NET_Packet__r_stringZ:srcECXCallFunction;
+  NET_Packet__w_u8:srcECXCallFunction;
+  NET_Packet__r_u8:srcECXCallFunction;
 
 const
   M_UPDATE: word = 0;
@@ -143,6 +147,9 @@ const
   M_SV_DIGEST:word=44;
   M_REMOTE_CONTROL_CMD:word=41;//<------------------------------------!!!
   M_FILE_TRANSFER:word=45;
+  M_SECURE_MESSAGE:word=48;
+
+  M_FZ_DIGEST:word=$1300;
 
 
   GAME_EVENT_MAKE_DATA:cardinal=42;
@@ -167,7 +174,7 @@ const
   DPNSEND_IMMEDIATELLY:cardinal=$100;
 
 implementation
-uses sysutils, srcBase, basedefs;
+uses sysutils, srcBase, basedefs, windows;
 
 function ip_address_to_str(a:ip_address):string; stdcall;
 begin
@@ -175,9 +182,24 @@ begin
 end;
 
 function Init():boolean; stdcall;
+var
+  ptr:pointer;
 begin
   pCompressor:=pointer(xrNetServer+$14630);
-  Decompress:=srcECXCallFunction.Create(pointer(xrNetServer+$80E8),[vtPointer, vtInteger, vtPointer, vtInteger], 'Decompress', 'NET_Compressor');
+
+  ptr:=GetProcAddress(xrNetServer, '?Decompress@NET_Compressor@@QAEGPAEABI01@Z');
+  NET_Compressor__Decompress:=srcECXCallFunction.Create(ptr,[vtPointer, vtInteger, vtPointer, vtInteger], 'Decompress', 'NET_Compressor');
+
+  ptr:=GetProcAddress(xrCore, '?r_stringZ@NET_Packet@@QAEXAAVshared_str@@@Z');
+  NET_Packet__r_stringZ:=srcECXCallFunction.Create(ptr, [vtPointer, vtPointer], 'r_stringZ', 'NET_Packet');
+
+  //Write arg (uint)
+  ptr:=GetProcAddress(xrCore, '?w_u8@NET_Packet@@QAEXE@Z');
+  NET_Packet__w_u8:=srcECXCallFunction.Create(ptr, [vtPointer, vtInteger], 'w_u8', 'NET_Packet' );
+
+  //read to arg (puint)
+  ptr:=GetProcAddress(xrCore, '?r_u8@NET_Packet@@QAEXAAE@Z');
+  NET_Packet__r_u8:=srcECXCallFunction.Create(ptr, [vtPointer, vtPointer], 'r_u8', 'NET_Packet');
 
   result:=true;
 end;

@@ -32,8 +32,6 @@ begin
 end;
 
 function Init():boolean; stdcall;
-var
-  addr:pointer;
 begin
   CLocatorApi__xr_FS:=pointer(xrCore+$BE718);
   CLocatorApi__update_path:=srcECXCallFunction.Create(pointer(xrCore+$128d0), [vtPointer, vtPChar, vtPChar, vtPChar], 'update_path', 'CLocatorAPI');
@@ -42,6 +40,7 @@ end;
 
 function Free():boolean; stdcall;
 begin
+  result:=true;
   //Functions will be deleted by framework
 end;
 

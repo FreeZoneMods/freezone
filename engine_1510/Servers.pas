@@ -72,8 +72,10 @@ var
   IPureServer__SendTo:srcECXCallFunction;
   IPureServer__SendTo_LL:srcECXCallFunction;
   virtual_IPureServer__DisconnectClient:srcVirtualECXCallFunction;
+  virtual_IPureServer__OnMessage:srcVirtualECXCallFunction;
   virtual_IPureServer__Flush_Clients_Buffers:srcVirtualECXCallFunction;
   CID_Generator__tfGetID:srcESICallFunctionWEAXArg;
+  xrServer__ID_to_entity:srcECXCallFunction;
 
 procedure xrServer__SendConnectResult(this:pxrServer; CL:pIClient; res:byte; res1:byte; ResultStr:PChar); stdcall;
 
@@ -200,17 +202,23 @@ function Init():boolean; stdcall;
 const
   IPureServer__DisconnectClient_index:cardinal = $40;
   IPureServer__Flush_Clients_Buffers_index:cardinal = $1C;
+  IPureServer__OnMessage_index:cardinal = $24;
 begin
  IPureServer__SendTo:=srcECXCallFunction.Create(pointer(xrNetServer+$B0E0), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger], 'SendTo', 'IPureServer'); ;
  IPureServer__SendTo_LL:=srcECXCallFunction.Create(pointer(xrNetServer+$AFF0), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger, vtInteger], 'SendTo_LL', 'IPureServer'); ; 
  virtual_IPureServer__DisconnectClient:=srcVirtualECXCallFunction.Create(IPureServer__DisconnectClient_index, [vtPointer, vtPointer, vtPChar], 'DisconnectClient','IPureServer');
  virtual_IPureServer__Flush_Clients_Buffers:=srcVirtualECXCallFunction.Create(IPureServer__Flush_Clients_Buffers_index, [vtPointer], 'Flush_Clients_Buffers','IPureServer');
+ virtual_IPureServer__OnMessage:=srcVirtualECXCallFunction.Create(IPureServer__OnMessage_index, [vtPointer, vtPointer, vtInteger], 'OnMessage', 'IPureServer' );
 
  if xrGameDllType()=XRGAME_SV_1510 then begin
    CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$5F370), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
+   xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2c6f20), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
  end else if xrGameDllType()=XRGAME_CL_1510 then begin
    CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$60F00), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
+   xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2dbf90), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
  end;
+
+
  result:=true;
 end;
 

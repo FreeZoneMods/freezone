@@ -147,6 +147,7 @@ function Init():boolean; stdcall;
 var
   ptr:pointer;
 begin
+  result:=false;
   if xrGameDllType()=XRGAME_SV_1510 then begin
     c_sv_timelimit:=pointer(xrGame+$5EB0A0);
     c_sv_fraglimit:=pointer(xrGame+$5EB0B8);

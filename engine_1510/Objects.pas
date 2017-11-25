@@ -22,7 +22,7 @@ end;
 
 CObjectSpace = packed record
   Lock:xrCriticalSection;
-  Static:CDB__MODEL;
+  m_static:CDB__MODEL;
   m_BoundingVolume:FBox3;
   xrc:xrXRC;
   r_temp:collide__rq_results;

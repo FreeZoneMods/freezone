@@ -56,7 +56,7 @@ CSE_Abstract = packed record
 end;
 
 pCSE_Abstract = ^CSE_Abstract;
-
+ppCSE_Abstract = ^pCSE_Abstract;
 
 
 CSE_Visual = packed record

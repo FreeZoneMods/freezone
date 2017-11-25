@@ -213,6 +213,7 @@ const
 
 var
   game_sv_mp__KillPlayer:srcECXCallFunction;
+  game_sv_mp__RejectGameItem:srcECXCallFunction;
   virtual_game_sv_mp__Player_AddMoney:srcVirtualECXCallFunction;
 
 const
@@ -225,8 +226,10 @@ function Init():boolean; stdcall;
 begin
   if xrGameDllType()=XRGAME_SV_1510 then begin
     game_sv_mp__KillPlayer:=srcECXCallFunction.Create(pointer(xrGame+$30ab90),[vtPointer, vtInteger, vtInteger], 'KillPlayer', 'game_sv_mp');
+    game_sv_mp__RejectGameItem:=srcECXCallFunction.Create(pointer(xrGame+$30ef40),[vtPointer, vtPointer], 'RejectGameItem', 'game_sv_mp');
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     game_sv_mp__KillPlayer:=srcECXCallFunction.Create(pointer(xrGame+$3209E0),[vtPointer, vtInteger, vtInteger], 'KillPlayer', 'game_sv_mp');
+    game_sv_mp__RejectGameItem:=srcECXCallFunction.Create(pointer(xrGame+$324de0),[vtPointer, vtPointer], 'RejectGameItem', 'game_sv_mp');
   end;
   virtual_game_sv_mp__Player_AddMoney:=srcVirtualECXCallFunction.Create(game_sv_mp__Player_AddMoney_index, [vtPointer, vtPointer, vtInteger], 'Player_AddMoney','game_sv_mp');
  result:=true;

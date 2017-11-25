@@ -55,20 +55,19 @@ PlayerAction = function (player:pointer{pIClient}; parameter:pointer=nil; parame
 
 procedure ForEachClientDo_LL(pm:pPlayersMonitor; action:PlayerAction; predicate:PlayerSearchPredicate = nil; parameter:pointer=nil; parameter2:pointer=nil); stdcall;
 
-function OneIDSearcher(player:pointer; id:pointer; parameter2:pointer=nil):boolean; stdcall;
-function AssignFoundClientAction(player:pointer; id:pointer; res:pointer):boolean; stdcall;
-function LocalClientSearcher(player:pointer; id:pointer; parameter2:pointer=nil):boolean; stdcall;
-function OneGameIDSearcher(player:pointer; id:pointer; parameter2:pointer=nil):boolean; stdcall;
-function AssignFoundClientDataAction(player:pointer; id:pointer; res:pointer):boolean; stdcall;
+function OneIDSearcher(player:pointer; id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
+function AssignFoundClientAction(player:pointer; {%H-}id:pointer; res:pointer):boolean; stdcall;
+function LocalClientSearcher(player:pointer; {%H-}id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
+function OneGameIDSearcher(player:pointer; id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
+function AssignFoundClientDataAction(player:pointer; {%H-}id:pointer; res:pointer):boolean; stdcall;
 
 function CheckForClientOnline_LL(pm:pPlayersMonitor; cl:pointer{pIClient}):boolean; stdcall; //doesn't enter critical section! You MUST enter it manually before calls!
 
 implementation
-uses Clients, LogMgr, dynamic_caster;
+uses Clients, dynamic_caster;
 
 function LocalClientSearcher(player:pointer; id:pointer; parameter2:pointer=nil):boolean; stdcall;
 var
-  cid:cardinal;
   cl:pIClient;
 begin
   result:=false;

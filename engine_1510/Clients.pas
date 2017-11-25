@@ -135,6 +135,7 @@ pxrGameSpyClientData=^xrGameSpyClientData;
 
 const
   ICLIENT_FLAG_LOCAL:cardinal = 1;
+  ICLIENT_FLAG_RECONNECT:cardinal = 4;
 
 implementation
 

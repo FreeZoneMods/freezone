@@ -1,7 +1,7 @@
 unit misc_stuff;
 {$mode delphi}
 interface
-uses Console, basedefs, Clients, Packets;
+uses Clients, Packets;
 function Init():boolean; stdcall;
 function BanTimeFromMinToSec(min:cardinal):cardinal; stdcall;
 function IpToStr(ip:ip_address):string; stdcall;

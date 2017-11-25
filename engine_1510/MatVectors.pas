@@ -73,7 +73,6 @@ interface
   procedure build_projection(m:pFMatrix4x4; hat:single; aspect:single; near_plane:single; far_plane:single);
 
 implementation
-uses Math;
 
 const EPS:single = 0.0001;
 

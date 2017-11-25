@@ -21,6 +21,7 @@ shared_str = packed record
 end;
 
 pshared_str = ^shared_str;
+ppshared_str = ^pshared_str;
 
 str_container=packed record
   //TODO:Fill
@@ -36,12 +37,17 @@ end;
 
 procedure init_string(str:pshared_str); stdcall;
 procedure assign_string(str:pshared_str; text:PChar); stdcall;
+function GetGlobalUndockedEmptyStr():pshared_str; stdcall;
 
 implementation
 uses srcCalls, basedefs;
 var
   g_pStringContainer:ppstr_container;
   dock:srcECXCallFunction;
+
+  // "Неучтенные" игрой строки, на которые можно ссылаться
+  global_undocked_empty_shared_str_value:str_value;
+  global_undocked_empty_shared_str:shared_str;
 
 procedure assign_string(str:pshared_str; text:PChar); stdcall;
 var
@@ -60,6 +66,11 @@ begin
   str^.p_:=docked;
 end;
 
+function GetGlobalUndockedEmptyStr: pshared_str; stdcall;
+begin
+  result:=@global_undocked_empty_shared_str;
+end;
+
 procedure init_string(str:pshared_str); stdcall;
 begin
   str.p_:=nil;
@@ -70,6 +81,13 @@ begin
   result:=false;
   g_pStringContainer := pointer(xrCore+$BE784);
   dock:=srcECXCallFunction.Create(pointer(xrCore+$1DDA0), [vtPointer, vtPChar], 'dock', 'str_container');
+
+  global_undocked_empty_shared_str_value.value:=chr(0);
+  global_undocked_empty_shared_str_value.dwCRC:=0;
+  global_undocked_empty_shared_str_value.dwReference:=1;
+  global_undocked_empty_shared_str_value.length:=0;
+  global_undocked_empty_shared_str_value.next:=nil;
+  global_undocked_empty_shared_str.p_:=@global_undocked_empty_shared_str_value;
 
   if (g_pStringContainer=nil) or (dock=nil) then exit;
   result:=true;

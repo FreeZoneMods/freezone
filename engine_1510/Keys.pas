@@ -2,7 +2,8 @@ unit Keys;
 {$mode delphi}
 interface
 
-function ConvertToBase32(pcIn:PChar; nInBytes:integer):string; stdcall;
+function ConvertToBase32(pcIn:PAnsiChar; nInBytes:integer):string; stdcall;
+function ConvertFromBase32(pcIn:PAnsiChar; nInBytes:integer):string;
 function GenerateKey(data:pbyte; data_size:cardinal; use_separators:boolean=true):string;
 function GenerateRandomKey(use_separators:boolean=true):string;
 
@@ -33,7 +34,18 @@ begin
   pc[s-1] := char(byte(pc[s-1]) shr n);
 end;
 
-function ConvertToBase32(pcIn:PChar; nInBytes:integer):string; stdcall;
+procedure LeftShift(pc:PChar; s:integer; n:integer); stdcall;
+var
+  i:integer;
+begin
+  for i:=s-1 downto 1 do begin
+    pc[i]:= char(byte(pc[i]) shl n);
+    pc[i]:= char(byte(pc[i]) or (byte(pc[i-1]) shr (8-n)));
+  end;
+  pc[0] := char(byte(pc[0]) shl n);
+end;
+
+function ConvertToBase32(pcIn:PAnsiChar; nInBytes:integer):string; stdcall;
 const
   gpcBase32Set:PChar='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 var
@@ -63,9 +75,61 @@ begin
 
     for i:=0 to nOutBytes-1 do begin
       result:=result+gpcBase32Set[acShift[0] and $1F];
-      RightShift(PChar(@acShift[0]), 5,5);
+      RightShift(PAnsiChar(@acShift[0]), 5,5);
     end;
   end;
+end;
+
+function Base32Value(ch:char):integer;
+const
+  gpcBase32Set:string='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+begin
+  result:=Pos(ch, gpcBase32Set)-1;
+end;
+
+function ConvertFromBase32(pcIn:PAnsiChar; nInBytes:integer):string;
+var
+  pcCursor:PAnsiChar;
+  acShift:array[0..4] of byte;
+  acWorkCopy:array[0..7] of byte;
+  nValue, i, nCopyableBytes, nOutBytes:integer;
+begin
+	pcCursor := pcIn;
+  result:='';
+
+	while (nInBytes > 0) do begin
+    if nInBytes > 8 then nCopyableBytes := 8 else nCopyableBytes := nInBytes;
+		nOutBytes := (nCopyableBytes * 5) div 8;
+
+    for i:=0 to 4 do begin
+      acShift[i]:=0;
+    end;
+
+		for i := 0 to nCopyableBytes - 1 do begin
+			acWorkCopy[i] := Byte(pcCursor[nCopyableBytes - i - 1]);
+		end;
+
+		pcCursor := @pcCursor[nCopyableBytes];
+
+		for i := 0 to nCopyableBytes-1 do begin
+			// Make room for new bits
+			LeftShift(PAnsiChar(@acShift[0]), 5, 5);
+
+			// Put the value onto the end of the register
+			nValue := Base32Value(CHR(acWorkCopy[i]));
+			if (nValue < 0) then begin
+				result:='';
+        exit;
+			end;
+			acShift[0] := acShift[0] or nValue;
+		end;
+
+		nInBytes -= nCopyableBytes;
+
+    for i:=0 to nOutBytes-1 do begin
+      result:=result+chr(acShift[i]);
+    end;
+	end;
 end;
 
 function GenerateKey(data:pbyte; data_size:cardinal; use_separators:boolean=true):string;
@@ -79,7 +143,7 @@ begin
   assert(data_size>=10);
 
   check:=CreateCheck(data, data_size-sizeof(word),CLEAR_SKY_KEY);
-  PWord(cardinal(data) + data_size-sizeof(word))^:=check;
+  PWord(cardinal(data) + data_size{%H-}-sizeof(word))^:=check;
   tmp_result:=ConvertToBase32(PChar(data),data_size);
 
   if use_separators then begin

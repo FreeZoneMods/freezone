@@ -1,7 +1,7 @@
 unit Level;
 {$mode delphi}
 interface
-uses BaseClasses, Objects, vector, Cameras, HUD, PureClient, Clients, Physics, xrstrings, Servers, Battleye, games, NET_Common, AnticheatStuff;
+uses BaseClasses, Objects, vector, Cameras, HUD, PureClient, Physics, xrstrings, Servers, Battleye, games, NET_Common, AnticheatStuff;
 
 type
 IGame_Level = packed record
@@ -17,6 +17,7 @@ IGame_Level = packed record
     Sounds_Random_Enabled:cardinal;
     m_pCameras:pCCameraManager;
     snd_ER:xr_vector;
+    //offset: 0x4c
     Objects:CObjectList;
     ObjectSpace:CObjectSpace;
     bReady:cardinal;
@@ -213,9 +214,17 @@ g_ppGameLevel:ppIGame_Level;
 
 function Init():boolean; stdcall;
 
-implementation
+function ObjectById(lvl:pIGame_Level; id:word):pCObject;
 
+implementation
 uses basedefs, windows;
+
+function ObjectById(lvl:pIGame_Level; id:word):pCObject;
+begin
+  assert(lvl<>nil);
+  result:=lvl.Objects.map_NETID[id];
+end;
+
 function Init():boolean; stdcall;
 begin
   g_ppGameLevel:=GetProcAddress(xrEngine, '?g_pGameLevel@@3PAVIGame_Level@@A');
