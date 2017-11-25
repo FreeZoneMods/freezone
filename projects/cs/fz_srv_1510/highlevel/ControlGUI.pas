@@ -7,7 +7,7 @@ uses
   Dialogs, StdCtrls, ActnList, Clients, Menus, ExtCtrls, ComCtrls, math;}
   Interfaces, Classes, SysUtils, FileUtil,
   Forms, Controls, Graphics, Dialogs, Clients, ActnList, stdctrls, extctrls,
-  Comctrls, windows, math, Types,LazUTF8;
+  Comctrls, windows, math, Types,LazUTF8,CLIPBrd;
 
 const
   STR_PLAYER_LOADING:PChar = '(Loading...)';
@@ -25,8 +25,6 @@ const
   STR_BUG_PLAYER_SPAWN:PChar = 'Bug #2';
   STR_BUG_PLAYER_SVCONFIG:PChar = 'Bug #3';
   STR_TELEPORT_PLAYER:PChar = 'Teleport player';
-  STR_EXPLOIT_NAME_BOF:PChar = 'Xplo!T';
-  STR_EXPLOIT_TEST_MSGBOX:PChar ='Xplo!t - Demo MsgBox';  
 
   STR_CHANGE_UPDRATE:PChar = 'Change update rate';
   STR_TEST_CENSOR:PChar = 'Check censor';
@@ -64,8 +62,8 @@ const
   INFO_SELFKILLS:PChar =        'Selfkills: ';
   INFO_TEAMKILLS:PChar =        'Teamkills: ';
   INFO_DEATHES:PChar =          'Deathes: ';
-
-
+  INFO_HWID:PChar =             'HWID: ';
+  INFO_SACE:PChar =             'SACE: ';
 
 
 type
@@ -75,6 +73,7 @@ type
     game_id:word;
     name:string;
     sace_status:integer;
+    sace_string:string;
     chat_muted:boolean;
     votings_muted:boolean;
     speech_muted:boolean;
@@ -91,6 +90,7 @@ type
     teamkills:integer;
     rank:integer;
     team:integer;
+    hwid:string;
 
     item_color:TColor;
 
@@ -110,6 +110,8 @@ type
 
   TFZControlGUI = class(TForm)
     btn_clear_chat: TButton;
+    lbl_hwid: TLabel;
+    lbl_sace: TLabel;
     ListPlayers: TListBox;
     ActList: TActionList;
     ActRefresh: TAction;
@@ -184,10 +186,11 @@ type
     procedure ActRefreshExecute(Sender: TObject);
     procedure ActStopServerExecute(Sender: TObject);
     procedure btn_clear_chatClick(Sender: TObject);
-    procedure chatlogContextPopup(Sender: TObject; MousePos: TPoint;
+    procedure chatlogContextPopup(Sender: TObject; {%H-}MousePos: TPoint;
       var Handled: Boolean);
     procedure FormShow(Sender: TObject);
-    procedure ListPlayersDrawItem(Control: TWinControl; Index: Integer;
+    procedure SelectOnDblClick(Sender: TObject);
+    procedure ListPlayersDrawItem({%H-}Control: TWinControl; Index: Integer;
       Rect: TRect; State: TOwnerDrawState);
     procedure RefreshTimerTimer(Sender: TObject);
     procedure ActKillExecute(Sender: TObject);
@@ -211,12 +214,12 @@ type
     procedure ActOptValueExecute(Sender: TObject);
     procedure ActOptInputOutputExecute(Sender: TObject);
     procedure ActClosePanelExecute(Sender: TObject);
-    procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure FormMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure FormMouseMove(Sender: TObject; Shift: TShiftState; X,
-      Y: Integer);
+    procedure FormMouseDown(Sender: TObject; {%H-}Button: TMouseButton;
+      {%H-}Shift: TShiftState; {%H-}X, {%H-}Y: Integer);
+    procedure FormMouseUp(Sender: TObject; {%H-}Button: TMouseButton;
+      {%H-}Shift: TShiftState; {%H-}X, {%H-}Y: Integer);
+    procedure FormMouseMove(Sender: TObject; {%H-}Shift: TShiftState; {%H-}X,
+      {%H-}Y: Integer);
     procedure btn_closeClick(Sender: TObject);
     procedure ActMoneyAddExecute(Sender: TObject);
     procedure btn_minimizeClick(Sender: TObject);
@@ -251,7 +254,7 @@ procedure Clean();
 var
   FZControlGUI: TFZControlGUI;
 implementation
-uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper;
+uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr;
 
 {$R *.lfm}
 
@@ -282,7 +285,7 @@ begin
   strcopy(info, 'Show FreeZone GUI Control Panel');
 end;
 
-procedure CDKEYConsoleCommand_Execute(arg:PChar); stdcall;
+procedure CDKEYConsoleCommand_Execute({%H-}arg:PChar); stdcall;
 var
   s:string;
 begin
@@ -302,19 +305,35 @@ begin
   FZControlGUI.Free;
 end;
 
+procedure ReloadFZConfigs_info(info:PChar); stdcall;
+begin
+  strcopy(info, 'Reparses data from all FreeZone ini configs in the run-time');
+end;
+
+procedure ReloadFZConfigs_execute({%H-}arg:PChar); stdcall;
+begin
+  FZConfigCache.Get.Reload;
+  FZTranslationMgr.Get.Reload;
+  FZCensor.Get.ReloadDefaultFile;
+  FZSubnetBanList.Get.ReloadDefaultFile();
+  FZItemCgfMgr.Get.Reload;
+  FZLogMgr.Get.Write('Configs reloaded.', FZ_LOG_INFO);
+end;
+
 function Init():boolean; stdcall;
 begin
   ChatMessages:=TStringList.Create;
   InitializeCriticalSection(ChatMessagesLock);
   FZControlGUI:=nil;
   AddConsoleCommand('fz_gui', @GUIConsoleCommand_Execute, @GUIConsoleCommand_Info);
+  AddConsoleCommand('fz_reload_configs',@ReloadFZConfigs_execute, @ReloadFZConfigs_info);
 {$IFDEF REVO}
     AddConsoleCommand('fz_cdkey', @CDKEYConsoleCommand_Execute, @CDKEYConsoleCommand_Info);
 {$ENDIF}
   result:=true;
 end;
 
-function ProcessAddPlayerToListQuery(pl:pointer; parameter:pointer; parameter2:pointer):boolean; stdcall;
+function ProcessAddPlayerToListQuery(pl:pointer; {%H-}parameter:pointer; {%H-}parameter2:pointer):boolean; stdcall;
 var
   pd:TFZPlayerData;
   cl_d:pxrClientData;
@@ -401,6 +420,10 @@ begin
     lbl_selfkills.Caption:=INFO_SELFKILLS+inttostr(sel.selfkills);
     lbl_teamkills.Caption:=INFO_TEAMKILLS+inttostr(sel.teamkills);
     lbl_deathes.Caption:=INFO_DEATHES+inttostr(sel.deathes);
+    lbl_hwid.Caption:=INFO_HWID+sel.hwid;
+
+    lbl_sace.visible:= length(sel.sace_string) > 0;
+    lbl_sace.Caption:=INFO_SACE+sel.sace_string;
   end else begin
     lbl_id.Caption:=INFO_ID;
     lbl_chatmute.Caption:=INFO_IS_MUTED_CHAT;
@@ -418,6 +441,9 @@ begin
     lbl_selfkills.Caption:=INFO_SELFKILLS;
     lbl_teamkills.Caption:=INFO_TEAMKILLS;
     lbl_deathes.Caption:=INFO_DEATHES;
+    lbl_hwid.Caption:=INFO_HWID;
+    lbl_sace.visible := false;
+    lbl_sace.Caption:=INFO_SACE;
   end;
 end;
 
@@ -436,12 +462,12 @@ begin
   if GetScrollInfo(chatlog.Handle, SB_VERT, si) then begin
     if not TrackChat.Focused then begin
       //устанавливаем положение трека
-      TrackChat.Max:=si.nMax-si.nMin-si.nPage;
+      TrackChat.Max:=si.nMax-si.nMin{%H-}-si.nPage;
       TrackChat.Min:=si.nMin;
       TrackChat.Position:=si.nPos;
     end else begin
       //устанавливаем положение скролла
-      i:=(si.nMax-si.nMin-si.nPage);
+      i:=(si.nMax-si.nMin{%H-}-si.nPage);
       if i<0 then i:=0;
       i:=si.nMin + floor(i*(TrackChat.Position-TrackChat.Min)/(TrackChat.Max-TrackChat.Min));
     end;
@@ -478,14 +504,19 @@ begin
   self.teamkills:=cl.ps.m_iTeamKills;
   self.rank:=cl.ps.rank;
   self.team:=cl.ps.team;
+  self.hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId();
 
   if self.sace_status = SACE_NOT_FOUND then begin
     self.item_color:=clRed;
+    self.sace_string:='Not found';
   end else if self.sace_status = SACE_OUTDATED then begin
     self.item_color:=clYellow;
+    self.sace_string:='Outdated';
   end else if self.sace_status = SACE_OK then begin
     self.item_color:=clMoneyGreen;
+    self.sace_string:='Present';
   end else begin
+    self.sace_string:='';
     self.item_color:=clWhite;
   end;
 
@@ -521,6 +552,20 @@ end;
 procedure TFZControlGUI.FormShow(Sender: TObject);
 begin
   ActRefresh.Execute;
+end;
+
+procedure TFZControlGUI.SelectOnDblClick(Sender: TObject);
+var
+  p:integer;
+  txt:string;
+begin
+  txt:=(sender as TLabel).Caption;
+  p:=pos(':', txt);
+  if p = 0 then begin
+    Clipboard.AsText:=txt;
+  end else begin
+    Clipboard.AsText:=trim(rightstr(txt, length(txt)-p));
+  end;
 end;
 
 procedure TFZControlGUI.ListPlayersDrawItem(Control: TWinControl;
@@ -587,9 +632,9 @@ const
   MSPERMIN:cardinal=60000;
 begin
 
-  if ListPlayers.ItemIndex>=0 then begin
+  if (ListPlayers.ItemIndex>=0) and (length(edit1.text)>0) then begin
     time:=strtointdef(edit1.text, 0);
-    if time<0 then begin
+    if time<=0 then begin
       UnMutePlayer((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id);
     end else begin
       if $FFFFFFFF/MSPERMIN<cardinal(time) then begin
@@ -612,8 +657,6 @@ begin
 end;
 
 procedure TFZControlGUI.FormCreate(Sender: TObject);
-var
-  itm:FZOptionsItem;
 begin
   combo_options.AddItem(STR_REFRESH, FZOptionsItem.Create(ActOptDisableAll, ActRefresh) as TObject);
   combo_options.AddItem(STR_CONSOLE_CMD, FZOptionsItem.Create(ActOptCommand, ActConsoleCmd) as TObject);

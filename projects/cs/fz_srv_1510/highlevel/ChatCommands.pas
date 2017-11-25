@@ -50,7 +50,7 @@ end;
 function Init():boolean;
 
 implementation
-uses Sysutils, Chat, TranslationMgr, LogMgr, PureServer, SACE_interface, players;
+uses Sysutils, Chat, TranslationMgr, LogMgr, SACE_interface, players;
 
 var _instance:FZChatCommandList;
 
@@ -199,7 +199,7 @@ end;
 
 { FZChatSaceCommand }
 
-function CheckAndFillSace(player:pointer; p1:pointer; p2:pointer):boolean; stdcall;
+function CheckAndFillSace(player:pointer; p1:pointer; {%H-}p2:pointer):boolean; stdcall;
 var
   str:pstring;
   cl:pIClient;
@@ -207,9 +207,12 @@ begin
   result:=true;
   cl:=pIClient(player);
   if cl=nil then exit;
-  if GetSACEStatus(cl.ID.id)=SACE_OK then begin
-    str:=pstring(p1);
-    str^:=str^ + PChar(@cl.name.p_.value)+' ';
+
+  if (cl.flags and ICLIENT_FLAG_LOCAL)=0 then begin
+    if GetSACEStatus(cl.ID.id)=SACE_OK then begin
+      str:=pstring(p1);
+      str^:=str^ + PChar(@cl.name.p_.value)+' ';
+    end;
   end;
 end;
 

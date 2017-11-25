@@ -58,7 +58,6 @@ procedure SendBrokenMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:w
 //server's crash can appears!!!
 var
   p:NET_Packet;
-  s:string;
   b:byte;
   c:cardinal;
 begin
@@ -138,7 +137,6 @@ procedure SendFileReceivePacket(srv:pIPureServer; cl_id:cardinal); stdcall;
 var
   p:NET_Packet;
   b:byte;
-  s:string;
   c:cardinal;
 begin
   ClearPacket(@p);

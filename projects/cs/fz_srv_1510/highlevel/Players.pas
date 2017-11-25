@@ -1,13 +1,18 @@
 unit Players;
 {$mode delphi}
 interface
-uses Clients, windows, Servers,PureServer,MatVectors;
+uses Clients, windows, Servers,PureServer,MatVectors,Packets, xrstrings;
 
 type
+
+{ FZPlayerStateAdditionalInfo }
+
 FZPlayerStateAdditionalInfo = class
 protected
   _lock:TRtlCriticalSection;
   _valid:boolean;
+  _connected_and_ready:boolean;
+
   _mute_start_time:cardinal;
   _mute_time_period:cardinal;
 
@@ -37,9 +42,14 @@ protected
 
   _last_ping_warning_time:cardinal;
 
-  constructor Create(ps:pgame_PlayerState);
+  _hwid:string;
+
+  {%H-}constructor Create(ps:pgame_PlayerState);
 public
   procedure SetUpdrate(d:cardinal);
+  procedure SetHwId(hwid:string);
+  function GetHwId():string;
+
   property updrate:cardinal read _updrate write SetUpdrate;
   property last_ready:cardinal read _last_ready_time write _last_ready_time;
   property valid:boolean read _valid write _valid;
@@ -51,6 +61,7 @@ public
   procedure AssignVoteMute(time:cardinal);
   procedure AssignSpeechMute(time:cardinal);
 
+  procedure OnDisconnected();
 
 
   function IsMuted():boolean;
@@ -70,7 +81,7 @@ end;
 
 procedure FromPlayerStateConstructor(ps:pgame_PlayerState); stdcall;
 procedure FromPlayerStateDestructor(ps:pgame_PlayerState); stdcall;
-procedure FromPlayerStateClear(ps:pgame_PlayerState); stdcall;
+procedure FromPlayerStateClear({%H-}ps:pgame_PlayerState); stdcall;
 
 
 procedure DisconnectPlayer(id:ClientID; reason:string); stdcall;
@@ -80,6 +91,9 @@ procedure SetUpdRate(id:ClientID; updrate:cardinal); stdcall;
 procedure KillPlayer(id:ClientID); stdcall;
 procedure AddMoney(id:ClientID; amount:integer); stdcall;
 
+procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
+function GetHwId(cl: pxrClientData): string; stdcall;
+
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
 
 function CheckPlayerReadySignalValidity(cl:pxrClientData):boolean; stdcall;
@@ -88,14 +102,28 @@ function OnPingWarn(cl:pxrClientData):boolean; stdcall;
 function CanChangeName(client:pxrClientData):boolean; stdcall;
 
 procedure OnAttachNewClient(srv:pxrServer; cl:pIClient); stdcall;
-procedure OnClientReady(srv:pIPureServer; cl:pxrClientData); stdcall;
+procedure OnClientReady({%H-}srv:pIPureServer; cl:pxrClientData); stdcall;
 
 function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdcall;
+procedure xrServer__OnCL_Disconnected_appendToPacket({%H-}p:pNET_Packet; pname:ppshared_str; cl:pxrClientData); stdcall;
+function game_sv_mp__OnPlayerDisconnect_is_message_needed(name:PAnsiChar):boolean; stdcall;
 
 procedure SendMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word; pos:pFVector3; dir:pFVector3); stdcall;
 
 implementation
-uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, Games, TranslationMgr, Chat, Packets, sysmsgs, DownloadMgr, Synchro, ServerStuff, NET_Common, MapList;
+uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, Games, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList;
+
+procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
+begin
+  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetHwId(hwid);
+end;
+
+function GetHwId(cl: pxrClientData): string; stdcall;
+begin
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId();
+end;
+
+
 
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
 const
@@ -124,7 +152,7 @@ end;
 
 
 /////////////////////////////////////////////////////
-function DoAddMoney(player:pointer{pIClient}; pcardinal_id:pointer; amount:pointer):boolean; stdcall;
+function DoAddMoney(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; amount:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
   lvl:pCLevel;
@@ -143,7 +171,7 @@ begin
 end;
 
 /////////////////////////////////////////////////////
-function DoKillPlayer(player:pointer{pIClient}; pcardinal_id:pointer; junk:pointer):boolean; stdcall;
+function DoKillPlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; {%H-}junk:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
   lvl:pCLevel;
@@ -162,7 +190,7 @@ begin
 end;
 
 /////////////////////////////////////////////////////
-function DoSetUpdRate(player:pointer{pIClient}; pcardinal_id:pointer; val:pointer):boolean; stdcall;
+function DoSetUpdRate(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; val:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
 begin
@@ -178,7 +206,7 @@ begin
   ForEachClientDo(DoSetUpdRate, OneIDSearcher, @id.id, @updrate);
 end;
 /////////////////////////////////////////////////////
-function DoUnMutePlayer(player:pointer{pIClient}; pcardinal_id:pointer; res:pointer):boolean; stdcall;
+function DoUnMutePlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; res:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
 begin
@@ -186,20 +214,24 @@ begin
   cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
   if cl_d<>nil then begin
     FZPlayerStateAdditionalInfo(cl_d.ps.FZBuffer).UnMute();
-    pboolean(res)^:=1 ;//true;
+    pcardinal(res)^:=1 ;//true;
   end;
 end;
 
 function UnMutePlayer(id:ClientID):boolean; stdcall;
+var
+  do_mute:cardinal;
 begin
+  do_mute:=0;
   if time>0 then begin
     result:=false;
-    ForEachClientDo(DoUnMutePlayer, OneIDSearcher, @id.id, @result);
+    ForEachClientDo(DoUnMutePlayer, OneIDSearcher, @id.id, @do_mute);
   end;
+  result:=(do_mute<>0);
 end;
 
 /////////////////////////////////////////////////////
-function DoMutePlayer(player:pointer{pIClient}; pcardinal_id:pointer; pcardinal_time:pointer):boolean; stdcall;
+function DoMutePlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; pcardinal_time:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
 begin
@@ -221,7 +253,7 @@ begin
 end;
 
 /////////////////////////////////////////////////////
-function DoDisconnectPlayer(player:pointer{pIClient}; pcardinal_id:pointer; pchar_reason:pointer):boolean; stdcall;
+function DoDisconnectPlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; pchar_reason:pointer):boolean; stdcall;
 var
   l:pCLevel;
   sv:pxrServer;
@@ -294,6 +326,11 @@ begin
   end;
 end;
 
+procedure FZPlayerStateAdditionalInfo.OnDisconnected;
+begin
+  self._connected_and_ready:=false;
+end;
+
 procedure FZPlayerStateAdditionalInfo.AssignVoteMute(time: cardinal);
 var
   new_period:cardinal;
@@ -322,6 +359,7 @@ begin
   srcKit.Get.DbgLog('New buffer, '+inttohex(cardinal(self),8));
   InitializeCriticalSection(_lock);
   _valid:=false;
+  _connected_and_ready:=false;
   _mute_start_time:=0;
   _mute_time_period:=0;
   _my_player:=ps;
@@ -557,6 +595,18 @@ begin
   self._updrate:=d;
 end;
 
+procedure FZPlayerStateAdditionalInfo.SetHwId(hwid: string);
+begin
+  if (length(self._hwid)=0) or (not self._connected_and_ready) then begin
+    self._hwid:=hwid;
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.GetHwId: string;
+begin
+  result:=_hwid;
+end;
+
 procedure FZPlayerStateAdditionalInfo.UnMute;
 begin
   EnterCriticalSection(_lock);
@@ -606,9 +656,7 @@ end;
 procedure SendMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word; pos:pFVector3; dir:pFVector3); stdcall;
 var
   p:NET_Packet;
-  s:string;
   b:byte;
-  c:cardinal;
 begin
   ClearPacket(@p);
   p.w_allow:=true;
@@ -729,9 +777,6 @@ var
   need_dl:boolean;
   userdata:FZSysMsgSendCallbackData;
 
-  gamedescr:GameDescriptionData;
-  buf:FZClientVotingElement;
-  mapname2:string;
 begin
   xrCriticalSection__Enter(@srv.base_IPureServer.net_players.csPlayers);
   try
@@ -794,6 +839,7 @@ begin
       dlinfo.fileinfo.filename:=PAnsiChar(filename);
       dlinfo.fileinfo.progress_msg:=PAnsiChar(dl_msg);
       dlinfo.fileinfo.error_already_has_dl_msg:=PAnsiChar(err_msg);
+      need_dl:=true;
       dlinfo.fileinfo.crc32:=FZDownloadMgr.Get.GetCRC32(mapname, mapver, need_dl);
       dlinfo.fileinfo.compression:=FZDownloadMgr.Get.GetCompressionType(mapname, mapver);
 
@@ -825,6 +871,7 @@ end;
 procedure OnClientReady(srv:pIPureServer; cl:pxrClientData); stdcall;
 begin
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid:=true;
+  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._connected_and_ready:=true;
 end;
 
 function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdcall;
@@ -833,6 +880,37 @@ begin
   if result then begin
     FZLogMgr.Get.Write('Force removing player state of disconnected client!', FZ_LOG_INFO);
   end;
+end;
+
+procedure xrServer__OnCL_Disconnected_appendToPacket(p:pNET_Packet; pname:ppshared_str; cl:pxrClientData); stdcall;
+var
+  write_empty_name:boolean;
+begin
+  write_empty_name:=true;
+
+  if cl<>nil then begin
+    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).OnDisconnected();
+    if FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid then begin
+      write_empty_name:=false;
+    end;
+  end;
+
+  if write_empty_name then begin
+    //make 'empty' name if we don't need to show 'disconnect' message to clients
+    FZLogMgr.Get.Write('CL (not ready) disconnecting: '+PAnsiChar(@pname^.p_.value)+', id='+inttostr(cl.base_IClient.ID.id), FZ_LOG_INFO);
+    pname^:=GetGlobalUndockedEmptyStr();
+  end else begin
+    FZLogMgr.Get.Write('CL disconnecting: '+PAnsiChar(@pname^.p_.value)+', id='+inttostr(cl.base_IClient.ID.id), FZ_LOG_INFO);
+  end;
+
+end;
+
+function game_sv_mp__OnPlayerDisconnect_is_message_needed(name:PAnsiChar):boolean; stdcall;
+var
+  empty_name:string;
+begin
+  empty_name:='';
+  result:= empty_name <> name;
 end;
 
 end.

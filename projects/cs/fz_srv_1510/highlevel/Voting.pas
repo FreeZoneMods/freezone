@@ -5,23 +5,23 @@ uses Packets, Clients, Games, xrstrings, misc_stuff;
 
 function PatchVoteCommandsArrayPtrAtAddr(addr:pointer; offset:cardinal):boolean; stdcall;
 function IsVoteEarlyFail(game:pgame_sv_mp; agreed, against_explicit, total_clients:cardinal):boolean; stdcall;
-function IsVoteEarlySuccess(game:pgame_sv_mp; agreed, against_explicit, total_clients:cardinal):boolean; stdcall;
+function IsVoteEarlySuccess({%H-}game:pgame_sv_mp; agreed, {%H-}against_explicit, total_clients:cardinal):boolean; stdcall;
 function IsVoteSuccess(agreed, against_explicit, total_clients:cardinal):boolean; stdcall;
 
 procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PChar; resVoteCommand:PChar); stdcall;
 
-function CanSafeStartVote(game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
+function CanSafeStartVote({%H-}game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
 function CarefullyComparePlayerNames(name1:PChar; name2:PChar):cardinal; stdcall;
 
 function IterateAndComparePlayersNames(it_begin:ppIClient; it_end:ppIClient; newname:PChar; client:pIClient):ppIClient; stdcall;
 function OnVoteStartIncorrectPlayerName(game:pgame_sv_mp): boolean; stdcall;
-function OnVote(game:pgame_sv_mp; sender_id:ClientID; status:boolean):boolean; stdcall;
+function OnVote({%H-}game:pgame_sv_mp; sender_id:ClientID; {%H-}status:boolean):boolean; stdcall;
 
 
 //TODO: антифлуд
 //TODO: интервал между назначений голосований для каждого из игроков
 implementation
-uses srcBase, LogMgr, math, sysutils, console, CommonHelper, strutils, TranslationMgr, ConfigCache, PureServer, Players, dynamic_caster, basedefs, chat, Level, Servers;
+uses srcBase, LogMgr, math, sysutils, console, CommonHelper, TranslationMgr, ConfigCache, PureServer, Players, dynamic_caster, basedefs, chat, Level, Servers;
 var
   votecommands:array of _votecommands;
 
@@ -217,7 +217,7 @@ begin
     result:=0;
 end;
 
-function OnPlayerStartVote(pl:pointer; id_ptr:pointer; pbyte_res_ptr:pointer):boolean; stdcall;
+function OnPlayerStartVote(pl:pointer; {%H-}id_ptr:pointer; pbyte_res_ptr:pointer):boolean; stdcall;
 var
   cld:pxrClientData;
 begin

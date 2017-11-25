@@ -27,7 +27,7 @@ begin
     dvReceivedData:=dvReceivedData-SACE_MARK_OFFSET;
     result:= (pcardinal(dvReceivedData)^ = SACE_MARK_VALUE);
     if result then begin
-      FZLogMgr.Get.Write('SACE DL bypass', FZ_LOG_INFO);
+      FZLogMgr.Get.Write('SACE DL bypass', FZ_LOG_DBG);
     end;
 end;
 

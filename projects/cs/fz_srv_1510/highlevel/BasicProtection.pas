@@ -8,7 +8,7 @@ function CheckIfPCharZStringIsLesserThen(p:PChar; len:cardinal; id:ClientID; aut
 function CheckIfPacketZStringIsLesserThenWithDisconnect(p:pNET_Packet; len:cardinal; cl:pIClient; msgid:cardinal):boolean; stdcall;
 
 implementation
-uses srcBase, misc_stuff;
+uses misc_stuff;
 
 function CheckIfPacketZStringIsLesserThen(p:pNET_Packet; len:cardinal; id:ClientID; autocorrection:boolean; msgid:cardinal):boolean; stdcall;
 var
@@ -38,7 +38,7 @@ begin
     str:=str+' max string length is '+inttostr(len)+' byte(s), current length is '+inttostr(cnt)+' byte(s)';
     FZLogMgr.Get.Write(str, FZ_LOG_ERROR);
     if autocorrection then begin
-      p.B.data[p.r_pos+len-1]:=0;
+      p.B.data[p.r_pos+len{%H-}-1]:=0;
       result:=true;
     end;
   end;

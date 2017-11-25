@@ -68,7 +68,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="G:\stalker\stcs\freezone\bin\dedicated\freezone"/>
+            <Filename Value="..\..\..\release\cs_1510\bins\freezone"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -114,7 +114,7 @@
       <local>
         <FormatVersion Value="1"/>
         <HostApplicationFilename Value="G:\stalker\stcs\freezone\bin\dedicated\xrEngine.exe"/>
-        <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_pool/tdm/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
+        <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_firestation/tdm/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
         <WorkingDirectory Value="G:\stalker\stcs\freezone\bin"/>
       </local>
     </RunParams>
@@ -126,7 +126,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="76">
+    <Units Count="78">
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -434,13 +434,22 @@
         <Filename Value="..\..\..\engine_1510\dynamic_caster.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit75>
+      <Unit76>
+        <Filename Value="highlevel\itemscfgmgr.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ItemsCfgMgr"/>
+      </Unit76>
+      <Unit77>
+        <Filename Value="..\..\..\engine_1510\clsids.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit77>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
     <Version Value="11"/>
     <PathDelim Value="\"/>
     <Target>
-      <Filename Value="G:\stalker\stcs\freezone\bin\dedicated\freezone"/>
+      <Filename Value="..\..\..\release\cs_1510\bins\freezone"/>
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
@@ -460,6 +469,11 @@
         <ExecutableType Value="Library"/>
       </Options>
     </Linking>
+    <Other>
+      <OtherDefines Count="1">
+        <Define0 Value="RELEASE_BUILD"/>
+      </OtherDefines>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

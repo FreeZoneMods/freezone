@@ -5,7 +5,7 @@ interface
 uses ConfigBase;
 type FZConfigMgr=class(FZConfigBase)
 private
-  constructor Create();
+  {%H-}constructor Create();
 public
   procedure Reload();
   class function Get(): FZConfigMgr;

@@ -20,14 +20,14 @@ pfz_ll_net_packet_structure=^fz_ll_net_packet_structure;
 pnet_handler_args=^net_handler_args;
 
 procedure net_Handler(args:pnet_handler_args); stdcall;
-procedure SentPacketsRegistrator(id:cardinal; data:pointer; size:cardinal); stdcall;
+procedure SentPacketsRegistrator({%H-}id:cardinal; data:pointer; {%H-}size:cardinal); stdcall;
 function Init():boolean;
 
 
 implementation
-uses LogMgr, ConfigCache, sysutils, srcBase;
+uses LogMgr, ConfigCache, sysutils;
 
-function IsCCSMode():boolean; stdcall;
+function IsStrictMode():boolean; stdcall;
 begin
   result:=FZConfigCache.Get.GetDataCopy.is_strict_filter;
 end;
@@ -40,17 +40,8 @@ begin
 end;
 
 
-procedure ProcessSinglePacketInNetHandle(data:PChar; size:cardinal; clid:cardinal); stdcall;
+procedure ProcessSinglePacketInNetHandle({%H-}data:PAnsiChar; {%H-}size:cardinal; {%H-}clid:cardinal); stdcall;
 begin
-  //FZLogMgr.Get.Write('[in]'+inttohex(pword(data)^,4)+', sz='+inttostr(size));
-  //FZLogMgr.Get.Write(inttostr(pWord(data)^));
-      //if FZControllerMgr.Get.GetParams.ccs_present then begin
-        //оно не любит пакетов с пустыми хешами
-        //if pWord(data)^=M_SV_DIGEST then begin
-           //FZLogMgr.Get.Write('M_SV_DIGEST caught: '+PChar(@pPacketData.data[2]));
-           //FZLogMgr.Get.Write('M_SV_DIGEST caught:');
-        //end;
-      //end
 end;
 
 
@@ -70,31 +61,33 @@ begin
     end else begin
       //проверка на размер пакета - должен быть не более $4000 байт
       if pMsg.dwReceiveDataSize>=$4000 then begin
-        FZLogMgr.Get.Write('Packet size = '+inttostr(pMsg.dwReceiveDataSize), FZ_LOG_DBG);
+        FZLogMgr.Get.Write('Packet size = '+inttostr(pMsg.dwReceiveDataSize), FZ_LOG_IMPORTANT_INFO);
         DPNDestroyClient(pMsg.dpnidSender);
         exit;
       end;
 
       pPacketData:= pfz_ll_net_packet_structure(pMsg.pReceiveData);
 
-      //что интересно, контролер при получении пакета с NET_TAG_NONMERGED или отличным размером/включенным сжатием сразу вызывает (IPureServer)->NET->DestroyClient (vtable:0x60)
-      if IsCCSMode() then begin
-        if (pPacketData.header.tag<>NET_TAG_MERGED) or (pPacketData.header.unpacked_size<>pMsg.dwReceiveDataSize-4) or (pPacketData.compression_byte<>NET_TAG_NONCOMPRESSED) then begin
-          FZLogMgr.Get.Write('-----------------------------------------------------', FZ_LOG_DBG);
-          FZLogMgr.Get.Write('Strict filter detected bad packet from client '+inttostr(pMsg.dpnidSender)+'. Packet parameters:', FZ_LOG_DBG);
-          FZLogMgr.Get.Write('Tag = '+inttohex(pPacketData.header.tag, 2)+', expected: '+inttohex(NET_TAG_MERGED, 2), FZ_LOG_DBG);
-          FZLogMgr.Get.Write('unpacked_size = '+inttostr(pPacketData.header.unpacked_size)+', expected: '+inttostr(pMsg.dwReceiveDataSize-4), FZ_LOG_DBG);
-          FZLogMgr.Get.Write('Compression tag: '+inttohex(pPacketData.compression_byte, 2) + ', expected: '+inttohex(NET_TAG_NONCOMPRESSED,2), FZ_LOG_DBG);
+      if (pPacketData.header.tag<>NET_TAG_MERGED) then begin
+        FZLogMgr.Get.Write('NON-MERGED packet from client id='+inttostr(pMsg.dpnidSender), FZ_LOG_IMPORTANT_INFO);
+        if IsStrictMode() then begin
+          //что интересно, контролер при получении пакета с NET_TAG_NONMERGED или отличным размером/включенным сжатием сразу вызывает (IPureServer)->NET->DestroyClient (vtable:0x60)
           DPNDestroyClient(pMsg.dpnidSender);
-          FZLogMgr.Get.Write('-----------------------------------------------------', FZ_LOG_DBG);
           exit;
         end;
       end;
 
-      //todo:Decompress
-      if (pPacketData.header.unpacked_size<>pMsg.dwReceiveDataSize-4) then begin
-        //compression unsupported now
-        exit;
+      if pPacketData.compression_byte=NET_TAG_NONCOMPRESSED then begin
+        if pPacketData.header.unpacked_size<>pMsg.dwReceiveDataSize-4 then begin
+          FZLogMgr.Get.Write('Invalid size in header, packet from client id='+inttostr(pMsg.dpnidSender), FZ_LOG_IMPORTANT_INFO);
+          DPNDestroyClient(pMsg.dpnidSender);
+          exit;
+        end;
+      end else if pPacketData.compression_byte=NET_TAG_COMPRESSED then begin;
+        //TODO: Из-за ассерта в декомпрессоре могут быть проблемы...
+        //TODO: Decompress
+      end else begin
+        FZLogMgr.Get.Write('Unknown compression tag value, client id='+inttostr(pMsg.dpnidSender), FZ_LOG_IMPORTANT_INFO);
       end;
 
       if pPacketData.header.tag=NET_TAG_MERGED then begin

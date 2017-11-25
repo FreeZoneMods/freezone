@@ -3,7 +3,7 @@ unit ServerStuff;
 {$mode delphi}
 
 interface
-uses Servers, Packets, PureServer, Clients,NET_common;
+uses Servers, Packets, PureServer, Clients,NET_common, CSE, Games;
 
 type
 FZServerState = record
@@ -20,17 +20,26 @@ function game__OnEvent_SelfKill_Check(target:pxrClientData; senderid:cardinal):b
 function CheckKillMessage(p:pNET_Packet; sender_id:cardinal):boolean; stdcall;
 function CheckHitMessage(p:pNET_Packet; sender_id:cardinal):boolean; stdcall;
 
-function game_sv_mp__OnPlayerHit_preventlocal(victim:pgame_PlayerState; hitter:pgame_PlayerState):boolean; stdcall;
+function game_sv_mp__OnPlayerHit_preventlocal({%H-}victim:pgame_PlayerState; hitter:pgame_PlayerState):boolean; stdcall;
 procedure game_sv_mp__OnPlayerKilled_preventlocal(victim:pgame_PlayerState; hitter:ppgame_PlayerState; weaponid:pword; specialkilltype:pbyte); stdcall;
+function game_sv__OnDetach_isitemremovingneeded(item:pCSE_Abstract):boolean; stdcall;
+function game_sv__OnDetach_isitemtransfertobagneeded(item:pCSE_Abstract):boolean; stdcall;
+procedure game_sv_Deathmatch__OnDetach_destroyitems(game:pgame_sv_mp; pfirst_item:ppCSE_Abstract; plast_item:ppCSE_Abstract); stdcall;
+
+function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_mp; corpse:pCSE_Abstract):boolean; stdcall;
 
 procedure GetMapStatus(var name:string; var ver:string; var link:string); stdcall;
 procedure xrServer__Connect_updatemapname(gdd:pGameDescriptionData); stdcall;
+
+procedure xrServer__OnMessage_additional(srv:pIPureServer; p:pNET_Packet; sender:ClientID ); stdcall;
+
+function IPureServer__GetClientAddress_check_arg(pClientAddress:pointer; Address:pip_address; pPort:pcardinal):boolean; stdcall;
 
 function Init():boolean; stdcall;
 procedure Clean(); stdcall;
 
 implementation
-uses LogMgr, dynamic_caster, basedefs, sysutils, Hits, ConfigCache, Windows;
+uses LogMgr, sysutils, Hits, ConfigCache, Windows, ItemsCfgMgr, clsids;
 
 var
   _serverstate:FZServerState;
@@ -98,7 +107,6 @@ var
   cld, victim, hitter:pxrClientData;
   killer_id:word;
   target_id:word;
-  weapon_id:word;
   health_dec:single;
   victim_str, hitter_str:string;
 begin
@@ -138,7 +146,6 @@ var
   cld, victim, hitter:pxrClientData;
   hit:SHit;
   hit_stat_mode:cardinal;
-  fmt:TFormatSettings;
   victim_str, hitter_str:string;
 begin
 //  FZLogMgr.Get.Write('hit by '+inttostr(senderid));
@@ -264,6 +271,82 @@ begin
     hitter^:=victim;
     specialkilltype^:=SPECIAL_KILL_TYPE__SKT_NONE;
     weaponid^:=$FFFF;
+  end;
+end;
+
+function game_sv__OnDetach_isitemtransfertobagneeded(item: pCSE_Abstract): boolean; stdcall;
+begin
+  //Игрок умер, этот предмет в его инвентаре
+  //Если вернем true - предмет будет перемещен в рюкзак, став доступным для поднятия другими
+  result:=false;
+
+  //Если предмет - рюкзак, возвращаем false
+  if item.m_tClassID = CLSID_OBJECT_PLAYERS_BAG then exit;
+
+  result:=FZItemCgfMgr.Get.IsItemNeedToBeTransfered(PAnsiChar(@item.s_name.p_.value));
+end;
+
+function game_sv__OnDetach_isitemremovingneeded(item: pCSE_Abstract): boolean; stdcall;
+begin
+  //Игрок умер, этот предмет в его инвентаре
+  //Если вернем true - предмет будет удален из симуляции
+  result:=false;
+
+  //Если предмет - рюкзак, возвращаем false
+  if item.m_tClassID = CLSID_OBJECT_PLAYERS_BAG then exit;
+
+  //перед этим уже было проверено, нуждается ли предмет в перемещении, и если нуждается - нас бы не вызвали
+  result:=FZItemCgfMgr.Get.IsItemNeedToBeRemoved(PAnsiChar(@item.s_name.p_.value));
+end;
+
+procedure game_sv_Deathmatch__OnDetach_destroyitems(game: pgame_sv_mp; pfirst_item: ppCSE_Abstract; plast_item: ppCSE_Abstract); stdcall;
+begin
+  while pfirst_item<>plast_item do begin
+    if pfirst_item<>nil then begin
+      game_sv_mp__RejectGameItem.Call([game, pfirst_item^]);
+    end;
+    pfirst_item:=pointer(uintptr(pfirst_item)+sizeof(pfirst_item));
+  end;
+end;
+
+function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_mp; corpse: pCSE_Abstract): boolean; stdcall;
+var
+  pid:pword;
+  item:pCSE_Abstract;
+begin
+  pid:=corpse.children.start;
+  result:=true;
+  while pid<>corpse.children.last do begin
+    item:=xrServer__ID_to_entity.Call([game.base_game_sv_GameState.m_server, pid^]).VPointer;
+    if (item <> nil) and (item.m_tClassID = CLSID_OBJECT_PLAYERS_BAG) then begin
+      // Рюкзак не выбросился, пока удалять нельзя
+      result:=false;
+      break;
+    end;
+    pid:=pointer(uintptr(pid)+sizeof(word));
+  end;
+end;
+
+procedure xrServer__OnMessage_additional(srv:pIPureServer; p:pNET_Packet; sender:ClientID ); stdcall;
+var
+  tmp_packet:NET_Packet;
+begin
+  if PWord(@p.B.data[0])^=M_FZ_DIGEST then begin
+    FZLogMgr.Get.Write('FZ digest from '+inttostr(sender.id), FZ_LOG_DBG);
+    tmp_packet:=p^;
+    PWord(@tmp_packet.B.data[0])^:=M_SV_DIGEST;
+    tmp_packet.r_pos:=0;
+    virtual_IPureServer__OnMessage.Call([srv, @tmp_packet, sender.id]);
+  end;
+end;
+
+function IPureServer__GetClientAddress_check_arg(pClientAddress:pointer; Address:pip_address; pPort:pcardinal):boolean; stdcall;
+begin
+  result:=true;
+  if pClientAddress=nil then begin
+    FillMemory(Address, sizeof(ip_address), 0);
+    FillMemory(pPort, sizeof(cardinal), 0);
+    result:=false;
   end;
 end;
 

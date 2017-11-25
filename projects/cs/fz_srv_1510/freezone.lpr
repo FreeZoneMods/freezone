@@ -81,16 +81,14 @@ uses
   UpdateRate in 'fz_srv_1510\UpdateRate.pas',
   badpackets in 'tools\src_data\badpackets.pas', Compressor,
   ServerStuff in 'fz_srv_1510\ServerStuff.pas',
-  Hits in 'tools\src_typedefs\Hits.pas', SACE_hacks, appinit, MapList;
+  Hits in 'tools\src_typedefs\Hits.pas', SACE_hacks, appinit, MapList, ItemsCfgMgr, clsids;
 
 
 {$R *.res}
 
 function Init():boolean; stdcall;
-var
-c:char;
 begin
-  DecimalSeparator:='.';
+  DecimalSeparator{%H-}:='.';
   //вызвать Init'ы всех модулей
   if not appinit.Init() then begin
     TerminateProcess(GetCurrentProcess(), 13);

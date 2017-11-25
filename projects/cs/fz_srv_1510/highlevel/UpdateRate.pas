@@ -4,7 +4,7 @@ interface
 uses Clients, PureServer;
 
 function SelectUpdRateByPing(ping:integer):cardinal;
-function SelectUpdRate(srv:pIPureServer; cl:pIClient; cur_updrate:cardinal):cardinal; stdcall;
+function SelectUpdRate({%H-}srv:pIPureServer; cl:pIClient; cur_updrate:cardinal):cardinal; stdcall;
 function xrServer__Process_event_change_shooting_packets_proority():cardinal;stdcall;
 
 function Init():boolean;

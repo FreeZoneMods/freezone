@@ -1,14 +1,14 @@
 unit Chat;
 {$mode delphi}
 interface
-uses Packets, Clients, Servers, MatVectors, PureServer, Games;
+uses Packets, Clients, Servers, PureServer, Games;
 
 function OnChatMessage_ValidateAndChange(srv:pxrServer; p:pNET_packet; sender:pxrClientData):boolean; stdcall;
 //TODO: отдельный обработчик для админских сообщений; вывести из отдельной процедуры в Packets, перехватывающей всё отправляемые пакеты
 //function OnAdminChatMessage_Sent(srv:pxrServer; msg:PChar; sender:pxrClientData):boolean; stdcall;
 
-function OnPlayerSpeechMessage(game:pgame_sv_mp; p:pNET_packet; sender:ClientID):boolean; stdcall;
-function OnChatCommand(srv:pxrServer; msg:PChar; p:pNET_packet; sender:pxrClientData):boolean; stdcall;
+function OnPlayerSpeechMessage({%H-}game:pgame_sv_mp; {%H-}p:pNET_packet; sender:ClientID):boolean; stdcall;
+function OnChatCommand(srv:pxrServer; msg:PChar; {%H-}p:pNET_packet; sender:pxrClientData):boolean; stdcall;
 
 procedure SendChatMessage(srv:pIPureServer; cl_id:cardinal; name:string; msg:string; team_id:word=0; channel_id:word=$FFFF); stdcall;
 procedure SendChatMessageByFreeZone(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
@@ -21,7 +21,7 @@ const
   ServerAdminName:PChar = 'ServerAdmin';
 
 implementation
-uses misc_stuff, BasicProtection, LogMgr, sysutils, TranslationMgr, srcBase, ChatCommands, dynamic_caster, basedefs, Players, Console, Censor, ConfigCache, Level, ControlGUI;
+uses LogMgr, sysutils, TranslationMgr, ChatCommands, dynamic_caster, basedefs, Players, Console, Censor, ConfigCache, Level, ControlGUI;
 
 const
   MAX_NICK_SIZE:cardinal = 50;
@@ -86,7 +86,7 @@ begin
 end;
 
 
-function OnPlayerBadWord(player:pointer; pl_id:pointer; ptime:pointer):boolean; stdcall;
+function OnPlayerBadWord(player:pointer; {%H-}pl_id:pointer; ptime:pointer):boolean; stdcall;
 var
   cld:pxrClientData;
 begin
@@ -365,20 +365,9 @@ begin
   end;
 end;
 ////////////////////////////////////////////
-procedure ReloadBadwordsCmdInfo(args:PChar); stdcall;
-begin
-  strcopy(args, 'Reloads list of banned words in chat');
-end;
-
-procedure ReloadBadwordsCmdExecute(args:PChar); stdcall;
-begin
-  FZCensor.Get.ReloadDefaultFile;
-end;
-////////////////////////////////////////////
 
 function Init():boolean; stdcall;
 begin
-  AddConsoleCommand('fz_reload_banned_words', ReloadBadwordsCmdExecute, ReloadBadwordsCmdInfo);
   AddConsoleCommand('fz_muteplayer', MuteCmdExecute, MuteCmdInfo);
   result:=true;
 end;

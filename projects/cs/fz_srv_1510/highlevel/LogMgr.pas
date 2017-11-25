@@ -1,7 +1,7 @@
 unit LogMgr;
 {$mode delphi}
 interface
-uses SyncObjs, SysUtils, basedefs, srcBase, srcCalls, Console;
+uses SyncObjs, SysUtils, srcBase, srcCalls, Console;
 type
   FZLogMessageSeverity = ( FZ_LOG_DBG, FZ_LOG_INFO, FZ_LOG_IMPORTANT_INFO, FZ_LOG_ERROR, FZ_LOG_SILENT );
 
@@ -13,7 +13,7 @@ type
     LogFile:textfile;
     FZLogEnabled:boolean;
     _WriteLock:TCriticalSection;
-    constructor Create();
+    {%H-}constructor Create();
 
   public
     class function Get():FZLogMgr;

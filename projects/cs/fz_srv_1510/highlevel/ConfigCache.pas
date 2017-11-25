@@ -42,7 +42,7 @@ FZCacheData = record
   ping_warnings_max_interval:cardinal;
   auto_update_rate:boolean;
   can_player_change_name:boolean;
-  enable_map_downloader:boolean;  
+  enable_map_downloader:boolean;
   reconnect_ip:string;
   reconnect_port:cardinal;
   mod_name:string;
@@ -56,6 +56,7 @@ FZCacheData = record
   allow_russian_nicknames:boolean;
   hit_statistics_mode:cardinal;
   enable_maplist_sync:boolean;
+  strict_hwid:boolean;
 end;
 pFZCacheData = ^FZCacheData;
 
@@ -76,24 +77,12 @@ end;
 function Init():boolean; stdcall;
 
 implementation
-uses ConfigMgr, Console, LogMgr, sysutils, CommonHelper;
+uses ConfigMgr, LogMgr, sysutils, CommonHelper;
 var
   _instance:FZConfigCache;
 
-procedure ReloadFZConfig_info(info:PChar); stdcall;
-begin
-  strcopy(info, 'Updates data from FreeZone config in the run-time');
-end;
-
-procedure ReloadFZConfig_execute(arg:PChar); stdcall;
-begin
-  FZConfigCache.Get.Reload;
-  FZLogMgr.Get.Write('Config reloaded.', FZ_LOG_INFO);
-end;
-
 function Init():boolean; stdcall;
 begin
-  AddConsoleCommand('fz_reload_config',@ReloadFZConfig_execute, @ReloadFZConfig_info);
   _instance:=FZConfigCache.Get();
   result:=true;
 end;
@@ -181,7 +170,7 @@ begin
   self._data.enable_map_downloader:=FZConfigMgr.Get.GetBool('enable_map_downloader', false);
   self._data.enable_maplist_sync:=FZConfigMgr.Get.GetBool('enable_maplist_sync', false);
   if not FZConfigMgr.Get.GetData('reconnect_ip', self._data.reconnect_ip) then self._data.reconnect_ip:='';
-  self._data.reconnect_port:=FZConfigMgr.Get.GetInt('reconnect_port', 0);  
+  self._data.reconnect_port:=FZConfigMgr.Get.GetInt('reconnect_port', 0);
 
   if not FZConfigMgr.Get.GetData('mod_crc32', tmp) then tmp:='0';
   self._data.mod_crc32:=FZCommonHelper.HexToInt(tmp);
@@ -195,6 +184,8 @@ begin
 
   self._data.allow_russian_nicknames:=FZConfigMgr.Get.GetBool('allow_russian_nicknames', false);
   self._data.hit_statistics_mode:=FZConfigMgr.Get.GetInt('hit_statistics_mode', 0);
+
+  self._data.strict_hwid:=FZConfigMgr.Get.GetBool('strict_hwid', false);
 
   FZLogMgr.Get.SetTargetSeverityLevel(FZConfigMgr.Get.GetInt('log_severity',FZ_LOG_DEFAULT_SEVERITY));
 

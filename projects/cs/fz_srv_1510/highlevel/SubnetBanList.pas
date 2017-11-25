@@ -92,10 +92,6 @@ end;
 
 class function FZSubnetBanList.Get: FZSubnetBanList;
 begin
-//  if _instance=nil then begin
-//    _instance:=FZSubnetBanList.Create();
-//    _instance.ReloadDefaultFile();
-//  end;
   result:=_instance;
 end;
 

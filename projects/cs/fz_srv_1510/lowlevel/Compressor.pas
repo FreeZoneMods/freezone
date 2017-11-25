@@ -72,6 +72,7 @@ begin
   end;
 
   src_filesize:=GetFileSize(src_hfile, nil);
+  dst_filesize:=0;
   if mode = MODE_COMPRESS then begin
     dst_ptr:=VirtualAlloc(nil, src_filesize, MEM_COMMIT, PAGE_READWRITE);
     dst_filesize:=comp(dst_ptr, src_filesize, src_mapped, src_filesize);
@@ -80,6 +81,7 @@ begin
     dst_ptr:=VirtualAlloc(nil, dst_filesize, MEM_COMMIT, PAGE_READWRITE);
     bytes := comp(dst_ptr, dst_filesize, src_mapped, src_filesize);
   end else begin
+    bytes:=0;
     if not ReadFile(src_hfile, dst_filesize, sizeof(dst_filesize), bytes, nil) then begin
       FZLogMgr.Get.Write('Cannot read decompressed size!', FZ_LOG_ERROR);
       UnmapViewOfFile(src_mapped);
@@ -108,6 +110,7 @@ begin
 
   if mode = MODE_COMPRESS then begin
     FZLogMgr.Get.Write('CR = '+floattostr(dst_filesize/src_filesize), FZ_LOG_INFO);
+    bytes:=0;
     if not WriteFile(dst_hfile, src_filesize, sizeof(src_filesize), bytes, nil) then begin
       FZLogMgr.Get.Write('Output file write failed!', FZ_LOG_ERROR);
       VirtualFree(dst_ptr, 0, MEM_RELEASE);
@@ -121,6 +124,7 @@ begin
     end;
   end;
 
+  bytes:=0;
   if not WriteFile(dst_hfile, PByte(dst_ptr)^, dst_filesize, bytes, nil) then begin
     FZLogMgr.Get.Write('Output file write failed!', FZ_LOG_ERROR);
   end else begin

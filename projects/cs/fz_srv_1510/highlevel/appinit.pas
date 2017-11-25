@@ -11,7 +11,7 @@ implementation
 uses basedefs, dynamic_caster, global_functions, LogMgr, ConfigMgr, Console, Emergency, ConfigCache, TranslationMgr, DownloadMgr, SACE_Interface,
      ServerStuff, PacketFilter, UpdateRate, Bans, SubnetBanList, Censor, ChatCommands, Chat, fz_injections, ControlGUI, sysmsgs, Compressor, SACE_Hacks,
      BaseClasses, xrstrings, Packets, Clients, Time, PureServer, Level, CSE, Vector, MatVectors, GameMessages, misc_stuff, Banned, Servers, Items,
-     Objects, Games, Gametypes, MapList;
+     Objects, Games, Gametypes, MapList, ItemsCfgMgr, clsids;
 
 function Init():boolean; stdcall;
 var
@@ -48,6 +48,7 @@ begin
   end;
 
   if not ConfigMgr.Init then exit;
+  if not ItemsCfgMgr.Init then exit;
   if not Console.Init then exit;
   if not ConfigCache.Init then exit;
 
@@ -60,6 +61,7 @@ begin
 
 
   if not BaseClasses.Init then exit;
+  if not clsids.Init then exit;
   if not xrstrings.Init then exit;
   if not Packets.Init then exit;
   if not Clients.Init then exit;
@@ -107,6 +109,7 @@ end;
 function Free():boolean; stdcall;
 begin
   //не нарушать порядок!
+  result:=true;
   ControlGUI.Clean;
   sysmsgs.Free();
   SACE_Hacks.Free();
@@ -123,7 +126,6 @@ begin
   FZLogMgr.Get.Free;
 
   basedefs.Free;
-  result:=true;
 end;
 
 end.

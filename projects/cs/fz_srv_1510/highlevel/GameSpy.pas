@@ -7,7 +7,7 @@ uses misc_stuff;
 type gsBufWriter = procedure (buf:pointer; data:PChar); cdecl;
 
 procedure WriteHostnameToClientRequest(old_hostname:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
-procedure WriteMapnameToClientRequest(old_name:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
+procedure WriteMapnameToClientRequest({%H-}old_name:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
 function OnAuthSend(cl:pgsclient_t):boolean; stdcall;
 function IsSameCdKeyValidated():boolean; stdcall;
 

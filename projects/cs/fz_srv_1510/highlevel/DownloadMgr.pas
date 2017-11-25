@@ -8,7 +8,7 @@ type
 
   FZDownloadMgr = class(FZConfigBase)
   private
-    constructor Create();
+    {%H-}constructor Create();
   public
    class function Get():FZDownloadMgr;
    function GetLinkByMapName(map:string; ver:string):string;
@@ -25,7 +25,7 @@ type
 function Init():boolean; stdcall;
 
 implementation
-uses ConfigMgr, CommonHelper, sysutils;
+uses CommonHelper, sysutils;
 var
   _instance:FZDownloadMgr;
 
