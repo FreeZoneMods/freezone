@@ -54,7 +54,7 @@ end;
 
 type srcCleanupInjection = class (srcBaseInjection)
   protected
-  function _AssembleInit(args:array of cardinal):boolean; override;
+  function _AssembleInit({%H-}args:array of cardinal):boolean; override;
   public
   constructor Create(addr:pointer; payload:pointer; count:cardinal);
   destructor Destroy; override;
@@ -288,20 +288,20 @@ begin
       //с пам€тью и смещени€ми не работаем
       tmp:=(args[i]+$32767) shr 29;
       PByte(pos)^:=PUSH_EAX+tmp;
-      pos:=PChar(pos)+1;
+      pos:=PAnsiChar(pos)+1;
 
       //»нкремент/декремент значени€ аргумента из регистра (+/-32767 max)
       tmpw:=(args[i] and $FFFF);
       tmpi:=tmpw;
       srcKit.Get.DbgLog('tmpw='+inttostr(tmpw));
-      if (tmp=PUSH_ESP-PUSH_EAX) then tmpi:=tmpi+_GetSavedInStackBytesCount()+esp_add;
+      if (tmp{%H-}{%H-}=PUSH_ESP-PUSH_EAX) then tmpi:=tmpi{%H-}+_GetSavedInStackBytesCount()+esp_add;
       srcKit.Get.DbgLog('tmpi='+inttostr(tmpi));
       if tmpi<>0 then begin
         //add [esp], XXXXX
         PCardinal(pos)^:=$240481; //значимы 3 байта, а не 4!!! Ќа старший пофиг
-        pos:=PChar(pos)+3;
+        pos:=PAnsiChar(pos)+3;
         PCardinal(pos)^:=tmpi;
-        pos:=PChar(pos)+4;
+        pos:=PAnsiChar(pos)+4;
       end;
       esp_add:=esp_add+4;
 
@@ -311,17 +311,17 @@ begin
       if (args[i] and $F0000000)<>(F_PUSH_ESP-F_MEMOFFSET) then begin
         srcKit.Get.DbgLog('not esp');
         PWord(pos)^:=$B0FF+(tmp shl 8);
-        pos:=PChar(pos)+2;
+        pos:=PAnsiChar(pos)+2;
         PCardinal(pos)^:= (args[i] and $00FFFFFF)-$800000;
-        pos:=PChar(pos)+4;
+        pos:=PAnsiChar(pos)+4;
         esp_add:=esp_add+4;
 
       end else begin
         srcKit.Get.DbgLog('esp');
         PCardinal(pos)^:=$0024B4FF;
-        pos:=PChar(pos)+3;
+        pos:=PAnsiChar(pos)+3;
         PCardinal(pos)^:= (args[i] and $00FFFFFF)-$800000+_GetSavedInStackBytesCount()+esp_add; //не забываем про pushad
-        pos:=PChar(pos)+4;
+        pos:=PAnsiChar(pos)+4;
         esp_add:=esp_add+4;
       end;
 

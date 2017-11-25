@@ -108,6 +108,7 @@ function Free():boolean; stdcall;
 begin
   //не нарушать порядок!
   ControlGUI.Clean;
+  sysmsgs.Free();
   SACE_Hacks.Free();
   ServerStuff.Clean;
   FZChatCommandList.Get.Free;
@@ -122,6 +123,7 @@ begin
   FZLogMgr.Get.Free;
 
   basedefs.Free;
+  result:=true;
 end;
 
 end.

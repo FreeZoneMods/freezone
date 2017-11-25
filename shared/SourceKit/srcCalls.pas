@@ -19,7 +19,7 @@ protected
 
   function _ArgsInit(args:array of const; pos:pointer):pointer; virtual;
   function _AssembleWrapper(pos:pointer; args:array of const):pointer; virtual;
-  function _WriteCallInstruction(pos:pointer; args:array of const):pointer; virtual;
+  function _WriteCallInstruction(pos:pointer; {%H-}args:array of const):pointer; virtual;
 public
   constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
   destructor Destroy(); override;
@@ -80,8 +80,7 @@ uses srcBase, sysutils;
 
 { srcESICallFunction }
 
-constructor srcESICallFunction.Create(addr: pointer; args: array of const;
-  name: string; visibility: string);
+constructor srcESICallFunction.Create(addr: pointer; args: array of const; name: string; visibility: string);
 begin
   inherited;
   _to_reg_move_opcode:=MOV_ESI_DWORD;
@@ -89,12 +88,12 @@ end;
 
 { srcBaseFunction }
 
-
 function srcBaseFunction.AsFloat(args: array of const): single;
 var
   tmp:cardinal;
 begin
-  tmp:=self.Call(args).VInteger;
+  result:=0;
+  tmp:=cardinal(self.Call(args).VInteger);
   Move(tmp, result, sizeof(result));
 end;
 
@@ -125,13 +124,13 @@ begin
   setlength(code, 5*self._argc+100); //TODO:посчитать размер "в граммах"
   srcKit.MakeExecutable(@code[0], 5*self._argc+100);
   try
-    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': calling, assembled wrapper at address @'+inttohex(cardinal(@code[0]),8));
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': calling, assembled wrapper at address @'+inttohex(uintptr(@code[0]),8));
 
     _AssembleWrapper(@code[0], args);
 
     result.VInteger:=integer(srcKit.LowLevelCall(@code[0]));
 
-    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': result='+inttostr(result.VInteger));
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': result='+inttohex(result.VInteger, 8));
   finally
     setlength(code, 0);
   end;
@@ -145,7 +144,7 @@ begin
   self._argc:=high(args)-low(args)+1;
   setlength(self._types, self._argc);
   for i:=0 to self._argc-1 do begin
-    self._types[i]:=args[low(args)+i].VInteger;
+    self._types[i]:=byte(args[low(args)+i].VInteger);
   end;
   self._name:=name;
   self._visibility:=visibility;
@@ -168,7 +167,7 @@ end;
 
 function srcBaseFunction.GetSignature: string;
 begin
-  result:=self._visibility+'::'+self._name+' (@'+inttohex(cardinal(self._addr), 8)+')';
+  result:=self._visibility+'::'+self._name+' (@'+inttohex(uintptr(self._addr), 8)+')';
 end;
 
 function srcBaseFunction.IsItMe(name, visibility: string): boolean;
@@ -179,11 +178,12 @@ end;
 function srcBaseFunction._ArgsInit(args: array of const; pos: pointer):pointer;
 var
   i:integer;
+  val:cardinal;
 begin
   for i:= high(args) downto low(args) do begin
     if args[i].VType=vtString then begin
-      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(cardinal(PChar(args[i].VString)), 8), false);
-      pos:=srcKit.WritePushDword(pos, cardinal(PChar(args[i].VString)))
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(uintptr(PAnsiChar(args[i].VString)), 8), false);
+      pos:=srcKit.WritePushDword(pos, uintptr(PAnsiChar(args[i].VString)))
     end else if args[i].VType = vtBoolean then begin
       if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': bool arg #'+inttostr(i)+' is '+booltostr(args[i].VBoolean, true), false);
       if (args[i].VBoolean) then begin
@@ -192,8 +192,9 @@ begin
         pos:=srcKit.WritePushDword(pos, 0);
       end;
     end else begin
-      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg #'+inttostr(i)+' is '+inttohex(cardinal(args[i].VInteger), 8), false);
-      pos:=srcKit.WritePushDword(pos, args[i].VInteger)
+      val:=cardinal(args[i].VInteger);
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg #'+inttostr(i)+' is '+inttohex(val, 8), false);
+      pos:=srcKit.WritePushDword(pos, val)
     end;
   end;
   result:=pos;
@@ -202,17 +203,17 @@ end;
 function srcBaseFunction._AssembleWrapper(pos: pointer; args:array of const): pointer;
 begin
   (PByte(pos))^:=PUSH_EAX;        //сюда будем писать резалт
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   pos:=srcKit.WriteSaveRegisters(pos);
   pos:=_ArgsInit(args, pos);
   pos:=_WriteCallInstruction(pos, args);
   (PCardinal(pos))^:=$24244489; //mov [esp+$24], eax
-  pos:=pointer(cardinal(pos)+4);
+  pos:=pointer(uintptr(pos)+4);
   pos:=srcKit.WriteLoadRegisters(pos);
   (PByte(pos))^:=POP_EAX;       //результат выполнения функции
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   (PByte(pos))^:=RET;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   result:=pos;
 end;
 
@@ -246,20 +247,20 @@ function srcCdeclFunction._AssembleWrapper(pos: pointer;
   args: array of const): pointer;
 begin
   (PByte(pos))^:=PUSH_EAX;        //сюда будем писать резалт
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   pos:=srcKit.WriteSaveRegisters(pos);
   pos:=_ArgsInit(args, pos);
   pos:=_WriteCallInstruction(pos, args);
   if self._argc>0 then pos:=srcKit.Get.WriteAddESPDword(pos, 4*self._argc);  //снимаем со стека лишнее
 
   (PCardinal(pos))^:=$24244489; //mov [esp+$24], eax
-  pos:=pointer(cardinal(pos)+4);
+  pos:=pointer(uintptr(pos)+4);
 
   pos:=srcKit.WriteLoadRegisters(pos);
   (PByte(pos))^:=POP_EAX;       //результат выполнения функции
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   (PByte(pos))^:=RET;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   result:=pos;
 end;
 
@@ -280,11 +281,12 @@ function srcECXCallFunction._ArgsInit(args: array of const;
   pos: pointer): pointer;
 var
   i:integer;
+  val:cardinal;
 begin
   for i:= high(args) downto low(args)+1 do begin
     if args[i].VType=vtString then begin
-      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(cardinal(PChar(args[i].VString)), 8), false);
-      pos:=srcKit.WritePushDword(pos, cardinal(PChar(args[i].VString)));
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(uintptr(PAnsiChar(args[i].VString)), 8), false);
+      pos:=srcKit.WritePushDword(pos, uintptr(PAnsiChar(args[i].VString)));
     end else if args[i].VType = vtBoolean then begin
       if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': bool arg #'+inttostr(i)+' is '+booltostr(args[i].VBoolean, true), false);
       if (args[i].VBoolean) then begin
@@ -293,14 +295,15 @@ begin
         pos:=srcKit.WritePushDword(pos, 0);
       end;
     end else begin
-      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg #'+inttostr(i)+' is '+inttohex(cardinal(args[i].VInteger), 8), false);
-      pos:=srcKit.WritePushDword(pos, args[i].VInteger)
+      val:=cardinal(args[i].VInteger);
+      if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg #'+inttostr(i)+' is '+inttohex(val, 8), false);
+      pos:=srcKit.WritePushDword(pos, val);
     end;
   end;
   (PByte(pos))^:=_to_reg_move_opcode;
-  pos:=pointer(cardinal(pos)+1);
-  (PCardinal(pos))^:=args[low(args)].VInteger;
-  pos:=pointer(cardinal(pos)+4);
+  pos:=pointer(uintptr(pos)+1);
+  (PCardinal(pos))^:=cardinal(args[low(args)].VInteger);
+  pos:=pointer(uintptr(pos)+4);
   result:=pos;
 end;
 
@@ -323,10 +326,10 @@ var
 begin
   if args[low(args)+1].VType=vtString then begin
     (PByte(pos))^:=MOV_EAX_DWORD;
-    pos:=pointer(cardinal(pos)+1);
-    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg is '+inttohex(cardinal(PChar(args[low(args)+1].VString)), 8), false);
-    (PCardinal(pos))^:=cardinal(PChar(args[low(args)+1].VString));
-    pos:=pointer(cardinal(pos)+4);
+    pos:=pointer(uintptr(pos)+1);
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg is '+inttohex(cardinal(PAnsiChar(args[low(args)+1].VString)), 8), false);
+    (puintptr(pos))^:=uintptr(PAnsiChar(args[low(args)+1].VString));
+    pos:=pointer(uintptr(pos)+4);
   end else begin
     if args[low(args)+1].VType=vtBoolean then begin
       if args[low(args)+1].VBoolean then begin
@@ -336,20 +339,20 @@ begin
       end;
       if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': bool arg is '+booltostr(args[low(args)+1].VBoolean), false);
     end else begin
-      val:=args[low(args)+1].VInteger;
+      val:=cardinal(args[low(args)+1].VInteger);
       if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': arg is '+inttohex(val, 8), false);
     end;
 
     (PByte(pos))^:=MOV_EAX_DWORD;
-    pos:=pointer(cardinal(pos)+1);
+    pos:=pointer(uintptr(pos)+1);
     (PCardinal(pos))^:=val;
-    pos:=pointer(cardinal(pos)+4);
+    pos:=pointer(uintptr(pos)+4);
   end;
 
   (PByte(pos))^:=MOV_ESI_DWORD;
-  pos:=pointer(cardinal(pos)+1);
-  (PCardinal(pos))^:=args[low(args)].VInteger;
-  pos:=pointer(cardinal(pos)+4);
+  pos:=pointer(uintptr(pos)+1);
+  (PCardinal(pos))^:=cardinal(args[low(args)].VInteger);
+  pos:=pointer(uintptr(pos)+4);
   result:=pos;
 end;
 
@@ -367,13 +370,13 @@ end;
 function srcVirtualBaseFunction._WriteCallInstruction(
   pos: pointer; args:array of const): pointer;
 var
-  obj:cardinal;
-  vftable:cardinal;
-  f:cardinal;
+  obj:uintptr;
+  vftable:uintptr;
+  f:uintptr;
 begin
-  obj:=args[low(args)].VInteger;
-  vftable:= (PCardinal(obj))^;
-  f:=(PCardinal(vftable+_vftable_offset))^;
+  obj:=uintptr(args[low(args)].VInteger);
+  vftable:= (puintptr(obj))^;
+  f:=(puintptr(vftable+_vftable_offset))^;
   result:=srcKit.WriteCall(pos, pointer(f), true);  
 end;
 
@@ -382,13 +385,13 @@ end;
 function srcVirtualECXCallFunction._WriteCallInstruction(pos: pointer;
   args: array of const): pointer;
 var
-  obj:cardinal;
-  vftable:cardinal;
-  f:cardinal;
+  obj:uintptr;
+  vftable:uintptr;
+  f:uintptr;
 begin
-  obj:=args[low(args)].VInteger;
-  vftable:= (PCardinal(obj))^;
-  f:=(PCardinal(vftable+_vftable_offset))^;
+  obj:=uintptr(args[low(args)].VInteger);
+  vftable:= (puintptr(obj))^;
+  f:=(puintptr(vftable+_vftable_offset))^;
   result:=srcKit.WriteCall(pos, pointer(f), true);  
 end;
 

@@ -14,7 +14,7 @@ private
   _fulllog:boolean;
   _injector: srcInjector;
   _functions: srcFunMgr;
-  constructor Create();
+  {%H-}constructor Create();
   procedure _Cleanup();
 
 public
@@ -193,6 +193,7 @@ class function srcKit.CopyBuf(src, dst: pointer; cnt: cardinal): boolean;
 var
   rb:cardinal;
 begin
+  rb:=0; //suppress warning
   WriteProcessMemory(GetCurrentProcess, dst, src, cnt, rb);
   result:=(cnt=rb);
 end;
@@ -237,8 +238,9 @@ var rb:cardinal;
     i:cardinal;
 begin
   result:=false;
-  for i:=cardinal(addr) to cardinal(addr)+count-1 do begin
-    WriteProcessMemory(GetCurrentProcess(), PChar(i), @opcode, 1, rb);
+  rb:=0;
+  for i:=0 to count-1 do begin
+    WriteProcessMemory(GetCurrentProcess(), @PAnsiChar(uintptr(addr))[i], @opcode, 1, rb);
     if rb<>1 then exit;
   end;
   result:=true;
@@ -252,13 +254,14 @@ var
   opcode:char;
 begin
   result:=nil;
+  rb:=0;
   if write_call then opcode:=CHR(CALL_RELATIVE) else opcode:=CHR(JMP_RELATIVE);
-  offsettowrite:=pointer(cardinal(dest_addr)-cardinal(patch_addr)-5);       //относительный адрес места, в которое произойдет переход
+  offsettowrite:=pointer(uintptr(dest_addr)-uintptr(patch_addr)-5);       //относительный адрес места, в которое произойдет переход
   writeprocessmemory(GetCurrentProcess(), patch_addr, @opcode, 1, rb);
   if rb<>1 then exit;
-  writeprocessmemory(GetCurrentProcess(), pointer(cardinal(patch_addr)+1), @offsettowrite, 4, rb);
+  writeprocessmemory(GetCurrentProcess(), pointer(uintptr(patch_addr)+1), @offsettowrite, 4, rb);
   if rb<>4 then exit;
-  result:=pointer(cardinal(patch_addr)+5);
+  result:=pointer(uintptr(patch_addr)+5);
 end;
 
 class function srcKit.WriteMemCall(patch_addr: pointer; var_addr: pointer;
@@ -268,6 +271,7 @@ var
   opcode:array [0..1] of byte;
 begin
   result:=nil;
+  rb:=0;
 
   opcode[0]:=$FF;
   if write_call then opcode[1]:=$15 else opcode[1]:=$25;
@@ -275,26 +279,26 @@ begin
   writeprocessmemory(GetCurrentProcess(), patch_addr, @(opcode[0]), 2, rb);
   if rb<>2 then exit;
 
-  writeprocessmemory(GetCurrentProcess(), pointer(cardinal(patch_addr)+2), @var_addr, 4, rb);
+  writeprocessmemory(GetCurrentProcess(), pointer(uintptr(patch_addr)+2), @var_addr, 4, rb);
   if rb<>4 then exit;
-  result:=pointer(cardinal(patch_addr)+6);
+  result:=pointer(uintptr(patch_addr)+6);
 end;
 
 class function srcKit.WriteLoadRegisters(pos: pointer): pointer;
 begin
   (PByte(pos))^:=POPFD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   (PByte(pos))^:=POPAD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   result:=pos;
 end;
 
 class function srcKit.WriteSaveRegisters(pos: pointer): pointer;
 begin
   (PByte(pos))^:=PUSHAD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   (PByte(pos))^:=PUSHFD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   result:=pos;
 end;
 
@@ -310,19 +314,18 @@ end;
 class function srcKit.WritePushDword(pos: pointer; val: cardinal): pointer;
 begin
   (PByte(pos))^:=PUSH_DWORD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   (PCardinal(pos))^:=val;
-  pos:=pointer(cardinal(pos)+4);
+  pos:=pointer(uintptr(pos)+4);
   result:=pos;
 end;
 
-class function srcKit.WriteAddESPDword(pos: pointer;
-  val: cardinal): pointer;
+class function srcKit.WriteAddESPDword(pos: pointer; val: cardinal): pointer;
 begin
   (PWord(pos))^:=ADD_ESP_DWORD;
-  pos:=pointer(cardinal(pos)+2);
+  pos:=pointer(uintptr(pos)+2);
   (PCardinal(pos))^:=val;
-  pos:=pointer(cardinal(pos)+4);
+  pos:=pointer(uintptr(pos)+4);
   result:=pos;
 end;
 
@@ -351,6 +354,7 @@ var
   offsettowrite:pointer;
 begin
   result:=nil;
+  rb:=0;
 
   opcode[0]:=$0F;
   opcode[1]:=jmptype;
@@ -358,10 +362,10 @@ begin
   writeprocessmemory(GetCurrentProcess(), patch_addr, @(opcode[0]), 2, rb);
   if rb<>2 then exit;
 
-  offsettowrite:=pointer(cardinal(to_addr)-cardinal(patch_addr)-6);       //относительный адрес места, в которое произойдет переход
-  writeprocessmemory(GetCurrentProcess(), pointer(cardinal(patch_addr)+2), @offsettowrite, 4, rb);
+  offsettowrite:=pointer(uintptr(to_addr)-uintptr(patch_addr)-6);       //относительный адрес места, в которое произойдет переход
+  writeprocessmemory(GetCurrentProcess(), pointer(uintptr(patch_addr)+2), @offsettowrite, 4, rb);
   if rb<>4 then exit;
-  result:=pointer(cardinal(patch_addr)+6);
+  result:=pointer(uintptr(patch_addr)+6);
 end;
 
 class function srcKit.WriteTestReg(pos: pointer; test_type:word): pointer;
@@ -372,21 +376,21 @@ end;
 class function srcKit.WriteWordInstruction(pos: pointer; instruction: word): pointer;
 begin
   (PWord(pos))^:=instruction;
-  pos:=pointer(cardinal(pos)+sizeof(instruction));
+  pos:=pointer(uintptr(pos)+sizeof(instruction));
   result:=pos;
 end;
 
 class function srcKit.WriteLoadOnlyGeneralRegisters(pos: pointer): pointer;
 begin
   (PByte(pos))^:=POPAD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   result:=pos;
 end;
 
 class function srcKit.WriteSaveOnlyGeneralRegisters(pos: pointer): pointer;
 begin
   (PByte(pos))^:=PUSHAD;
-  pos:=pointer(cardinal(pos)+1);
+  pos:=pointer(uintptr(pos)+1);
   result:=pos;
 end;
 
@@ -398,7 +402,7 @@ begin
    jmp [var_addr]
  @nojmp:}
 
-  result:=WriteConditionalJump(patch_addr, pointer(cardinal(patch_addr)+12), jmptype);
+  result:=WriteConditionalJump(patch_addr, pointer(uintptr(patch_addr)+12), jmptype);
   if result<>nil then result:=WriteMemCall(result, var_addr, false);
 
 end;
@@ -407,12 +411,14 @@ class function srcKit.MakeExecutable(addr: pointer; sz: cardinal): boolean;
 var
   oldprotect:cardinal;
 begin
+  oldprotect:=0;
   result:=(VirtualProtect(addr, sz, PAGE_EXECUTE_READWRITE, oldprotect));
 end;
 
 function srcKit.FindEngineCall(name: string; visibility: string
   ): srcBaseFunction; stdcall;
 begin
+  result:=nil;
   self._functions.SearchByName(result, name, visibility);
 end;
 

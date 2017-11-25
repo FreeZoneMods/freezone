@@ -80,6 +80,9 @@ FZDllDownloadInfo = packed record
   //Если параметр не совпадает с указанным в командной строке - происходит дисконнект игрока
   //Если в командной строке параметра нет - происходит установка мода.
   name_lock:PAnsiChar;
+
+  //Строка, выводимая при обнаружении несовместимого мода
+  incompatible_mod_message:PAnsiChar;
 end;
 pFZDllDownloadInfo = ^FZDllDownloadInfo;
 
@@ -149,6 +152,10 @@ external 'sysmsgs.dll' name 'FZSysMsgsProcessClientModDll';
 //Функция инициализации модуля системных сообщений. Вызовите ее перед началом работы с модулем!
 function Init():boolean; stdcall;
 external 'sysmsgs.dll' name 'FZSysMsgsInit';
+
+//Функция очистки, вызовите ее перед завершением работы с модулем!
+function Free():boolean; stdcall;
+external 'sysmsgs.dll' name 'FZSysMsgsFree';
 
 //Функция позволяет узнать используемую версию DLL.
 function GetModuleVer():PChar; stdcall;

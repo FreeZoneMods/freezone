@@ -55,10 +55,12 @@ function srcFunMgr.CallByName(args: array of const; name,
 var
   f:srcBaseFunction;
 begin
+  f:=nil;
   if SearchByName(f, name, visibility) then begin
     result:=f.Call(args);
   end else begin
     srcKit.Get.DbgLog('srcFunMgr.CallByName: function: '+visibility+'::'+name+' not registered!', true);
+    result.VPointer:=nil;
   end;
 end;
 

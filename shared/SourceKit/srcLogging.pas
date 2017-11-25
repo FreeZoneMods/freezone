@@ -1,7 +1,6 @@
 unit srcLogging;
 {$mode delphi}
 interface
-uses SyncObjs;
 type
   srcLog = class
   private
@@ -23,8 +22,8 @@ uses SysUtils, Windows;
 constructor srcLog.Create(logname:string; filename:string; recreate:boolean=false);
 begin
   inherited Create();
-  InitializeCriticalSection(_lock);
-  EnterCriticalSection(_lock);
+  windows.InitializeCriticalSection(_lock);
+  windows.EnterCriticalSection(_lock);
   try
     assignfile(_logfile, filename);
     if recreate then
@@ -39,34 +38,34 @@ begin
     _logname:=logname;
   except
   end;
-  LeaveCriticalSection(_lock);
+  windows.LeaveCriticalSection(_lock);
 end;
 
 procedure srcLog.Write(data:string; IsError:boolean = false);
 begin
-    EnterCriticalSection(_lock);
+    windows.EnterCriticalSection(_lock);
     if IsError then
       writeln(_logfile, '['+ GetCurDate+' '+ GetCurTime +'] ERROR: '+data)
     else
       writeln(_logfile, '['+ GetCurDate+' '+ GetCurTime +'] '+data);
     flush(_logfile);
-    LeaveCriticalSection(_lock);
+    windows.LeaveCriticalSection(_lock);
 end;
 
 function srcLog.Name():string;
 begin
-  EnterCriticalSection(_lock);
+  windows.EnterCriticalSection(_lock);
   result:=_logname;
-  LeaveCriticalSection(_lock);
+  windows.LeaveCriticalSection(_lock);
 end;
 
 destructor srcLog.Destroy;
 begin
-  EnterCriticalSection(_lock);
+  windows.EnterCriticalSection(_lock);
   Write('Log <'+_logname+'> finished.');
   closefile(_logfile);
-  LeaveCriticalSection(_lock);
-  DeleteCriticalSection(_lock);
+  windows.LeaveCriticalSection(_lock);
+  windows.DeleteCriticalSection(_lock);
   inherited;
 end;
 
@@ -75,6 +74,7 @@ class function srcLog.GetCurTime():string;
 var
   st:_SYSTEMTIME;
 begin
+  st.Day:=0; //suppress warning
   GetLocalTime(st);
   if st.wHour<10 then result:='0' else result:='';
   result:=result+inttostr(st.wHour)+':';
@@ -88,6 +88,7 @@ class function srcLog.GetCurDate():string;
 var
   st:_SYSTEMTIME;
 begin
+  st.Day:=0; //suppress warning
   GetLocalTime(st);
   if st.wDay<10 then result:='0' else result:='';
   result:=result+inttostr(st.wDay)+'.';

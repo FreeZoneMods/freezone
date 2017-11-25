@@ -724,7 +724,7 @@ var
   dlinfo:FZMapInfo;
   moddllinfo:FZDllDownloadInfo;
   mapname, mapver, maplink, link, xml:string;
-  dl_msg, err_msg:string;
+  dl_msg, err_msg, incompatible_mod_msg:string;
   filename:string;
   need_dl:boolean;
   userdata:FZSysMsgSendCallbackData;
@@ -745,6 +745,7 @@ begin
       filename:=dat.mod_name+'.mod';
       dl_msg:=FZTranslationMgr.Get().Translate('fz_mod_downloading');
       err_msg:=FZTranslationMgr.Get().Translate('fz_already_has_download');
+      incompatible_mod_msg:=FZTranslationMgr.Get().Translate('fz_incompatible_mod');
 
       moddllinfo.fileinfo.filename:=PAnsiChar(filename);
       moddllinfo.fileinfo.url:=PAnsiChar(dat.mod_link);
@@ -756,6 +757,8 @@ begin
       moddllinfo.procarg1:=PAnsiChar(dat.mod_name);
       moddllinfo.procarg2:=PAnsiChar(dat.mod_params);
       moddllinfo.dsign:=PAnsiChar(dat.mod_dsign);
+      moddllinfo.name_lock:=PAnsiChar(dat.mod_name);
+      moddllinfo.incompatible_mod_message:=PAnsiChar(incompatible_mod_msg);
 
       if dat.mod_is_reconnect_needed then begin
         moddllinfo.is_reconnect_needed:=1;
