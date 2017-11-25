@@ -82,6 +82,8 @@ var
 begin
   MaxComponentLength:=0;
   FileSystemFlags:=0;
+  VolumeName[0]:=CHR(0);
+  FileSystemName[0]:=CHR(0);
   GetVolumeInformation(nil,
       VolumeName,
       MAX_PATH,

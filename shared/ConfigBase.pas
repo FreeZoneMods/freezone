@@ -3,349 +3,95 @@ unit ConfigBase;
 {$mode delphi}
 
 interface
-uses SysUtils, syncobjs, LazUTF8;
-
-{$DEFINE 1USE_CUSTOM_IMPL}
+uses SysUtils, INIFiles, LazUTF8, SyncObjs;
 
 type
+
+  { FZConfigBase }
+
   FZConfigBase = class
-     function GetValue(str: string):string;
-     function GetKey(str: string):string;
     public
      constructor Create();
+     destructor Destroy(); override;
      procedure Load(FName:string);
-     function GetData(Key:string; var Value:string):boolean;
-     function GetBool(Key:string; default:boolean = false):boolean;
-     function GetInt(Key:string; default:integer = 0):integer;
-     function GetString(key:string; default:string = ''):string;     
-     procedure SetData(Key:string; Value:string);
-     procedure Save();
+     function GetData(Key:string; var Value:string; section:string = 'main'):boolean;
+     function GetBool(Key:string; default:boolean = false; section:string = 'main'):boolean;
+     function GetInt(Key:string; default:integer = 0; section:string = 'main'):integer;
+     function GetFloat(Key:string; default:single = 0; section:string = 'main'):single;
+     function GetString(key:string; default:string = ''; section:string = 'main'):string;
      procedure Reload();
-     function IsSaved():boolean;
     protected
+     _lock:TCriticalSection;
      _filename:string;
-
-
-{$IFDEF USE_CUSTOM_IMPL}
-{$IFDEF USE_TMREWS}
-     _lock:TMultiReadExclusiveWriteSynchronizer;
-{$ELSE}
-     _cs:TCriticalSection;
-{$ENDIF}
-     _keys:array of string;
-     _values:array of string;
-     _size:integer;
-     _is_saved:boolean;
-{$ELSE}
      _full_path:string;
-{$ENDIF}
-
-    procedure _BeginRead();
-    procedure _EndRead();
-    procedure _BeginWrite();
-    procedure _EndWrite();
+     _inifile:TIniFile;
   end;
 
 implementation
-uses Windows, CommonHelper, LogMgr;
-
+uses CommonHelper;
 
 constructor FZConfigBase.Create();
 begin
   inherited;
+  _lock:=SyncObjs.TCriticalSection.Create();
   self._filename:='';
-
-{$IFDEF USE_CUSTOM_IMPL}
-{$IFDEF USE_TMREWS}
-  _lock:=TMultiReadExclusiveWriteSynchronizer.Create;
-{$ELSE}
-  _cs:=TCriticalSection.Create;
-{$ENDIF}
-{$ELSE}
-self._full_path:='';
-{$ENDIF}
+  self._full_path:='';
+  _inifile:=nil;
 end;
 
-{$IFDEF USE_CUSTOM_IMPL}
-procedure FZConfigBase.Load(FName:string);
-var
-  f:textfile;
-  t:string;
+destructor FZConfigBase.Destroy;
 begin
-  self._BeginWrite;
-  try
-    setlength(_keys, 0);
-    setlength(_values, 0);
-    _size:=0;
-    _filename :=FName;
-    try
-      assignfile(f, FName);
-      reset(f);
-
-      while not eof(f) do begin
-       readln(f,t);
-        if pos('=',t)>0 then begin
-          setlength(_keys, _size+1);
-          setlength(_values, _size+1);
-          _keys[_size] := lowercase(GetKey(t));
-          _values[_size]:= GetValue(t);
-          _size:=_size+1;
-        end;
-      end;
-      closefile(f);
-      _is_saved :=true;
-    except
-      _is_saved :=false;
-    end;
-  finally
-    self._EndWrite;
-  end;
+  _inifile.Free();
+  _lock.Free();
+  inherited Destroy;
 end;
 
-function FZConfigBase.GetValue(str: string):string;
-var
-  i:integer;
-  after_last_equals:string;
-  tmp:string;
-
-begin
-  self._BeginRead;
-  try
-    result:='';
-
-    after_last_equals:='';
-    tmp:='';
-    
-    for i:=length(str) downto 1 do begin
-       if str[i] = ';' then begin
-        after_last_equals:='';
-        tmp:='';
-      end else if str[i] = '=' then begin
-        after_last_equals:= trim(tmp);
-        tmp:=str[i]+tmp;
-      end else begin
-        tmp:=str[i]+tmp;
-      end;
-    end;
-
-    result:=after_last_equals;
-  finally
-    self._EndRead;
-  end;
-end;
-
-function FZConfigBase.GetKey(str: string):string;
-var i:integer;
-begin
-  result:='';
-  self._BeginRead;
-  try
-    for i:=1 to length(str) do begin
-      if str[i] = '=' then begin
-        result:= trim(result);
-        exit;
-      end else begin
-        result:=result + str[i];
-      end;
-    end
-  finally
-    self._EndRead;
-  end;
-end;
-
-function FZConfigBase.GetData(Key:string; var Value:string):boolean;
-var
-  i:integer;
-begin
-  self._BeginRead;
-  try
-    result:=false;
-    key := lowercase(key);
-    for i:=_size-1 downto 0 do begin
-      if lowercase(_keys[i]) = key then begin
-        value:=_values[i];
-        result:=true;
-        break;
-      end;
-    end;
-  finally
-    self._EndRead;
-  end;
-end;
-
-procedure FZConfigBase.SetData(Key:string; Value:string);
-var
-  success:boolean;
-  i:integer;
-begin
-  self._BeginWrite;
-  try
-    success:=false;
-    for i:=_size-1 downto 0 do begin
-      if _keys[i] = key then begin
-        _values[i]:=value;
-        success:=true;
-        break;
-      end;
-    end;
-    if not success then begin
-      setlength(_keys, _size+1);
-      setlength(_values, _size+1);
-      _keys[_size]:=Key;
-      _values[_size]:=Value;
-      _size:=_size+1;
-    end;
-    _is_saved :=false;
-  finally
-    self._EndWrite;
-  end;
-end;
-
-procedure FZConfigBase.Save();
-var
-  i:integer;
-  f:textfile;
-begin
-  self._BeginRead;
-  try
-    assignfile(f, _filename);
-    rewrite(f);
-    for i:=0 to _size-1 do begin
-       writeln(f, _keys[i],' = ', _values[i]);
-    end;
-    closefile(f);
-    _is_saved :=true;
-  finally
-    self._EndRead;
-  end;
-end;
-
-function FZConfigBase.IsSaved: boolean;
-begin
-  result:= _is_saved;
-end;
-
-procedure FZConfigBase._BeginRead();
-begin
-{$IFDEF USE_TMREWS}
-  _lock.BeginRead;
-{$ELSE}
-  _cs.Enter;
-{$ENDIF}
-end;
-
-procedure FZConfigBase._EndRead();
-begin
-{$IFDEF USE_TMREWS}
-  _lock.EndRead;
-{$ELSE}
-  _cs.Leave
-{$ENDIF}
-end;
-
-procedure FZConfigBase._BeginWrite();
-begin
-{$IFDEF USE_TMREWS}
-  _lock.BeginWrite;
-{$ELSE}
-  _cs.Enter;
-{$ENDIF}
-end;
-
-procedure FZConfigBase._EndWrite();
-begin
-{$IFDEF USE_TMREWS}
-  _lock.EndWrite;
-{$ELSE}
-  _cs.Leave
-{$ENDIF}
-end;
-
-{$ELSE}
 procedure FZConfigBase.Load(FName:string);
 begin
+  _lock.Enter();
+
   self._filename:=FName;
   self._full_path:= Utf8ToWinCP(GetCurrentDir())+'\'+FName;
+  if _inifile<>nil then begin
+    _inifile.Free();
+  end;
+
+  try
+    _inifile:=TIniFile.Create(_full_path, [ifoStripComments, ifoStripInvalid] );
+  except
+    _inifile:=nil;
+  end;
+
+  _lock.Leave();
 end;
 
-
-function FZConfigBase.GetValue(str: string):string;
-begin
-  assert(false, 'NOT IMPLEMENTED!');
-end;
-
-function FZConfigBase.GetKey(str: string):string;
-begin
-  assert(false, 'NOT IMPLEMENTED!');
-end;
-
-procedure FZConfigBase.SetData(Key:string; Value:string);
-begin
-  assert(false, 'NOT IMPLEMENTED!');
-end;
-
-procedure FZConfigBase.Save();
-begin
-  assert(false, 'NOT IMPLEMENTED!');
-end;
-
-function FZConfigBase.IsSaved: boolean;
-begin
-  assert(false, 'NOT IMPLEMENTED!');
-  result:=false;
-end;
-
-procedure FZConfigBase._BeginRead();
-begin
-end;
-
-procedure FZConfigBase._EndRead();
-begin
-end;
-
-procedure FZConfigBase._BeginWrite();
-begin
-end;
-
-procedure FZConfigBase._EndWrite();
-begin
-end;
-
-
-function FZConfigBase.GetData(Key: string; var Value: string): boolean;
+function FZConfigBase.GetData(Key: string; var Value: string; section:string = 'main'): boolean;
 var
-  arr:PAnsiChar;
-  i, res:cardinal;
-  flag:boolean;
   tmp:string;
 begin
-  i:=128;
-  repeat
-    i:=i*2;
-    GetMem(arr, i);
-    res:=GetPrivateProfileString('main', PAnsiChar(Key),nil, @arr[0], 1024, PAnsiChar(_full_path));
-    flag:= (res=i-1);
-    if flag then FreeMem(arr, i);
-  until not flag;
+  result:=false;
 
-  tmp:=string(arr)+';';
-  FZCommonHelper.GetNextParam(tmp, Value, ';');
-  Value:=trim(Value);
+  _lock.Enter();
+  if (_inifile<>nil) and _inifile.SectionExists(section) and _inifile.ValueExists(section, key) then begin
+    Value:=_inifile.ReadString(section, key, '');
 
-  result:=(res>0);
+    tmp:=Value+';';
+    FZCommonHelper.GetNextParam(tmp, Value, ';');
+    Value:=trim(Value);
 
-  FreeMem(arr, i);
+    if length(Value)>0 then begin
+      result:=true;
+    end;
+  end;
+  _lock.Leave();
 end;
 
-{$ENDIF}
-
-
-function FZConfigBase.GetBool(Key:string; default:boolean = false):boolean;
+function FZConfigBase.GetBool(Key:string; default:boolean = false; section:string = 'main'):boolean;
 var
   temp:string;
 begin
   result:=default;
-  if GetData(Key, temp) then begin
+  if GetData(Key, temp, section) then begin
     if (lowercase(temp)='true') or (lowercase(temp)='on') or (lowercase(temp)='1') then
       result:=true
     else
@@ -353,28 +99,35 @@ begin
   end;
 end;
 
-function FZConfigBase.GetString(key:string; default:string = ''):string;
+function FZConfigBase.GetString(key:string; default:string = ''; section:string = 'main'):string;
 var
   temp:string;
 begin
   result:=default;
-  if GetData(Key, temp) then begin
+  if GetData(Key, temp, section) then begin
     result:=temp;
   end;
 end;
 
-function FZConfigBase.GetInt(Key:string; default:integer = 0):integer;
+function FZConfigBase.GetInt(Key:string; default:integer = 0; section:string = 'main'):integer;
 var
   temp:string;
 begin
-  result:=default;
+  if GetData(Key, temp, section) then begin
+    result:=strtointdef(temp, default);
+  end else begin
+    result:=default;
+  end;
+end;
 
-  if GetData(Key, temp) then begin
-    try
-      result:=strtoint(temp);
-    except
-      result:=default;
-    end;
+function FZConfigBase.GetFloat(Key: string; default: single; section: string): single;
+var
+  temp:string;
+begin
+  if GetData(Key, temp, section) then begin
+    result:=strtofloatdef(temp, default);
+  end else begin
+    result:=default;
   end;
 end;
 
@@ -382,7 +135,6 @@ procedure FZConfigBase.Reload();
 begin
   Load(_filename);
 end;
-
 
 end.
 

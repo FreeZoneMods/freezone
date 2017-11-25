@@ -1,5 +1,6 @@
 unit RegExpr;
-
+{$hints off}
+{$warnings off}
 {
      TRegExpr class library
      Delphi Regular Expressions

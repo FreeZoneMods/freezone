@@ -5,21 +5,20 @@ uses ConfigBase;
 
 type FZTranslationMgr = class(FZConfigBase)
   private
-    constructor Create();
+    {%H-}constructor Create();
   public
    class function Get(): FZTranslationMgr;
    function TranslateSingle(text:string): string; //вернет исходную строку при отсутсвующем транслейте
    function TranslateOrEmptySingle(text:string): string; //вернет пустую строку при отсутствующем транслейте
    function Translate(text:string): string;
    function Translate_NoSpaces(text:string): string;
-//   function BackTranslate(text:string; var res:string):boolean;
    destructor Destroy(); override;
 end;
 
 function Init:boolean; stdcall;
 
 implementation
-uses CommonHelper, sysutils, StrUtils, Console;
+uses CommonHelper, sysutils, StrUtils{, Console};
 var _instance:FZTranslationMgr;
 
 {FZTranslationMgr}
@@ -82,42 +81,10 @@ begin
   result:=result+TranslateSingle(tmp);
 end;
 
-{function FZTranslationMgr.BackTranslate(text:string; var res:string):boolean;
-var
-  i:integer;
-begin
-  self._BeginRead;
-  try
-    result:=false;
-
-    for i:=_size-1 downto 0 do begin
-      if _values[i] = text then begin
-        res:=_keys[i];
-        result:=true;
-        break;
-      end;
-    end;
-  finally
-    self._EndRead;
-  end;
-end;}
-
-
-procedure ReloadTranslations_Info(info:PChar); stdcall;
-begin
-  strcopy(info, 'Reloads string translation config');
-end;
-
-procedure ReloadTranslations(arg:PChar); stdcall;
-begin
-  _instance.Reload();
-end;
-
 function Init:boolean; stdcall;
 begin
   _instance:=FZTranslationMgr.Create();
   result:=true;
-  //AddConsoleCommand('fz_reload_translations', @ReloadTranslations, @ReloadTranslations_Info);
 end;
 
 end.
