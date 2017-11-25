@@ -48,6 +48,7 @@ end;
 
 function Free():boolean; stdcall;
 begin
+  result:=true;
   //Functions will be deleted by framework
 end;
 

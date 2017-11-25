@@ -3,6 +3,7 @@ del *.bak
 del *.dcu
 del *.dll
 del *.dbg
+del *.exe
 
 del highlevel\*.~pas
 del highlevel\*.bak

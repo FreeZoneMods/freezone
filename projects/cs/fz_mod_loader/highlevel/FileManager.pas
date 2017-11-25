@@ -29,16 +29,22 @@ type
 
   FZFileItemAction = ( FZ_FILE_ACTION_UNDEFINED, FZ_FILE_ACTION_NO, FZ_FILE_ACTION_DOWNLOAD, FZ_FILE_ACTION_IGNORE, FZ_FILE_ACTION_VERIFY );
 
+  FZDlMode = (FZ_DL_MODE_CURL, FZ_DL_MODE_GAMESPY);
+
+  FZCheckParams = record
+    size:cardinal;
+    crc32:cardinal;
+    md5:string;
+  end;
+  pFZCheckParams = ^FZCheckParams;
+
   FZFileItemData = record
     name:string;
-    required_action:FZFileItemAction;
-    crc32_real:cardinal;
-    size_real:cardinal;
+    url:string; // учитывается только при FZ_FILE_ACTION_DOWNLOAD
     compression_type:cardinal;
-
-    url:string;             // учитывается только при FZ_FILE_ACTION_DOWNLOAD
-    crc32_target:cardinal;  // учитывается только при FZ_FILE_ACTION_DOWNLOAD
-    size_target:cardinal;   // учитывается только при FZ_FILE_ACTION_DOWNLOAD
+    required_action:FZFileItemAction;
+    real:FZCheckParams;
+    target:FZCheckParams; // учитывается только при FZ_FILE_ACTION_DOWNLOAD
   end;
   pFZFileItemData = ^FZFileItemData;
 
@@ -51,15 +57,17 @@ type
     _callback:FZFileActualizingCallback;
     _cb_userdata:pointer;
 
+    _mode:FZDlMode;
+
     function _ScanDir(dir_path:string):boolean;                                                                 //сканирует поддиректорию
-    function _CreateFileData(name:string; need_size:cardinal; need_crc32:cardinal; url:string; compression:cardinal):pFZFileItemData; //создает новую запись о файле и добавляет в список
+    function _CreateFileData(name: string; url: string; compression:cardinal; need_checks:FZCheckParams): pFZFileItemData; //создает новую запись о файле и добавляет в список
   public
     constructor Create();
     destructor Destroy(); override;
     procedure Clear();                                                                                          //полная очистка данных списка
     procedure Dump(severity:FZLogMessageSeverity=FZ_LOG_INFO);                                                  //вывод текущего состояния списка, отладочная опция
     function ScanPath(dir_path:string):boolean;                                                                 //построение списка файлов в указанной директории и ее поддиректориях для последующей актуализации
-    function UpdateFileInfo(filename:string; need_crc32:cardinal; need_size:cardinal; url:string; compression_type:cardinal):boolean;      //обновить сведения о целевых параметрах файла
+    function UpdateFileInfo(filename: string; url: string; compression_type:cardinal; targetParams:FZCheckParams):boolean;      //обновить сведения о целевых параметрах файла
     function ActualizeFiles():boolean;                                                                          //актуализировать игровые данные
     function AddIgnoredFile(filename:string):boolean;                                                           //добавить игнорируемый файл; вызывать после того, как все UpdateFileInfo выполнены
     procedure SetCallback(cb:FZFileActualizingCallback; userdata:pointer);                                      //добавить колбэк на обновление состояния синхронизации
@@ -68,58 +76,89 @@ type
     function GetEntry(i:cardinal):FZFileItemData;                                                               //получить копию информации об указанном файле
     procedure DeleteEntry(i:cardinal);                                                                          //удалить запись об синхронизации
     procedure UpdateEntryAction(i:cardinal; action:FZFileItemAction );                                          //обновить действие для файла
+
+    procedure SetDlMode(mode:FZDlMode);
   end;
 
-function GetFileCrc32(path:string; var out_crc32:cardinal; var out_size:cardinal):boolean;
+function GetFileChecks(path:string; out_check_params:pFZCheckParams; needMD5:boolean):boolean;
+function IsDummy(c:FZCheckParams):boolean;
+function GetDummyChecks():FZCheckParams;
+function CompareFiles(c1:FZCheckParams; c2:FZCheckParams):boolean;
 
 implementation
-uses global_functions, sysutils, windows, HttpDownloader;
+uses sysutils, windows, HttpDownloader, FastMd5, FastCrc;
 
-function GetFileCrc32(path:string; var out_crc32:cardinal; var out_size:cardinal):boolean;
-var
-  file_handle, mapping_handle:cardinal;
-  ptr:pointer;
+const
+  FM_LBL:string='[FM]';
+
+function GetDummyChecks():FZCheckParams;
 begin
-  FZLogMgr.Get.Write('Calculating CRC32 for '+path, FZ_LOG_DBG);
+  result.crc32:=0;
+  result.size:=0;
+  result.md5:='';
+end;
+
+function IsDummy(c:FZCheckParams):boolean;
+begin
+  result:=(c.crc32=0) and (c.size=0) and (length(c.md5)=0);
+end;
+
+function CompareFiles(c1:FZCheckParams; c2:FZCheckParams):boolean;
+begin
+  result:=(c1.crc32=c2.crc32) and (c1.size=c2.size) and (c1.md5=c2.md5);
+end;
+
+function GetFileChecks(path:string; out_check_params:pFZCheckParams; needMD5:boolean):boolean;
+var
+  file_handle:cardinal;
+  ptr:PChar;
+
+  readbytes:cardinal;
+  md5_ctx:TMD5Context;
+  crc32_ctx:TCRC32Context;
+const
+  WORK_SIZE:cardinal=1*1024*1024;
+begin
+  FZLogMgr.Get.Write('Calculating checks for '+path, FZ_LOG_DBG);
   result:=false;
+  out_check_params.crc32:=0;
+  out_check_params.md5:='';
+  readbytes:=0;
+
   file_handle:=CreateFile(PAnsiChar(path), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
   if (file_handle<>INVALID_HANDLE_VALUE) then begin
-    out_size:=GetFileSize(file_handle, nil);
+    out_check_params.size:=GetFileSize(file_handle, nil);
   end else begin
     FZLogMgr.Get.Write('Cannot read file, exiting', FZ_LOG_DBG);
     exit;
   end;
 
-  if out_size = 0 then begin
+  if out_check_params.size = 0 then begin
     CloseHandle(file_handle);
     result:=true;
-    out_crc32:=0;
     exit;
   end;
 
-  mapping_handle:=CreateFileMapping(file_handle, nil, PAGE_READONLY, 0, 0, nil);
-  if mapping_handle = INVALID_HANDLE_VALUE then begin
-     FZLogMgr.Get.Write('Cannot create file mapping for '+path, FZ_LOG_ERROR);
-    CloseHandle(file_handle);
+  GetMem(ptr, WORK_SIZE);
+  if (ptr<>nil) then begin
+    md5_ctx:=MD5Start();
+    crc32_ctx:=CRC32Start();
+    while ReadFile(file_handle, ptr[0], WORK_SIZE, readbytes, nil) and (WORK_SIZE=readbytes) do begin
+      if needMD5 then MD5Next(md5_ctx, ptr, WORK_SIZE div MD5BlockSize());
+      CRC32Update(crc32_ctx, ptr, WORK_SIZE);
+    end;
+    if needMD5 then out_check_params.md5:=MD5End(md5_ctx, ptr, readbytes);
+    out_check_params.crc32:=CRC32End(crc32_ctx, ptr, readbytes);
+    FreeMem(ptr);
+  end else begin
+    FZLogMgr.Get.Write('Cannot allocate memory, exiting', FZ_LOG_DBG);
     exit;
   end;
 
-  ptr:=MapViewOfFile(mapping_handle, FILE_MAP_READ, 0, 0, 0);
-  if (ptr=nil) then begin
-    FZLogMgr.Get.Write('Cannot map view for '+path, FZ_LOG_ERROR);
-    CloseHandle(mapping_handle);
-    CloseHandle(file_handle);
-    exit;
-  end;
+  FZLogMgr.Get.Write('File size is '+inttostr(out_check_params.size)+', crc32='+inttohex(out_check_params.crc32,8)+', md5=['+out_check_params.md5+']', FZ_LOG_DBG);
 
-  FZLogMgr.Get.Write('Running algo...', FZ_LOG_DBG);
-  out_crc32:=crc32(ptr, out_size);
-  result:=true;
-  FZLogMgr.Get.Write('File size is '+inttostr(out_size)+', crc32='+inttohex(out_crc32,8), FZ_LOG_DBG);
-
-  UnmapViewOfFile(ptr);
-  CloseHandle(mapping_handle);
   CloseHandle(file_handle);
+  result:=true;
 end;
 
 { FZFiles }
@@ -143,25 +182,23 @@ begin
     if (data.dwFileAttributes and FILE_ATTRIBUTE_DIRECTORY <> 0) then begin
       _ScanDir(dir_path+name+'\');
     end else begin
-      _CreateFileData(dir_path+name, 0, 0, '', 0);
-      FZLogMgr.Get.Write(dir_path+name, FZ_LOG_DBG);
+      _CreateFileData(dir_path+name, '', 0, GetDummyChecks());
+      FZLogMgr.Get.Write(FM_LBL+dir_path+name, FZ_LOG_DBG);
     end;
   until not FindNextFile(hndl, @data);
 
   FindClose(hndl);
 end;
 
-function FZFiles._CreateFileData(name: string; need_size: cardinal; need_crc32: cardinal; url: string; compression:cardinal): pFZFileItemData;
+function FZFiles._CreateFileData(name: string; url: string; compression:cardinal; need_checks:FZCheckParams): pFZFileItemData;
 begin
   New(result);
   result.name:=trim(name);
-  result.required_action:=FZ_FILE_ACTION_UNDEFINED;
-  result.crc32_real:=0;
-  result.size_real:=0;
-  result.crc32_target:=need_crc32;
-  result.size_target:=need_size;
   result.url:=trim(url);
   result.compression_type:=compression;
+  result.required_action:=FZ_FILE_ACTION_UNDEFINED;
+  result.target:=need_checks;
+  result.real:=GetDummyChecks();
   _files.Add(result);
 end;
 
@@ -171,6 +208,7 @@ begin
   _files:=TList.Create();
   _callback:=nil;
   _cb_userdata:=nil;
+  _mode:=FZ_DL_MODE_CURL;
 end;
 
 destructor FZFiles.Destroy;
@@ -201,15 +239,17 @@ var
   ptr:pFZFileItemData;
   i:integer;
 begin
-  FZLogMgr.Get.Write('=======File list dump start=======', severity);
+  FZLogMgr.Get.Write(FM_LBL+'=======File list dump start=======', severity);
   for i:=0 to _files.Count-1 do begin
     if _files.Items[i] <> nil then begin
       ptr:=_files.Items[i];
-      FZLogMgr.Get.Write(ptr.name+', action='+inttostr(cardinal(ptr.required_action))+
-                         ', size '+inttostr(ptr.size_real)+'('+inttostr(ptr.size_target)+'), crc32 '+inttohex(ptr.crc32_real,8)+'('+inttohex(ptr.crc32_target,8)+'), url='+ptr.url, severity);
+      FZLogMgr.Get.Write(FM_LBL+ptr.name+', action='+inttostr(cardinal(ptr.required_action))+
+                         ', size '+inttostr(ptr.real.size)+'('+inttostr(ptr.target.size)+
+                         '), crc32 '+inttohex(ptr.real.crc32,8)+'('+inttohex(ptr.target.crc32,8)+
+                         '), url='+ptr.url, severity);
     end;
   end;
-  FZLogMgr.Get.Write('=======File list dump end=======', severity);
+  FZLogMgr.Get.Write(FM_LBL+'=======File list dump end=======', severity);
 end;
 
 function FZFiles.ScanPath(dir_path: string):boolean;
@@ -217,26 +257,31 @@ begin
   result:=true;
   Clear();
 
-  FZLogMgr.Get.Write('=======Scanning directory=======', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'=======Scanning directory=======', FZ_LOG_DBG);
   if (dir_path[length(dir_path)]<>'\') and (dir_path[length(dir_path)]<>'/') then begin
     dir_path:=dir_path+'\';
   end;
   _parent_path := dir_path;
   _ScanDir('');
-  FZLogMgr.Get.Write('=======Scanning finished=======', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'=======Scanning finished=======', FZ_LOG_DBG);
 end;
 
-function FZFiles.UpdateFileInfo(filename: string; need_crc32: cardinal; need_size:cardinal; url: string; compression_type:cardinal):boolean;
+function FZFiles.UpdateFileInfo(filename: string; url: string; compression_type:cardinal; targetParams:FZCheckParams):boolean;
 var
   i:integer;
   filedata:pFZFileItemData;
 begin
-  FZLogMgr.Get.Write('Updating file info for '+filename+', size='+inttostr(need_size)+', crc='+inttohex(need_crc32, 8)+', url='+url+', compression '+inttostr(compression_type), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Updating file info for '+filename+
+                     ', size='+inttostr(targetParams.size)+
+                     ', crc='+inttohex(targetParams.crc32, 8)+
+                     ', md5=['+targetParams.md5+']'+
+                     ', url='+url+
+                     ', compression '+inttostr(compression_type), FZ_LOG_DBG);
   result:=false;
   filename:=trim(filename);
 
   if Pos('..', filename)>0 then begin
-    FZLogMgr.Get.Write('File path cannot contain ".."', FZ_LOG_ERROR);
+    FZLogMgr.Get.Write(FM_LBL+'File path cannot contain ".."', FZ_LOG_ERROR);
     exit;
   end;
 
@@ -249,31 +294,31 @@ begin
     end;
   end;
 
-  //Если файл есть в списке - посчитаем его CRC32, если ранее не считался
-  if (filedata<>nil) and (filedata.crc32_real=0) and (filedata.size_real=0) then begin
-    if not GetFileCrc32(_parent_path+filedata.name, filedata.crc32_real, filedata.size_real) then begin
-      filedata.crc32_real:=0;
-      filedata.size_real:=0;
-    end;
-    FZLogMgr.Get.Write('Current file info: CRC32='+inttostr(filedata.crc32_real)+', size='+inttostr(filedata.size_real), FZ_LOG_DBG );
-  end;
-
   if (filedata=nil) then begin
     //Файла нет в списке. Однозначно надо качать.
-    filedata:=_CreateFileData(filename, need_size, need_crc32, url, compression_type);
+    filedata:=_CreateFileData(filename, url, compression_type, targetParams);
     filedata.required_action:=FZ_FILE_ACTION_DOWNLOAD;
-    FZLogMgr.Get.Write('Created new file list entry', FZ_LOG_DBG );
+    FZLogMgr.Get.Write(FM_LBL+'Created new file list entry', FZ_LOG_DBG );
   end else begin
     //Файл есть в списке. Проверяем.
-    if (filedata.crc32_real=need_crc32) and (filedata.size_real=need_size) and (need_size<>0) then begin
+    if IsDummy(filedata.real) then begin
+      //посчитаем его CRC32, если ранее не считался
+      if not GetFileChecks(_parent_path+filedata.name, @filedata.real, length(targetParams.md5)>0 ) then begin
+        filedata.real.crc32:=0;
+        filedata.real.size:=0;
+        filedata.real.md5:='';
+      end;
+      FZLogMgr.Get.Write(FM_LBL+'Current file info: CRC32='+inttohex(filedata.real.crc32, 8)+', size='+inttostr(filedata.real.size)+', md5=['+filedata.real.md5+']', FZ_LOG_DBG );
+    end;
+
+    if  CompareFiles(filedata.real, targetParams) then begin
       filedata.required_action:=FZ_FILE_ACTION_NO;
-      FZLogMgr.Get.Write('Entry exists, file up-to-date', FZ_LOG_DBG );
+      FZLogMgr.Get.Write(FM_LBL+'Entry exists, file up-to-date', FZ_LOG_DBG );
     end else begin
       filedata.required_action:=FZ_FILE_ACTION_DOWNLOAD;
-      FZLogMgr.Get.Write('Entry exists, file outdated', FZ_LOG_DBG );
+      FZLogMgr.Get.Write(FM_LBL+'Entry exists, file outdated', FZ_LOG_DBG );
     end;
-    filedata.crc32_target:=need_crc32;
-    filedata.size_target:=need_size;
+    filedata.target:=targetParams;
     filedata.url:=url;
     filedata.compression_type:=compression_type;
   end;
@@ -305,37 +350,37 @@ begin
     if filedata=nil then continue;
     if filedata.required_action=FZ_FILE_ACTION_UNDEFINED then begin
       //такого файла не было в списке. Сносим.
-      FZLogMgr.Get.Write('Deleting file '+filedata.name, FZ_LOG_DBG);
+      FZLogMgr.Get.Write(FM_LBL+'Deleting file '+filedata.name, FZ_LOG_DBG);
       if not SysUtils.DeleteFile(_parent_path+filedata.name)then begin
-        FZLogMgr.Get.Write('Failed to delete '+filedata.name, FZ_LOG_ERROR);
+        FZLogMgr.Get.Write(FM_LBL+'Failed to delete '+filedata.name, FZ_LOG_ERROR);
         exit;
       end;
       Dispose(filedata);
       _files.Delete(i);
     end else if filedata.required_action=FZ_FILE_ACTION_DOWNLOAD then begin
-      total_dl_size:=total_dl_size+filedata.size_target;
+      total_dl_size:=total_dl_size+filedata.target.size;
       str:=_parent_path+filedata.name;
       while (str[length(str)]<>'\') and (str[length(str)]<>'/') do begin
         str:=leftstr(str,length(str)-1);
       end;
       if not ForceDirectories(str) then begin
-        FZLogMgr.Get.Write('Cannot create directory '+str, FZ_LOG_ERROR);
+        FZLogMgr.Get.Write(FM_LBL+'Cannot create directory '+str, FZ_LOG_ERROR);
         exit;
       end;
     end else if filedata.required_action=FZ_FILE_ACTION_NO then begin
-      total_actual_size:=total_actual_size+filedata.size_target;
+      total_actual_size:=total_actual_size+filedata.target.size;
     end else if filedata.required_action=FZ_FILE_ACTION_IGNORE then begin
-      FZLogMgr.Get.Write('Ignoring file '+filedata.name, FZ_LOG_DBG);
+      FZLogMgr.Get.Write(FM_LBL+'Ignoring file '+filedata.name, FZ_LOG_DBG);
     end else begin
-      FZLogMgr.Get.Write('Unknown action for '+filedata.name, FZ_LOG_ERROR);
+      FZLogMgr.Get.Write(FM_LBL+'Unknown action for '+filedata.name, FZ_LOG_ERROR);
       exit;
     end;
   end;
-  FZLogMgr.Get.Write('Total up-to-date size '+inttostr(total_actual_size), FZ_LOG_DBG);
-  FZLogMgr.Get.Write('Total downloads size '+inttostr(total_dl_size), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Total up-to-date size '+inttostr(total_actual_size), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Total downloads size '+inttostr(total_dl_size), FZ_LOG_DBG);
 
 
-  FZLogMgr.Get.Write('Starting downloads', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Starting downloads', FZ_LOG_DBG);
   result:=true;
 
   //Вызовем колбэк для сообщения о начале стадии загрузки
@@ -349,7 +394,11 @@ begin
   end;
 
   //Начнем загрузку
-  thread:=FZDownloaderThread.Create();
+  if _mode=FZ_DL_MODE_GAMESPY then begin
+    thread:=FZGameSpyDownloaderThread.Create();
+  end else begin
+    thread:=FZCurlDownloaderThread.Create();
+  end;
   setlength(downloaders, MAX_ACTIVE_DOWNLOADERS);
   last_file_index:=_files.Count-1;
   finished:=false;
@@ -358,7 +407,7 @@ begin
   while ( not finished ) do begin
     if not result then begin
       //Загрузка прервана.
-      FZLogMgr.Get.Write('Actualizing cancelled', FZ_LOG_ERROR);
+      FZLogMgr.Get.Write(FM_LBL+'Actualizing cancelled', FZ_LOG_ERROR);
       break;
     end;
 
@@ -373,12 +422,12 @@ begin
           last_file_index:=last_file_index-1; //сдвигаем индекс на необработанный файл
           if (filedata<>nil) and (filedata.required_action=FZ_FILE_ACTION_DOWNLOAD) then begin
             //файл для загрузки найден, помещаем его в слот.
-            FZLogMgr.Get.Write('Starting download of '+filedata.url, FZ_LOG_DBG);
+            FZLogMgr.Get.Write(FM_LBL+'Starting download of '+filedata.url, FZ_LOG_DBG);
             finished:=false;
-            downloaders[i]:=FZFileDownloader.Create(filedata.url, _parent_path+filedata.name, filedata.compression_type, thread);
+            downloaders[i]:=thread.CreateDownloader(filedata.url, _parent_path+filedata.name, filedata.compression_type);
             result:=downloaders[i].StartAsyncDownload();
             if not result then begin
-              FZLogMgr.Get.Write('Cannot start download for '+filedata.url, FZ_LOG_ERROR);
+              FZLogMgr.Get.Write(FM_LBL+'Cannot start download for '+filedata.url, FZ_LOG_ERROR);
             end else begin
               filedata.required_action:=FZ_FILE_ACTION_VERIFY;
             end;
@@ -391,11 +440,11 @@ begin
         downloaded_now:=downloaded_now+downloaders[i].DownloadedBytes();
       end else begin
         //Слот завершил работу. Освободим его.
-        FZLogMgr.Get.Write('Download finished for '+downloaders[i].GetFilename(), FZ_LOG_DBG);
+        FZLogMgr.Get.Write(FM_LBL+'Need free slot contained '+downloaders[i].GetFilename(), FZ_LOG_DBG);
         result:=downloaders[i].IsSuccessful();
         downloaded_total:=downloaded_total+downloaders[i].DownloadedBytes();
         if not result then begin
-          FZLogMgr.Get.Write('Download failed for '+downloaders[i].GetFilename(), FZ_LOG_ERROR);
+          FZLogMgr.Get.Write(FM_LBL+'Download failed for '+downloaders[i].GetFilename(), FZ_LOG_ERROR);
         end;
         downloaders[i].Free();
         downloaders[i]:=nil;
@@ -413,6 +462,7 @@ begin
   end;
 
   //Останавливаем всех их
+  FZLogMgr.Get.Write(FM_LBL+'Request stop', FZ_LOG_DBG);
   for i:=0 to length(downloaders)-1 do begin
     if downloaders[i]<>nil then begin
       downloaders[i].RequestStop();
@@ -420,6 +470,7 @@ begin
   end;
 
   //и удаляем их
+  FZLogMgr.Get.Write(FM_LBL+'Delete downloaders', FZ_LOG_DBG);
   for i:=0 to length(downloaders)-1 do begin
     if downloaders[i]<>nil then begin
       downloaders[i].Free();
@@ -430,6 +481,7 @@ begin
 
   //вызываем колбэк окончания
   if result then begin
+    FZLogMgr.Get.Write(FM_LBL+'Run finish callback', FZ_LOG_DBG);
     cb_info.status:=FZ_ACTUALIZING_FINISHED;
     cb_info.total_downloaded:=downloaded_total;
     result := _callback(cb_info, _cb_userdata)
@@ -438,28 +490,29 @@ begin
   if result then begin
     //убедимся, что все требуемое скачалось корректно
     if (total_dl_size>0) then begin
+      FZLogMgr.Get.Write(FM_LBL+'Verifying downloaded', FZ_LOG_DBG);
       for i:=_files.Count-1 downto 0 do begin
         filedata:=_files.Items[i];
         if (filedata<>nil) and (filedata.required_action=FZ_FILE_ACTION_VERIFY) then begin
-          if GetFileCrc32(_parent_path+filedata.name, filedata.crc32_real, filedata.size_real) then begin
-            if (filedata.crc32_real <> filedata.crc32_target) or (filedata.size_real <> filedata.size_target) then begin
-              FZLogMgr.Get.Write('File NOT synchronized: '+filedata.name, FZ_LOG_ERROR);
+          if GetFileChecks(_parent_path+filedata.name, @filedata.real, length(filedata.target.md5)>0) then begin
+            if not CompareFiles(filedata.real, filedata.target) then begin
+              FZLogMgr.Get.Write(FM_LBL+'File NOT synchronized: '+filedata.name, FZ_LOG_ERROR);
               filedata.required_action:=FZ_FILE_ACTION_DOWNLOAD;
               result:=false;
             end;
           end else begin
-            FZLogMgr.Get.Write('Cannot check '+filedata.name, FZ_LOG_ERROR);
+            FZLogMgr.Get.Write(FM_LBL+'Cannot check '+filedata.name, FZ_LOG_ERROR);
             filedata.required_action:=FZ_FILE_ACTION_DOWNLOAD;
             result:=false;
           end;
         end else if (filedata<>nil) and (filedata.required_action=FZ_FILE_ACTION_DOWNLOAD) then begin
-          FZLogMgr.Get.Write('File '+filedata.name+' has FZ_FILE_ACTION_DOWNLOAD state after successful synchronization??? A bug suspected!', FZ_LOG_ERROR);
+          FZLogMgr.Get.Write(FM_LBL+'File '+filedata.name+' has FZ_FILE_ACTION_DOWNLOAD state after successful synchronization??? A bug suspected!', FZ_LOG_ERROR);
           result:=false;
         end;
       end;
     end;
 
-    FZLogMgr.Get.Write('All downloads finished', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(FM_LBL+'All downloads finished', FZ_LOG_DBG);
   end;
 end;
 
@@ -497,7 +550,7 @@ function FZFiles.GetEntry(i: cardinal): FZFileItemData;
 var
   filedata:pFZFileItemData;
 begin
-  if (i<_files.Count) then begin
+  if (int64(i)<int64(_files.Count)) then begin
     filedata:=_files.Items[i];
     if filedata<>nil then begin
       result:=filedata^;
@@ -509,7 +562,7 @@ procedure FZFiles.DeleteEntry(i: cardinal);
 var
   filedata:pFZFileItemData;
 begin
-  if (i<_files.Count) then begin
+  if (int64(i)<int64(_files.Count)) then begin
     filedata:=_files.Items[i];
     Dispose(filedata);
     _files.Delete(i);
@@ -520,10 +573,15 @@ procedure FZFiles.UpdateEntryAction(i: cardinal; action: FZFileItemAction);
 var
   filedata:pFZFileItemData;
 begin
-  if (i<_files.Count) then begin
+  if (int64(i)<int64(_files.Count)) then begin
     filedata:=_files.Items[i];
     filedata.required_action:=action;
   end;
+end;
+
+procedure FZFiles.SetDlMode(mode: FZDlMode);
+begin
+  _mode:=mode;
 end;
 
 end.

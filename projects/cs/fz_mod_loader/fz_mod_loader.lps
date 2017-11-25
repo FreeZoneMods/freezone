@@ -4,13 +4,13 @@
     <PathDelim Value="\"/>
     <Version Value="10"/>
     <BuildModes Active="Debug"/>
-    <Units Count="76">
+    <Units Count="84">
       <Unit0>
         <Filename Value="fz_mod_loader.lpr"/>
         <IsPartOfProject Value="True"/>
         <IsVisibleTab Value="True"/>
-        <TopLine Value="232"/>
-        <CursorPos X="82" Y="237"/>
+        <TopLine Value="122"/>
+        <CursorPos X="111" Y="155"/>
         <UsageCount Value="207"/>
         <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
@@ -23,6 +23,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\..\..\engine_1510\Banned.pas"/>
@@ -32,6 +33,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit2>
       <Unit3>
         <Filename Value="..\..\..\engine_1510\BaseClasses.pas"/>
@@ -50,6 +52,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit4>
       <Unit5>
         <Filename Value="..\..\..\engine_1510\Cameras.pas"/>
@@ -59,6 +62,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit5>
       <Unit6>
         <Filename Value="..\..\..\engine_1510\CDB.pas"/>
@@ -68,22 +72,22 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit6>
       <Unit7>
         <Filename Value="..\..\..\engine_1510\Clients.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="-1"/>
-        <TopLine Value="-1"/>
-        <CursorPos X="-1" Y="-1"/>
+        <TopLine Value="114"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit7>
       <Unit8>
         <Filename Value="..\..\..\engine_1510\Console.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="112"/>
-        <CursorPos X="32" Y="141"/>
+        <TopLine Value="158"/>
+        <CursorPos X="21" Y="179"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit8>
@@ -95,6 +99,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit9>
       <Unit10>
         <Filename Value="..\..\..\engine_1510\GameMessages.pas"/>
@@ -104,6 +109,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit10>
       <Unit11>
         <Filename Value="..\..\..\engine_1510\Games.pas"/>
@@ -113,6 +119,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit11>
       <Unit12>
         <Filename Value="..\..\..\engine_1510\Gametypes.pas"/>
@@ -131,6 +138,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit13>
       <Unit14>
         <Filename Value="..\..\..\engine_1510\HUD.pas"/>
@@ -147,22 +155,23 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit15>
       <Unit16>
         <Filename Value="..\..\..\engine_1510\Keys.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <WindowIndex Value="-1"/>
-        <TopLine Value="-1"/>
-        <CursorPos X="-1" Y="-1"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="32"/>
+        <CursorPos X="33" Y="52"/>
         <UsageCount Value="207"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit16>
       <Unit17>
         <Filename Value="..\..\..\engine_1510\Level.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="190"/>
-        <CursorPos Y="221"/>
+        <CursorPos X="65" Y="12"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit17>
@@ -174,15 +183,16 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit18>
       <Unit19>
         <Filename Value="..\..\..\engine_1510\MatVectors.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="-1"/>
-        <TopLine Value="-1"/>
-        <CursorPos X="-1" Y="-1"/>
+        <TopLine Value="62"/>
+        <CursorPos X="22" Y="66"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit19>
       <Unit20>
         <Filename Value="..\..\..\engine_1510\misc_stuff.pas"/>
@@ -201,6 +211,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit21>
       <Unit22>
         <Filename Value="..\..\..\engine_1510\Objects.pas"/>
@@ -210,6 +221,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit22>
       <Unit23>
         <Filename Value="..\..\..\engine_1510\Opcode.pas"/>
@@ -219,6 +231,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit23>
       <Unit24>
         <Filename Value="..\..\..\engine_1510\Packets.pas"/>
@@ -228,6 +241,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit24>
       <Unit25>
         <Filename Value="..\..\..\engine_1510\Physics.pas"/>
@@ -237,6 +251,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit25>
       <Unit26>
         <Filename Value="..\..\..\engine_1510\PureClient.pas"/>
@@ -246,13 +261,14 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit26>
       <Unit27>
         <Filename Value="..\..\..\engine_1510\PureServer.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="91"/>
-        <CursorPos X="3" Y="146"/>
+        <TopLine Value="108"/>
+        <CursorPos X="3" Y="113"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit27>
@@ -264,6 +280,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit28>
       <Unit29>
         <Filename Value="..\..\..\engine_1510\Servers.pas"/>
@@ -279,7 +296,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="6"/>
-        <CursorPos X="20" Y="36"/>
+        <CursorPos X="11" Y="28"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit30>
@@ -291,6 +308,7 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit31>
       <Unit32>
         <Filename Value="..\..\..\engine_1510\Vector.pas"/>
@@ -312,26 +330,27 @@
         <Filename Value="lowlevel\global_functions.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="7"/>
-        <CursorPos X="11" Y="11"/>
+        <TopLine Value="26"/>
+        <CursorPos X="16" Y="51"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit34>
       <Unit35>
         <Filename Value="highlevel\LogMgr.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="43"/>
-        <CursorPos X="22" Y="74"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="61"/>
+        <CursorPos X="54" Y="82"/>
         <UsageCount Value="207"/>
+        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit35>
       <Unit36>
         <Filename Value="..\..\..\shared\SourceKit\srcBase.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="92"/>
-        <CursorPos X="50" Y="186"/>
+        <TopLine Value="245"/>
+        <CursorPos X="18" Y="259"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit36>
@@ -339,8 +358,8 @@
         <Filename Value="..\..\..\shared\SourceKit\srcCalls.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="166"/>
-        <CursorPos X="136" Y="195"/>
+        <TopLine Value="9"/>
+        <CursorPos X="36" Y="19"/>
         <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit37>
@@ -348,19 +367,19 @@
         <Filename Value="..\..\..\shared\SourceKit\srcFunctionsMgr.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="-1"/>
-        <TopLine Value="-1"/>
-        <CursorPos X="-1" Y="-1"/>
+        <TopLine Value="45"/>
+        <CursorPos X="50" Y="47"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit38>
       <Unit39>
         <Filename Value="..\..\..\shared\SourceKit\srcInjections.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="-1"/>
-        <TopLine Value="-1"/>
-        <CursorPos X="-1" Y="-1"/>
+        <TopLine Value="43"/>
+        <CursorPos X="31" Y="57"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit39>
       <Unit40>
         <Filename Value="..\..\..\shared\SourceKit\srcInjectMgr.pas"/>
@@ -370,22 +389,23 @@
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit40>
       <Unit41>
         <Filename Value="..\..\..\shared\SourceKit\srcLogging.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <WindowIndex Value="-1"/>
-        <TopLine Value="-1"/>
-        <CursorPos X="-1" Y="-1"/>
+        <TopLine Value="53"/>
+        <CursorPos X="11" Y="68"/>
         <UsageCount Value="207"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit41>
       <Unit42>
         <Filename Value="..\..\..\engine_1510\xrfilesystem.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="12"/>
-        <CursorPos X="12" Y="28"/>
+        <TopLine Value="18"/>
+        <CursorPos X="36" Y="24"/>
         <UsageCount Value="209"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit42>
@@ -393,44 +413,47 @@
         <Filename Value="..\..\..\engine_1510\basedefs.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="16"/>
-        <CursorPos X="11" Y="58"/>
+        <CursorPos X="34" Y="61"/>
         <UsageCount Value="208"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit43>
       <Unit44>
         <Filename Value="highlevel\FileManager.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="436"/>
-        <CursorPos X="56" Y="277"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="551"/>
+        <CursorPos X="65" Y="561"/>
         <UsageCount Value="203"/>
+        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit44>
       <Unit45>
         <Filename Value="highlevel\HttpDownloader.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="175"/>
-        <CursorPos X="40" Y="193"/>
+        <EditorIndex Value="5"/>
+        <TopLine Value="230"/>
+        <CursorPos X="15" Y="242"/>
         <UsageCount Value="200"/>
+        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit45>
       <Unit46>
         <Filename Value="highlevel\IniFile.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="40"/>
-        <CursorPos X="34" Y="78"/>
-        <UsageCount Value="195"/>
+        <EditorIndex Value="6"/>
+        <TopLine Value="117"/>
+        <CursorPos X="39" Y="142"/>
+        <UsageCount Value="208"/>
+        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit46>
       <Unit47>
         <Filename Value="..\..\..\shared\CommonHelper.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <CursorPos X="15" Y="263"/>
-        <UsageCount Value="194"/>
+        <TopLine Value="71"/>
+        <CursorPos X="49" Y="74"/>
+        <UsageCount Value="207"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit47>
       <Unit48>
@@ -440,7 +463,7 @@
         <WindowIndex Value="-1"/>
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
-        <UsageCount Value="145"/>
+        <UsageCount Value="201"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit48>
       <Unit49>
@@ -448,7 +471,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <CursorPos Y="34"/>
-        <UsageCount Value="144"/>
+        <UsageCount Value="200"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit49>
       <Unit50>
@@ -457,7 +480,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="54"/>
         <CursorPos Y="82"/>
-        <UsageCount Value="143"/>
+        <UsageCount Value="200"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit50>
       <Unit51>
@@ -466,7 +489,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="18"/>
         <CursorPos X="15" Y="48"/>
-        <UsageCount Value="141"/>
+        <UsageCount Value="200"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit51>
       <Unit52>
@@ -475,16 +498,17 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="16"/>
         <CursorPos X="22" Y="33"/>
-        <UsageCount Value="139"/>
+        <UsageCount Value="200"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit52>
       <Unit53>
         <Filename Value="..\..\..\engine_1510\RenderDevice.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="30"/>
-        <CursorPos X="19" Y="49"/>
-        <UsageCount Value="138"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="24"/>
+        <CursorPos X="4" Y="66"/>
+        <UsageCount Value="201"/>
+        <Loaded Value="True"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit53>
       <Unit54>
@@ -493,7 +517,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="13"/>
         <CursorPos X="29" Y="20"/>
-        <UsageCount Value="138"/>
+        <UsageCount Value="201"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit54>
       <Unit55>
@@ -501,7 +525,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="13" Y="11"/>
-        <UsageCount Value="138"/>
+        <UsageCount Value="201"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit55>
       <Unit56>
@@ -509,7 +533,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="25" Y="11"/>
-        <UsageCount Value="115"/>
+        <UsageCount Value="206"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit56>
       <Unit57>
@@ -517,188 +541,281 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="13" Y="8"/>
-        <UsageCount Value="115"/>
+        <UsageCount Value="206"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit57>
       <Unit58>
         <Filename Value="lowlevel\safesync.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="9"/>
-        <CursorPos X="23" Y="20"/>
-        <UsageCount Value="114"/>
+        <TopLine Value="37"/>
+        <CursorPos X="21" Y="43"/>
+        <UsageCount Value="205"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit58>
       <Unit59>
         <Filename Value="..\..\..\engine_1510\GameCore.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <CursorPos X="7" Y="29"/>
-        <UsageCount Value="107"/>
+        <CursorPos X="5" Y="15"/>
+        <UsageCount Value="200"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit59>
       <Unit60>
         <Filename Value="lowlevel\Decompressor.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="34"/>
-        <CursorPos X="59" Y="38"/>
-        <UsageCount Value="85"/>
+        <TopLine Value="97"/>
+        <CursorPos X="26" Y="129"/>
+        <UsageCount Value="203"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit60>
       <Unit61>
+        <Filename Value="..\..\..\shared\3rdparty\FastCrc.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="69"/>
+        <CursorPos X="12" Y="82"/>
+        <UsageCount Value="153"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit61>
+      <Unit62>
+        <Filename Value="..\..\..\shared\3rdparty\FastMd5.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="152"/>
+        <CursorPos X="50" Y="155"/>
+        <UsageCount Value="153"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit62>
+      <Unit63>
+        <Filename Value="highlevel\commandlineparser.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="CommandLineParser"/>
+        <EditorIndex Value="8"/>
+        <TopLine Value="92"/>
+        <CursorPos Y="100"/>
+        <UsageCount Value="143"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit63>
+      <Unit64>
+        <Filename Value="..\..\..\shared\3rdparty\libcurl\curl.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="7"/>
+        <TopLine Value="534"/>
+        <CursorPos X="12" Y="521"/>
+        <UsageCount Value="115"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit64>
+      <Unit65>
+        <Filename Value="highlevel\mutexhunter.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="143"/>
+        <CursorPos X="13" Y="178"/>
+        <UsageCount Value="79"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit65>
+      <Unit66>
+        <Filename Value="highlevel\apipatcher.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ApiPatcher"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="209"/>
+        <CursorPos X="40" Y="221"/>
+        <UsageCount Value="51"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit66>
+      <Unit67>
+        <Filename Value="highlevel\curl.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="21"/>
+        <CursorPos X="28" Y="36"/>
+        <UsageCount Value="14"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit67>
+      <Unit68>
+        <Filename Value="..\..\..\shared\3rdparty\md5.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="159"/>
+        <CursorPos Y="185"/>
+        <UsageCount Value="50"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit68>
+      <Unit69>
+        <Filename Value="..\..\..\shared\3rdparty\crc.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="35"/>
+        <CursorPos X="34" Y="43"/>
+        <UsageCount Value="30"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit69>
+      <Unit70>
         <Filename Value="3rdparty\EctoSoftTree.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="60"/>
         <CursorPos X="29" Y="177"/>
-        <UsageCount Value="135"/>
+        <UsageCount Value="119"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
-      </Unit61>
-      <Unit62>
+      </Unit70>
+      <Unit71>
         <Filename Value="..\..\..\engine_1510\GameSpy.pas"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="10" Y="5"/>
-        <UsageCount Value="65"/>
+        <UsageCount Value="49"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
-      </Unit62>
-      <Unit63>
-        <Filename Value="lowlevel\basedefs.pas"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="19"/>
-        <CursorPos X="23" Y="32"/>
-        <UsageCount Value="13"/>
-      </Unit63>
-      <Unit64>
+      </Unit71>
+      <Unit72>
         <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\inc\objpash.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="175"/>
         <CursorPos X="23" Y="193"/>
-        <UsageCount Value="7"/>
-      </Unit64>
-      <Unit65>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\inc\objpas.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="283"/>
-        <CursorPos X="12" Y="286"/>
-        <UsageCount Value="4"/>
-      </Unit65>
-      <Unit66>
+        <UsageCount Value="8"/>
+      </Unit72>
+      <Unit73>
         <Filename Value="..\..\..\shared\ConfigBase.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="245"/>
         <CursorPos X="72" Y="326"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="9"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
-      </Unit66>
-      <Unit67>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\wininc\struct.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="4343"/>
-        <CursorPos X="6" Y="4361"/>
-        <UsageCount Value="6"/>
-      </Unit67>
-      <Unit68>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\filutilh.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="137"/>
-        <CursorPos X="10" Y="155"/>
-        <UsageCount Value="6"/>
-      </Unit68>
-      <Unit69>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\inc\systemh.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="1340"/>
-        <CursorPos X="10" Y="1357"/>
-        <UsageCount Value="2"/>
-      </Unit69>
-      <Unit70>
-        <Filename Value="..\fz_srv_1510\private\sysmsgs_private.pas"/>
-        <UnitName Value="sysmsgs"/>
-        <EditorIndex Value="-1"/>
-        <UsageCount Value="14"/>
-        <DefaultSyntaxHighlighter Value="Delphi"/>
-      </Unit70>
-      <Unit71>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\sysstrh.inc"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="189"/>
-        <CursorPos X="49" Y="264"/>
-        <UsageCount Value="3"/>
-      </Unit71>
-      <Unit72>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win32\windows.pp"/>
-        <EditorIndex Value="-1"/>
-        <UsageCount Value="3"/>
-      </Unit72>
-      <Unit73>
-        <Filename Value="G:\lazarus\fpc\3.0.2\source\packages\winunits-jedi\src\jwawindns.pas"/>
-        <UnitName Value="JwaWinDNS"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="1437"/>
-        <CursorPos X="26" Y="1461"/>
-        <UsageCount Value="8"/>
       </Unit73>
       <Unit74>
-        <Filename Value="..\..\..\engine_10006\Servers.pas"/>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\wininc\struct.inc"/>
         <EditorIndex Value="-1"/>
-        <CursorPos X="11" Y="24"/>
-        <UsageCount Value="4"/>
-        <DefaultSyntaxHighlighter Value="Delphi"/>
+        <TopLine Value="1066"/>
+        <CursorPos X="6" Y="1075"/>
+        <UsageCount Value="7"/>
       </Unit74>
       <Unit75>
-        <Filename Value="highlevel\FileManager - копия.pas"/>
+        <Filename Value="..\..\..\tools\common\FileListCreator\clean.bat"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="220"/>
-        <CursorPos X="3" Y="170"/>
-        <UsageCount Value="4"/>
-        <DefaultSyntaxHighlighter Value="Delphi"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="5"/>
+        <DefaultSyntaxHighlighter Value="Bat"/>
       </Unit75>
+      <Unit76>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\inc\systemh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="384"/>
+        <CursorPos X="10" Y="403"/>
+        <UsageCount Value="16"/>
+      </Unit76>
+      <Unit77>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\wininc\redef.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="993"/>
+        <CursorPos X="10" Y="1007"/>
+        <UsageCount Value="1"/>
+      </Unit77>
+      <Unit78>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\sysosh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="22"/>
+        <CursorPos X="81" Y="41"/>
+        <UsageCount Value="1"/>
+      </Unit78>
+      <Unit79>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\sysstrh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="62"/>
+        <CursorPos X="10" Y="76"/>
+        <UsageCount Value="16"/>
+      </Unit79>
+      <Unit80>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\wininc\ascdef.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="110"/>
+        <CursorPos X="10" Y="125"/>
+        <UsageCount Value="5"/>
+      </Unit80>
+      <Unit81>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\wininc\base.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="39"/>
+        <CursorPos X="6" Y="54"/>
+        <UsageCount Value="5"/>
+      </Unit81>
+      <Unit82>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\rtl\win\wininc\defines.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="2974"/>
+        <CursorPos X="6" Y="2989"/>
+        <UsageCount Value="5"/>
+      </Unit82>
+      <Unit83>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\packages\winceunits\src\tlhelp32.pas"/>
+        <UnitName Value="TlHelp32"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="203"/>
+        <CursorPos X="3" Y="224"/>
+        <UsageCount Value="14"/>
+      </Unit83>
     </Units>
-    <JumpHistory Count="11" HistoryIndex="10">
+    <JumpHistory Count="15" HistoryIndex="14">
       <Position1>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="284" Column="99" TopLine="265"/>
+        <Caret Line="631" Column="30" TopLine="617"/>
       </Position1>
       <Position2>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="721" Column="43" TopLine="703"/>
+        <Caret Line="630" Column="82" TopLine="612"/>
       </Position2>
       <Position3>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="487" Column="24" TopLine="460"/>
+        <Caret Line="630" Column="84" TopLine="612"/>
       </Position3>
       <Position4>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="237" Column="31" TopLine="227"/>
+        <Caret Line="645" Column="21" TopLine="624"/>
       </Position4>
       <Position5>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="237" Column="31" TopLine="227"/>
+        <Caret Line="635" Column="19" TopLine="619"/>
       </Position5>
       <Position6>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="238" Column="29" TopLine="221"/>
+        <Caret Line="617" Column="18" TopLine="612"/>
       </Position6>
       <Position7>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="241" Column="33" TopLine="230"/>
+        <Caret Line="3" Column="124"/>
       </Position7>
       <Position8>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="293" Column="73" TopLine="288"/>
+        <Caret Line="588" Column="54" TopLine="555"/>
       </Position8>
       <Position9>
-        <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="397" Column="18" TopLine="371"/>
+        <Filename Value="..\..\..\engine_1510\Keys.pas"/>
       </Position9>
       <Position10>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="398" Column="18" TopLine="371"/>
+        <Caret Line="806" Column="29" TopLine="776"/>
       </Position10>
       <Position11>
         <Filename Value="fz_mod_loader.lpr"/>
-        <Caret Line="403" Column="55" TopLine="374"/>
+        <Caret Line="10" Column="33"/>
       </Position11>
+      <Position12>
+        <Filename Value="fz_mod_loader.lpr"/>
+        <Caret Line="6" Column="148"/>
+      </Position12>
+      <Position13>
+        <Filename Value="fz_mod_loader.lpr"/>
+        <Caret Line="589" Column="51" TopLine="574"/>
+      </Position13>
+      <Position14>
+        <Filename Value="fz_mod_loader.lpr"/>
+        <Caret Line="293" Column="7" TopLine="281"/>
+      </Position14>
+      <Position15>
+        <Filename Value="highlevel\IniFile.pas"/>
+        <Caret Line="137" Column="26" TopLine="117"/>
+      </Position15>
     </JumpHistory>
   </ProjectSession>
 </CONFIG>

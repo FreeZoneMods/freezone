@@ -6,9 +6,14 @@ uses
   xrfilesystem, basedefs, global_functions, LogMgr, srcBase, sysutils, windows,
   FileManager, HttpDownloader, IniFile, Level, Servers, GamePersistent,
   MainMenu, xrstrings, GameSpySystem, UI, RenderDevice, UIWindows, Fonts,
-  Synchro, Console, Statistics, safesync, GameCore, JwaWinDNS, Decompressor;
+  Synchro, Console, Statistics, safesync, GameCore, Decompressor,
+  CommandLineParser, mutexhunter;
+
+type
+  FZMasterLinkListAddr = array of string;
 
 var
+  _mod_rel_path:PChar;
   _mod_name:PChar;
   _mod_params:PChar;
   _dll_handle:HINST;
@@ -19,145 +24,15 @@ const
   MAX_PARAMS_SIZE:cardinal=4096;
   gamedata_files_list_name:string ='gamedata_filelist.ini';
   engine_files_list_name:string ='engine_filelist.ini';
+  master_mods_list_name:string ='master_mods_filelist.ini';
   fsltx_name:string='fsgame.ltx';
   userltx_name:string='user.ltx';
   userdata_dir_name:string='userdata\';
   engine_dir_name:string='bin\';
   patches_dir_name:string='patches\';
+  mp_dir_name:string='mp\';
 
-function GetServerPort():integer;
-var
-  mod_params, tmp:string;
-  posit, i:integer;
-const
-  PORT_ARG='-srvport ';
-begin
-  result:=-1;
-  mod_params:=_mod_params+' ';
-  posit:=Pos(PORT_ARG, mod_params);
-  if posit>0 then begin
-    tmp:='';
-    for i:=posit+length(PORT_ARG) to length(mod_params) do begin
-      if mod_params[i]=' ' then begin
-        break;
-      end else begin
-        tmp:=tmp+mod_params[i];
-      end;
-    end;
-    result:=strtointdef(tmp, -1);
-  end;
-end;
-
-function GetServerIp():string;
-var
-  i:integer;
-  posit:integer;
-  mod_params:string;
-  rec:PDNS_RECORD;
-  res:cardinal;
-  ip:cardinal;
-const
-  SRV_IP:string='-srv ';
-  SRV_DOMAIN:string='-srvname ';
-begin
-  result:='';
-  mod_params:=_mod_params+' ';
-  rec:=nil;
-    //если в параметрах есть прямой IP - используем его
-  posit:=Pos(SRV_IP, mod_params);
-  if posit>0 then begin
-    for i:=posit+length(SRV_IP) to length(mod_params) do begin
-      if mod_params[i]=' ' then begin
-        break;
-      end else begin
-        result:=result+mod_params[i];
-      end;
-    end;
-    FZLogMgr.Get.Write('Use direct IP '+result, FZ_LOG_DBG);
-    exit;
-  end;
-    //если в параметрах есть доменное имя сервера - используем его
-  posit:=Pos(SRV_DOMAIN, mod_params);
-  if posit>0 then begin
-    FZLogMgr.Get.Write('Use domain name', FZ_LOG_DBG);
-    for i:=posit+length(SRV_DOMAIN) to length(mod_params) do begin
-      if mod_params[i]=' ' then begin
-        break;
-      end else begin
-        result:=result+mod_params[i];
-      end;
-    end;
-    res:=DnsQuery(PAnsiChar(result), DNS_TYPE_A, DNS_QUERY_STANDARD, nil, @rec, nil);
-    if res <> 0 then begin
-      FZLogMgr.Get.Write('Cannot resolve '+result, FZ_LOG_ERROR);
-      result:='';
-    end else begin
-      ip:=rec^.Data.A.IpAddress;
-      result:=inttostr(ip and $FF)+'.'+inttostr((ip and $FF00) shr 8)+'.'+inttostr((ip and $FF0000) shr 16)+'.'+inttostr((ip and $FF000000) shr 24);
-      FZLogMgr.Get.Write('Received IP '+result, FZ_LOG_DBG);
-    end;
-    if (rec<>nil) then begin
-      DnsRecordListFree(rec, DnsFreeRecordList);
-    end;
-    exit;
-  end;
-  FZLogMgr.Get.Write('Parameters contain no server address!', FZ_LOG_ERROR);
-end;
-
-function GetCustomGamedataUrl():string;
-var
-  posit:integer;
-  i:integer;
-  mod_params:string;
-const
-  GAME_LIST:string='-gamelist ';
-  gamedata_files_list_url:string = 'http://stalker.gamepolis.ru/mods_clear_sky/engine_1510/gamedata.txt';
-begin
-  result:=gamedata_files_list_url;
-  mod_params:=_mod_params+' ';
-  posit:=Pos(GAME_LIST, mod_params);
-  if posit>0 then begin
-    result:='';
-    for i:=posit+length(GAME_LIST) to length(mod_params) do begin
-      if mod_params[i]=' ' then begin
-        break;
-      end else begin
-        result:=result+mod_params[i];
-      end;
-    end;
-  end;
-end;
-
-function GetCustomBinUrl():string;
-var
-  posit:integer;
-  i:integer;
-  mod_params:string;
-const
-  BIN_LIST:string='-binlist ';
-  CUSTOM_BIN_KEY:string='-fz_custombins';
-  engine_files_list_url:string = 'http://stalker.gamepolis.ru/mods_clear_sky/engine_1510/engine.txt';
-begin
-  result:=engine_files_list_url;
-  mod_params:=_mod_params+' ';
-  posit:=Pos(BIN_LIST, mod_params);
-  if posit>0 then begin
-    if Pos(CUSTOM_BIN_KEY, Core.Params)=0 then begin
-      FZLogMgr.Get.Write('Custom binaries feature disabled. Please, run the game with key -fz_custombins', FZ_LOG_ERROR);
-      exit;
-    end;
-    result:='';
-    for i:=posit+length(BIN_LIST) to length(mod_params) do begin
-      if mod_params[i]=' ' then begin
-        break;
-      end else begin
-        result:=result+mod_params[i];
-      end;
-    end;
-  end;
-end;
-
-procedure ShowMpMainMenu(junk:pCMainMenu);
+procedure ShowMpMainMenu({%H-}junk:pCMainMenu);
 var
   main_menu:pCMainMenu;
 const
@@ -184,6 +59,100 @@ begin
   end;
 end;
 
+function CreateDownloaderThreadForUrl(url:PAnsiChar):FZDownloaderThread;
+begin
+  if IsGameSpyDlForced(_mod_params) and (leftstr(url, length('https')) <> 'https') then begin
+    FZLogMgr.Get.Write('Creating GS dl thread', FZ_LOG_DBG);
+    result:=FZGameSpyDownloaderThread.Create();
+  end else begin
+    FZLogMgr.Get.Write('Creating CURL dl thread', FZ_LOG_DBG);
+    result:=FZCurlDownloaderThread.Create();
+  end;
+end;
+
+procedure PushToArray(var a:FZMasterLinkListAddr; s:string);
+var
+  i:integer;
+begin
+  i:=length(a);
+  setlength(a, i+1);
+  a[i]:=s;
+end;
+
+function DownloadAndParseMasterModsList(root_dir:string; modname:string; var binlist:string; var gamelist:string):boolean;
+var
+  master_links:FZMasterLinkListAddr;
+  list_downloaded:boolean;
+  th:FZDownloaderThread;
+  dl:FZFileDownloader;
+  i:integer;
+  full_path:string;
+  cfg:FZIniFile;
+  params_approved:boolean;
+  params_binlist, params_gamelist:string;
+  core_params:string;
+const
+  DEBUG_MODE_KEY:string='-fz_customlists';
+  MASTERLINKS_BINLIST_KEY = 'binlist';
+  MASTERLINKS_GAMELIST_KEY = 'gamelist';
+begin
+  result:=false;
+
+  PushToArray(master_links, 'https://raw.githubusercontent.com/FreeZoneMods/modmasterlinks/master/links.ini');
+  PushToArray(master_links, 'http://stalker.gamepolis.ru/mods_clear_sky/links.ini');
+
+  list_downloaded:=false;
+  full_path:= root_dir+master_mods_list_name;
+
+  th:=CreateDownloaderThreadForUrl(PAnsiChar(master_links[0]));
+  for i:=0 to length(master_links)-1 do begin
+    dl:=th.CreateDownloader(master_links[i], full_path, 0);
+    list_downloaded:=dl.StartSyncDownload();
+    dl.Free;
+    if list_downloaded then break;
+  end;
+
+  params_binlist:=GetCustomBinUrl(_mod_params);
+  params_gamelist:=GetCustomGamedataUrl(_mod_params);
+  params_approved:=false;
+  if list_downloaded then begin
+    // Мастер-список успешно скачался, будем парсить его содержимое
+    cfg:=FZIniFile.Create(full_path);
+    for i:=0 to cfg.GetSectionsCount()-1 do begin
+      if cfg.GetSectionName(i) = modname then begin
+        if (length(params_binlist) > 0) and (params_binlist <> cfg.GetStringDef(modname, MASTERLINKS_BINLIST_KEY, '')) then begin
+          FZLogMgr.Get.Write('Master binlist link differs from specified in mod parameters', FZ_LOG_ERROR);
+          params_approved:=false;
+          break;
+        end else if (length(params_gamelist)>0) and (params_gamelist <> cfg.GetStringDef(modname, MASTERLINKS_GAMELIST_KEY, '')) then begin
+          FZLogMgr.Get.Write('Master gamelist link differs from specified in mod parameters', FZ_LOG_ERROR);
+          params_approved:=false;
+          break;
+        end;
+        params_gamelist := cfg.GetStringDef(modname, MASTERLINKS_GAMELIST_KEY, '');
+        params_binlist  := cfg.GetStringDef(modname, MASTERLINKS_BINLIST_KEY,  '');
+        params_approved := true;
+        break;
+      end else if (not params_approved) and ( (length(params_binlist) = 0) or (params_binlist = cfg.GetStringDef(cfg.GetSectionName(i), MASTERLINKS_BINLIST_KEY, ''))) then begin
+        // Ссылка на движок нас удовлетворяет, но надо продолжать проверять остальные секции
+        params_approved:=true;
+      end;
+    end;
+    cfg.Free;
+  end else begin
+    //Список почему-то не скачался. Ограничимся геймдатными модами.
+    params_approved:=( length(params_binlist) = 0);
+  end;
+
+  core_params:=PAnsiChar(@Core.Params[0]);
+  if params_approved or (Pos(DEBUG_MODE_KEY, core_params)>0) then begin
+    binlist:=params_binlist;
+    gamelist:=params_gamelist;
+    result:=true;
+  end;
+
+end;
+
 function DownloadAndApplyFileList(url:string; list_filename:string; root_dir:string; fileList:FZFiles):boolean;
 var
   dl:FZFileDownloader;
@@ -192,12 +161,12 @@ var
   i, files_count:integer;
 
   section:string;
-  filecrc32:cardinal;
-  filesize:cardinal;
+  fileCheckParams:FZCheckParams;
   fileurl:string;
   filename:string;
   compression:cardinal;
   thread:FZDownloaderThread;
+  starttime:cardinal;
 begin
   result:=false;
   if length(url)=0 then begin
@@ -205,23 +174,18 @@ begin
     exit;
   end;
 
-  if not ForceDirectories(root_dir) then begin
-    FZLogMgr.Get.Write('Cannot create root directory', FZ_LOG_ERROR);
-    exit;
-  end;
-
   filepath:=root_dir+list_filename;
   FZLogMgr.Get.Write('Downloading list '+url+' to '+filepath, FZ_LOG_INFO);
 
-  thread:=FZDownloaderThread.Create();
-  dl:=FZFileDownloader.Create(url, filepath, 0, thread);
+  thread:=CreateDownloaderThreadForUrl(PAnsiChar(url));
+  dl:=thread.CreateDownloader(url, filepath, 0);
   result:=dl.StartSyncDownload();
   dl.Free();
+  thread.Free();
   if not result then begin
     FZLogMgr.Get.Write('Downloading list failed', FZ_LOG_ERROR);
     exit;
   end;
-  thread.Free();
 
   cfg:=FZIniFile.Create(filepath);
   files_count:=cfg.GetIntDef('main', 'files_count', 0);
@@ -230,6 +194,7 @@ begin
     exit;
   end;
 
+  starttime:=GetCurrentTime();
   result:=false;
   for i:=0 to files_count-1 do begin
     section:='file_'+inttostr(i);
@@ -252,26 +217,29 @@ begin
         exit;
       end;
 
-      filecrc32:=0;
-      if not cfg.GetHex(section, 'crc32', filecrc32) then begin
+      compression:=cfg.GetIntDef(section, 'compression', 0);
+
+      fileCheckParams.crc32:=0;
+      if not cfg.GetHex(section, 'crc32', fileCheckParams.crc32) then begin
         FZLogMgr.Get.Write('Invalid crc32 for file #'+inttostr(i), FZ_LOG_ERROR);
         exit;
       end;
 
-      filesize:=cfg.GetIntDef(section, 'size', 0);
-      if filesize=0 then begin
+      fileCheckParams.size:=cfg.GetIntDef(section, 'size', 0);
+      if fileCheckParams.size=0 then begin
         FZLogMgr.Get.Write('Invalid size for file #'+inttostr(i), FZ_LOG_ERROR);
         exit;
       end;
+      fileCheckParams.md5:=LowerCase(cfg.GetStringDef(section, 'md5', ''));
 
-      compression:=cfg.GetIntDef(section, 'compression', 0);
-
-      if not fileList.UpdateFileInfo(filename, filecrc32, filesize, fileurl, compression) then begin
+      if not fileList.UpdateFileInfo(filename, fileurl, compression, fileCheckParams) then begin
         FZLogMgr.Get.Write('Cannot update file info #'+inttostr(i)+' ('+filename+')', FZ_LOG_ERROR);
         exit;
       end;
     end;
   end;
+  FZLogMgr.Get.Write('File list "'+list_filename+'" processed, time '+inttostr(GetCurrentTime()-starttime)+' ms', FZ_LOG_INFO);
+
   cfg.Free;
   result:=true;
 end;
@@ -321,7 +289,14 @@ begin
     writeln(f,'$app_data_root$=false |false |$fs_root$|'+userdata_dir_name);
     writeln(f,'$parent_app_data_root$=false |false|'+UpdatePath('$app_data_root$', ''));
     writeln(f,'$arch_dir$=false| false|'+UpdatePath('$arch_dir$', ''));
-    writeln(f,'$game_arch_mp$=false| false|'+UpdatePath('$game_arch_mp$', ''));
+
+    //SACE3 обладает нехорошей привычкой писать сюда db-файлы, одна ошибка - и неработоспособный клиент
+    //У нас "безопасное" место для записи - это юзердата (даже в случае ошибки - брикнем мод, не игру)
+    //Маппим $game_arch_mp$ в юзердату, а чтобы игра подхватывала оригинальные файлы с картами -
+    //создадим еще одну запись
+    writeln(f,'$game_arch_mp$=false| false|$app_data_root$');
+    writeln(f,'$game_arch_mp_parent$=false| false|'+UpdatePath('$game_arch_mp$', ''));
+
     writeln(f,'$arch_dir_levels$=false| false|'+UpdatePath('$arch_dir_levels$', ''));
     writeln(f,'$arch_dir_resources$=false| false|'+UpdatePath('$arch_dir_resources$', ''));
     writeln(f,'$arch_dir_localization$=false| false|'+UpdatePath('$arch_dir_localization$', ''));
@@ -354,16 +329,14 @@ begin
   end;
 end;
 
-function CopyFileIfValid(src_path:string; dst_path:string; target_size:cardinal; target_crc32:cardinal):boolean;
+function CopyFileIfValid(src_path:string; dst_path:string; targetParams:FZCheckParams):boolean;
 var
-  file_crc32, file_size:cardinal;
+  fileCheckParams:FZCheckParams;
   dst_dir:string;
 begin
   result:=false;
-  file_crc32:=0;
-  file_size:=0;
-  if GetFileCrc32(src_path, file_crc32, file_size) then begin
-    if (file_crc32=target_crc32) and (file_size=target_size) then begin
+  if GetFileChecks(src_path, @fileCheckParams, length(targetParams.md5)>0) then begin
+    if CompareFiles(fileCheckParams, targetParams) then begin
       dst_dir:=dst_path;
       while (dst_dir[length(dst_dir)]<>'\') and (dst_dir[length(dst_dir)]<>'/') do begin
         dst_dir:=leftstr(dst_dir,length(dst_dir)-1);
@@ -377,14 +350,14 @@ begin
         FZLogMgr.Get.Write('Cannot copy file '+src_path+' to '+dst_path, FZ_LOG_ERROR);
       end;
     end else begin
-      FZLogMgr.Get.Write('CRC32 or size not equal to target', FZ_LOG_DBG);
+      FZLogMgr.Get.Write('Checksum or size not equal to target', FZ_LOG_DBG);
     end;
   end;
 end;
 
 procedure PreprocessFiles(files:FZFiles; mod_root:string);
 const
-  NO_PRELOAD:string='-fz_nopreload ';
+  NO_PRELOAD:string='-fz_nopreload';
 var
   i:integer;
   e:FZFileItemData;
@@ -410,7 +383,7 @@ begin
         delete(filename,1,length(engine_dir_name));
         src:=core_root+filename;
         dst:=mod_root+e.name;
-        if CopyFileIfValid(src, dst, e.size_target, e.crc32_target) then begin
+        if CopyFileIfValid(src, dst, e.target) then begin
           files.UpdateEntryAction(i, FZ_FILE_ACTION_NO);
         end;
       end;
@@ -421,7 +394,18 @@ begin
         delete(filename,1,length(patches_dir_name));
         src:=UpdatePath('$arch_dir_patches$', filename);
         dst:=mod_root+e.name;
-        if CopyFileIfValid(src, dst, e.size_target, e.crc32_target) then begin
+        if CopyFileIfValid(src, dst, e.target) then begin
+          files.UpdateEntryAction(i, FZ_FILE_ACTION_NO);
+        end;
+      end;
+    end else if (leftstr(e.name, length(mp_dir_name))=mp_dir_name) and (e.required_action=FZ_FILE_ACTION_DOWNLOAD) then begin
+      if not disable_preload then begin
+        //Проверим, есть ли уже такой файл в текущей копии игры
+        filename:=e.name;
+        delete(filename,1,length(mp_dir_name));
+        src:=UpdatePath('$game_arch_mp$', filename);
+        dst:=mod_root+e.name;
+        if CopyFileIfValid(src, dst, e.target) then begin
           files.UpdateEntryAction(i, FZ_FILE_ACTION_NO);
         end;
       end;
@@ -429,7 +413,7 @@ begin
   end;
 end;
 
-function DoWork(mod_name:string):boolean; //Выполняется в отдельном потоке
+function DoWork(modname:string; modpath:string):boolean; //Выполняется в отдельном потоке
 var
   path, ip:string;
   port:integer;
@@ -437,11 +421,17 @@ var
   last_downloaded_bytes:int64;
   main_menu:pCMainMenu;
 
-  cmdline, cmdapp:string;
+  cmdline, cmdapp, workingdir:string;
   si:TStartupInfo;
   pi:TProcessInformation;
   tmp:cardinal;
   srcname, dstname:string;
+
+  gamelist_url, binlist_url:string;
+
+  fullPathToCurEngine:PAnsiChar;
+  sz:cardinal;
+
 begin
   result:=false;
   //Пока идет коннект(существует уровень) - не начинаем работу
@@ -460,7 +450,7 @@ begin
     //Атомарно выставим активность загрузки и получим предыдущее значение (только в младшем байте, остальное мусор!)
     tmp:=AtomicExchange(@main_menu.m_sPDProgress.IsInProgress, 1) and $FF;
     //Убедимся, что загрузку до нас никто еще не стартовал, пока мы ждали захват мьютекса
-  until tmp=0;;
+  until tmp=0;
 
   main_menu.m_sPDProgress.Progress:=0;
 
@@ -471,15 +461,32 @@ begin
   SafeExec(@ShowMpMainMenu);
 
   //Получим путь к корневой (установочной) диектории мода
-  path:=UpdatePath('$app_data_root$', mod_name);
+  path:=UpdatePath('$app_data_root$', modpath);
   if (path[length(path)]<>'\') and (path[length(path)]<>'/') then begin
     path:=path+'\';
   end;
   FZLogMgr.Get.Write('Path to mod is ' + path, FZ_LOG_DBG);
 
-  SafeExec(@AssignStatus, PChar('Scanning directory'));
+  if not ForceDirectories(path) then begin
+    FZLogMgr.Get.Write('Cannot create root directory', FZ_LOG_ERROR);
+    exit;
+  end;
+
+  SafeExec(@AssignStatus, PChar('Parsing master links list...'));
+  if not DownloadAndParseMasterModsList(path, modname, binlist_url, gamelist_url) then begin
+    FZLogMgr.Get.Write('Parsing master links list failed!', FZ_LOG_ERROR);
+    exit;
+  end;
+
+
+  SafeExec(@AssignStatus, PChar('Scanning directory...'));
   //Просканируем корневую директорию на содержимое
   files := FZFiles.Create();
+  if IsGameSpyDlForced(_mod_params) then begin
+    files.SetDlMode(FZ_DL_MODE_GAMESPY);
+  end else begin
+    files.SetDlMode(FZ_DL_MODE_CURL);
+  end;
   last_downloaded_bytes:=0;
   files.SetCallback(@DownloadCallback, @last_downloaded_bytes);
   if not files.ScanPath(path) then begin
@@ -491,19 +498,28 @@ begin
   SafeExec(@AssignStatus, PChar('Verifying installation...'));
   //Загрузим с сервера требуемую конфигурацию корневой директории и сопоставим ее с текущей
   FZLogMgr.Get.Write('=======Processing game resources list=======', FZ_LOG_INFO);
-  if not DownloadAndApplyFileList(GetCustomGamedataUrl(), gamedata_files_list_name, path, files) then begin
+  if length(gamelist_url)=0 then begin
+    FZLogMgr.Get.Write('Empty game files list URL found!', FZ_LOG_ERROR);
+    files.Free;
+    exit;
+  end;
+
+  if not DownloadAndApplyFileList(gamelist_url, gamedata_files_list_name, path, files) then begin
     FZLogMgr.Get.Write('Applying game files list failed!', FZ_LOG_ERROR);
     files.Free;
     exit;
   end;
 
-  if not DownloadAndApplyFileList(GetCustomBinUrl(), engine_files_list_name, path, files) then begin
-    FZLogMgr.Get.Write('Applying engine files list failed!', FZ_LOG_ERROR);
-    files.Free;
-    exit;
+  if length(binlist_url)>0 then begin
+    if not DownloadAndApplyFileList(binlist_url, engine_files_list_name, path, files) then begin
+      FZLogMgr.Get.Write('Applying engine files list failed!', FZ_LOG_ERROR);
+      files.Free;
+      exit;
+    end;
   end;
 
   //удалим файлы из юзердаты из списка синхронизируемых; скопируем доступные файлы вместо загрузки их
+  FZLogMgr.Get.Write('=======Preprocessing files=======', FZ_LOG_INFO);
   SafeExec(@AssignStatus, PChar('Preprocessing files...'));
   PreprocessFiles(files, path);
   files.Dump(FZ_LOG_INFO);
@@ -546,40 +562,76 @@ begin
 
   SafeExec(@AssignStatus, PChar('Running game...'));
   //Надо стартовать игру с модом
-  ip:=GetServerIp();
+  ip:=GetServerIp(_mod_params);
   if length(ip)=0 then begin
     FZLogMgr.Get.Write('Cannot determine IP address of the server', FZ_LOG_ERROR);
     exit;
   end;
 
-  port:=GetServerPort();
+  //Подготовимся к перезапуску
+  FZLogMgr.Get.Write('Prepare to restart client '+cmdapp+' '+cmdline);
+  port:=GetServerPort(_mod_params);
   if (port<0) or (port>65535) then begin
     FZLogMgr.Get.Write('Cannot determine port', FZ_LOG_ERROR);
     exit;
   end;
 
-  cmdapp:=path+'bin\xrEngine.exe';
-  cmdline:= '-fz_nomod -start client('+ip+'/port='+inttostr(port)+')';
-  FZLogMgr.Get.Write('Running '+cmdapp+' '+cmdline);
+  if length(binlist_url) > 0 then begin
+    // Нестандартный двиг мода
+    cmdapp:=path+'bin\xrEngine.exe';
+    //-fzmod - показывает имя мода; -fz_nomod - тключает загрузку модов (чтобы не впасть в рекурсию/старая версия)
+    //так как проверка на имя мода идет первой, то все должно работать
+    cmdline:= 'xrEngine.exe -fz_nomod -fzmod '+modname+' -start client('+ip+'/port='+inttostr(port)+')';
+    workingdir:=path;
+  end else begin
+    // Используем текущий двиг
+    sz :=128;
+    fullPathToCurEngine:=nil;
+    repeat
+      if fullPathToCurEngine <> nil then FreeMem(fullPathToCurEngine, sz);
+      sz:=sz*2;
+      GetMem(fullPathToCurEngine, sz);
+      if fullPathToCurEngine = nil then exit;
+    until GetModuleFileName(xrEngine, fullPathToCurEngine, sz) < sz-1;
+    cmdapp:=fullPathToCurEngine;
+    workingdir:=path;
+    cmdline:= 'xrEngine.exe -fz_nomod -fzmod '+modname+' -wosace -start client('+ip+'/port='+inttostr(port)+')';
+    FreeMem(fullPathToCurEngine, sz);
+  end;
 
-  si.cb:=sizeof(si);
   FillMemory(@si, sizeof(si),0);
   FillMemory(@pi, sizeof(pi),0);
-  if (not CreateProcess(PAnsiChar(cmdapp), PAnsiChar(cmdline), nil, nil, false, 0, nil, PAnsiChar(path),si, pi)) then begin
+  si.cb:=sizeof(si);
+
+  //Прибьем блокирующий запуск нескольких копий сталкера мьютекс
+  KillMutex();
+
+  //Запустим клиента
+  if (not CreateProcess(PAnsiChar(cmdapp), PAnsiChar(cmdline), nil, nil, false, CREATE_SUSPENDED, nil, PAnsiChar(workingdir),si, pi)) then begin
+    FZLogMgr.Get.Write('cmdapp: '+cmdapp, FZ_LOG_ERROR);
+    FZLogMgr.Get.Write('cmdline: '+cmdline, FZ_LOG_ERROR);
     FZLogMgr.Get.Write('Cannot run application', FZ_LOG_ERROR);
-    exit;
+  end else begin
+    ResumeThread(pi.hThread);
+    result:=true;
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    ExecuteConsoleCommand(PAnsiChar('flush'));
+
+    //Отдадим команду на выход из игры
+    //FZLogMgr.Get.Write('Exiting game', FZ_LOG_DBG);
+    //ExecuteConsoleCommand(PAnsiChar('quit'));
   end;
-  result:=true;
 end;
-
-
 
 procedure ThreadBody(); stdcall;
 var
   main_menu:pCMainMenu;
 begin
   FZLogMgr.Get.Write('Starting working thread', FZ_LOG_DBG);
-  if not DoWork(_mod_name) then begin
+  if not DoWork(_mod_name, _mod_rel_path) then begin
     FZLogMgr.Get.Write('Loading failed!', FZ_LOG_ERROR);
     SafeExec(@AssignStatus, PChar('Downloading failed. Try again.'));
     Sleep(4000);
@@ -590,7 +642,6 @@ begin
   end else begin
     TerminateProcess(GetCurrentProcess, 0);
   end;
-  FZLogMgr.Get.Write('Exiting working thread', FZ_LOG_DBG);
   InterlockedDecrement(_lock);
 end;
 
@@ -633,8 +684,9 @@ begin
 
     //И выделить память под аргументы
     _mod_name:=VirtualAlloc(nil, MAX_NAME_SIZE, MEM_COMMIT, PAGE_READWRITE);
+    _mod_rel_path:=VirtualAlloc(nil, MAX_NAME_SIZE, MEM_COMMIT, PAGE_READWRITE);
     _mod_params:=VirtualAlloc(nil, MAX_PARAMS_SIZE, MEM_COMMIT, PAGE_READWRITE);
-    if (_mod_name = nil) or (_mod_params=nil) then begin
+    if (_mod_rel_path = nil) or (_mod_params=nil) then begin
       FZLogMgr.Get.Write('Cannot allocate memory', FZ_LOG_ERROR);
       FreeLibrary(_dll_handle);
       _dll_handle:=0;
@@ -664,9 +716,9 @@ begin
     exit;
   end;
 
-  FZLogMgr.Get.Write( 'g_pGamePersistent '+inttohex(cardinal(g_ppGamePersistent^), 8), FZ_LOG_DBG );
-  FZLogMgr.Get.Write( 'main_menu '+inttohex(cardinal(main_menu), 8), FZ_LOG_DBG );
-  FZLogMgr.Get.Write( 'main_menu.IsInProgress '+inttohex(cardinal(@main_menu.m_sPDProgress.IsInProgress), 8), FZ_LOG_DBG );
+  FZLogMgr.Get.Write( 'g_pGamePersistent '+inttohex(PtrInt(g_ppGamePersistent^), 8), FZ_LOG_DBG );
+  FZLogMgr.Get.Write( 'main_menu '+inttohex(PtrInt(main_menu), 8), FZ_LOG_DBG );
+  FZLogMgr.Get.Write( 'main_menu.IsInProgress '+inttohex(PtrInt(@main_menu.m_sPDProgress.IsInProgress), 8), FZ_LOG_DBG );
 
 
   if (main_menu.m_sPDProgress.FileName.p_ = nil) then begin
@@ -692,16 +744,34 @@ begin
   end;
 end;
 
+//Схема работы загрузчика с ипользованием с мастер-списка модов:
+// 1) Скачиваем мастер-список модов
+// 2) Если мастер-список скачан и мод с таким названием есть в списке - используем ссылки на движок и геймдату
+//    из этого списка; если заданы кастомные и не совпадающие с теми, которые в списке - ругаемся и не работаем
+// 3) Если мастер-список скачан, но мода с таким названием в нем нет - убеждаемся, что ссылка на движок либо не
+//    задана (используется текущий), либо есть среди других модов, либо на клиенте активен дебаг-режим. Если не
+//    выполняется ничего из этого - ругаемся и не работаем, если выполнено - используем указанные ссылки
+// 4) Если мастер-список НЕ скачан - убеждаемся, что ссылка на движок либо не задана (надо использовать текущий),
+//    либо активен дебаг-режим на клиенте. Если это не выполнено - ругаемся и не работаем, иначе используем
+//    предоставленные пользователем ссылки.
+// 5) Скачиваем сначала геймдатный список, затем движковый (чтобы не дать возможность переопределить в первом файлы второго)
+// 6) Актуализируем файлы и рестартим клиент
+
+
 //Доступные ключи запуска, передающиеся в mod_params:
 //-binlist <URL> - ссылка на адрес, по которому берется список файлов движка (для работы требуется запуск клиента с ключлм -fz_custom_bin)
 //-gamelist <URL> - ссылка на адрес, по которому берется список файлов мода (геймдатных\патчей)
 //-srv <IP> - IP-адрес сервера, к которому необходимо присоединиться после запуска мода
 //-srvname <domainname> - доменное имя, по которому располагается сервер. Можно использовать вместо параметра -srv в случае динамического IP сервера
 //-port<number> - порт сервера
+//-gamespymode - стараться использовать загрузку средствами GameSpy
 
 procedure ModLoad(mod_name:PAnsiChar; mod_params:PAnsiChar); stdcall;
+var
+  i:integer;
 const
   mod_dir_prefix:PChar='.svn\';
+  allowed_symbols_in_mod_name:string='1234567890abcdefghijklmnopqrstuvwxyz_';
 begin
   //Убедимся, что процесс загрузки из нашей длл не находится в активной фазе, и заблочим повторный запуск до завершения
   if InterlockedExchangeAdd(@_lock, 1)<>0 then begin
@@ -718,21 +788,36 @@ begin
   AbortConnection();
 
   //Работаем
-  if length(mod_name)+length(mod_dir_prefix)>=MAX_NAME_SIZE-1 then begin
+  if Int64(length(mod_name))+Int64(length(mod_dir_prefix))>=Int64(MAX_NAME_SIZE-1) then begin
     FZLogMgr.Get.Write('Too long mod name, exiting', FZ_LOG_ERROR);
+    InterlockedDecrement(_lock);
     exit;
   end;
   if length(mod_params)>=MAX_PARAMS_SIZE-1 then begin
     FZLogMgr.Get.Write('Too long mod params, exiting', FZ_LOG_ERROR);
+    InterlockedDecrement(_lock);
     exit;
   end;
 
-  //Благодаря этому хаку, игра не полезет подгружать файлы мода при запуске оригинального клиента
-  StrCopy(_mod_name, mod_dir_prefix);
-  StrCopy(@_mod_name[length(mod_dir_prefix)], mod_name);
+  i:=0;
+  while(mod_name[i]<>chr(0)) do begin
+    if pos(mod_name[i], allowed_symbols_in_mod_name) = 0 then begin
+      FZLogMgr.Get.Write('Invalid mod name, exiting', FZ_LOG_ERROR);
+      InterlockedDecrement(_lock);
+      exit;
+    end;
+    i:=i+1;
+  end;
+
+
+  StrCopy(_mod_name, mod_name);
+
+  //Благодаря этому хаку с префиксом, игра не полезет подгружать файлы мода при запуске оригинального клиента
+  StrCopy(_mod_rel_path, mod_dir_prefix);
+  StrCopy(@_mod_rel_path[length(mod_dir_prefix)], mod_name);
 
   StrCopy(_mod_params, mod_params);
-  if not RunModLoad(_mod_name, _mod_params) then begin
+  if not RunModLoad(_mod_rel_path, _mod_params) then begin
     InterlockedDecrement(_lock);
     exit;
   end;
@@ -744,10 +829,9 @@ end;
 {$IFNDEF RELEASE}
 procedure ModLoadTest(); stdcall;
 begin
-  ModLoad('fz_mod_loader', '-srvname localhost -srvport 5449');
+  ModLoad({'guns_cs'}{'fz_mod_loader'}'sace3', ' -srvname localhost -srvport 5449 ');
 end;
 {$ENDIF}
-
 
 exports
 {$IFNDEF RELEASE}

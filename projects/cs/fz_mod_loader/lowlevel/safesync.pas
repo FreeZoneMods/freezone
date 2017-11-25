@@ -52,7 +52,7 @@ begin
   payload(arg);
 
   //Самое время перезапустить второй поток
-  thread_spawn(pointer(xrEngine+$556F0), PChar(xrEngine+$7ACB4), 0, 0);
+  thread_spawn(pointer(xrEngine+$556F0), PChar(xrEngine+$7ACB4), 0, nil);
 
   //Больше не требуется ничего ждать :)
   xrCriticalSection__Leave(@pDevice.mt_csEnter);

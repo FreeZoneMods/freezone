@@ -10,7 +10,7 @@ var
 const
   XRCORE_DLL:PAnsiChar='xrCore';
 
-procedure ModLoad(mod_name:PAnsiChar); stdcall;
+procedure ModLoad(mod_name:PAnsiChar; mod_params:PAnsiChar); stdcall;
 begin
   xrCore:=LoadLibrary(XRCORE_DLL);
   Log_fun:=srcCdeclFunction.Create(pointer(xrCore+$16270), [vtPChar], 'Log');
