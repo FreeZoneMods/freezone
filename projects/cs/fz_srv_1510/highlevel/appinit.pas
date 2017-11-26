@@ -16,6 +16,8 @@ uses basedefs, dynamic_caster, global_functions, LogMgr, ConfigMgr, Console, Eme
 function Init():boolean; stdcall;
 var
   tp:cardinal;
+  cfg:FZCacheData;
+  old_severity:cardinal;
 begin
   result:=false;
 
@@ -27,6 +29,14 @@ begin
   if not global_functions.Init then exit;
 
   if not LogMgr.Init then exit;
+  if not ConfigMgr.Init then exit;
+  if not ConfigCache.Init then exit;
+
+  //Принудительно распечатаем инициализационную инфу в лог
+  cfg:=FZConfigCache.Get().GetDataCopy();
+  old_severity:=cfg.log_severity;
+  cfg.log_severity := 0;
+  FZConfigCache.Get().OverrideConfig(cfg);
 
   FZLogMgr.Get.Write('Initializing...', FZ_LOG_IMPORTANT_INFO);
 {$IFDEF REVO}
@@ -47,10 +57,11 @@ begin
     FZLogMgr.Get.Write('xrGame.dll - UNKNOWN version!', FZ_LOG_ERROR);
   end;
 
-  if not ConfigMgr.Init then exit;
+  cfg.log_severity:=old_severity;
+  FZConfigCache.Get().OverrideConfig(cfg);
+
   if not ItemsCfgMgr.Init then exit;
   if not Console.Init then exit;
-  if not ConfigCache.Init then exit;
 
   if not Emergency.Init then exit;
   if not TranslationMgr.Init then exit;

@@ -5,13 +5,27 @@ uses SyncObjs, SysUtils, srcBase, srcCalls, Console;
 type
   FZLogMessageSeverity = ( FZ_LOG_DBG, FZ_LOG_INFO, FZ_LOG_IMPORTANT_INFO, FZ_LOG_ERROR, FZ_LOG_SILENT );
 
+  { FZFileLogger }
+
+  FZFileLogger = class
+  private
+    _enabled:boolean;
+    _file:textfile;
+  public
+    constructor Create();
+    destructor Destroy(); override;
+    procedure EnableLogging();
+    procedure DisableLogging();
+    procedure Log(msg:string; severity:FZLogMessageSeverity);
+  end;
+
   { FZLogMgr }
 
   FZLogMgr = class
   private
+    _target_severity:cardinal; //DO NOT make class member!
     _logfun:srcBaseFunction;
-    LogFile:textfile;
-    FZLogEnabled:boolean;
+    _logfile:FZFileLogger;
     _WriteLock:TCriticalSection;
     {%H-}constructor Create();
 
@@ -21,6 +35,7 @@ type
 
     procedure Write(data:string; severity:FZLogMessageSeverity; JustInFile:boolean = false);
     procedure SetTargetSeverityLevel(severity:cardinal);
+    procedure SetFileLoggingStatus(status:boolean);
     destructor Destroy(); override;    
   end;
 
@@ -34,12 +49,76 @@ implementation
 uses CommonHelper, strutils;
 var
   Mgr:FZLogMgr;
-  _target_severity:cardinal; //DO NOT make class member!
+
+{ FZFileLogger }
+
+constructor FZFileLogger.Create;
+begin
+  _enabled := false;
+end;
+
+destructor FZFileLogger.Destroy;
+begin
+  DisableLogging();
+  inherited;
+end;
+
+procedure FZFileLogger.EnableLogging;
+var
+  opened:boolean;
+begin
+  opened := false;
+  if not _enabled then begin
+    try
+      assignfile(_file, 'fz_events.log');
+      append(_file);
+      opened := true;
+    except
+      opened := false;
+    end;
+
+    if not opened then begin
+      try
+        assignfile(_file, 'fz_events.log');
+        rewrite(_file);
+        opened := true;
+      except
+        opened := false;
+      end;
+    end;
+
+    if opened then begin
+      writeln(_file, 'Log started '+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime);
+      _enabled:=true;
+    end;
+  end;
+end;
+
+procedure FZFileLogger.Log(msg: string; severity: FZLogMessageSeverity);
+begin
+  if _enabled then begin
+    if severity = FZ_LOG_ERROR then
+      writeln(_file, '['+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime+'] ERROR: '+ msg)
+    else
+      writeln(_file, '['+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime+'] '+ msg);
+    flush(_file);
+  end;
+end;
+
+procedure FZFileLogger.DisableLogging;
+begin
+  if _enabled then begin
+    writeln(_file, 'Log finished '+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime);
+    closefile(_file);
+    _enabled := false;
+  end;
+end;
 
 {FZLogMgr}
 
 class function FZLogMgr.Get(): FZLogMgr;
 begin
+  assert(Mgr<>nil, 'Log mgr is not created yet');
   result:=Mgr;
 end;
 
@@ -59,22 +138,9 @@ constructor FZLogMgr.Create();
 begin
   inherited;
   _target_severity:=FZ_LOG_DEFAULT_SEVERITY;
-
-  FZLogEnabled:=true;
-  _logfun:=nil;
   _WriteLock:=TCriticalSection.Create;
-  if FZLogEnabled then begin
-    try
-      assignfile(logfile, 'fz_events.log');
-      try
-        append(LogFile);
-      except
-        rewrite(LogFile);
-      end;
-      writeln(LogFile, 'Log started '+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime);
-    except
-    end;
-  end;
+  _logfun:=nil;
+  _logfile:=FZFileLogger.Create();
 end;
 
 procedure FZLogMgr.SetTargetSeverityLevel(severity: cardinal);
@@ -82,6 +148,19 @@ begin
   _target_severity:=severity;
 end;
 
+procedure FZLogMgr.SetFileLoggingStatus(status: boolean);
+begin
+  _WriteLock.Enter;
+  try
+    if (status) then begin
+      _logfile.EnableLogging();
+    end else begin
+      _logfile.DisableLogging();
+    end;
+  finally
+    _WriteLock.Leave;
+  end;
+end;
 
 procedure FZLogMgr.Write(data:string; severity:FZLogMessageSeverity; JustInFile:boolean = false);
 begin
@@ -101,13 +180,7 @@ begin
       end;
     end;
 
-    if FZLogEnabled then begin
-      if severity = FZ_LOG_ERROR then
-        writeln(LogFile, '['+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime+'] ERROR: '+data)
-      else
-        writeln(LogFile, '['+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime+'] '+data);
-      flush(LogFile);
-    end;
+    _logfile.Log(data, severity);
   finally
     _WriteLock.Leave;
   end;
@@ -115,8 +188,8 @@ end;
 
 destructor FZLogMgr.Destroy();
 begin
-  writeln(LogFile, 'Log finished '+ FZCommonHelper.GetCurDate+' '+FZCommonHelper.GetCurTime);
-  closefile(LogFile);
+  _logfile.Free();
+  _WriteLock.Free();
   Mgr:=nil;
   inherited;
 end;

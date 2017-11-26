@@ -33,9 +33,7 @@ end;
 
 class function FZConfigMgr.Get(): FZConfigMgr;
 begin
-  if _instance=nil then begin
-    _instance:=FZConfigMgr.Create();
-  end;
+  assert(_instance<>nil, 'Config mgr is not created yet');
   result:=_instance;
 end;
 
@@ -46,7 +44,7 @@ end;
 
 function Init():boolean; stdcall;
 begin
-  _instance:=nil;
+  _instance:=FZConfigMgr.Create();
   result:=true;
 end;
 

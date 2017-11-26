@@ -293,7 +293,9 @@ begin
   end;
 
   //переделка названия логфайла
-  RenameGameLog(PChar(xrCore+$3F438), sizeof(string_path));
+  if FZConfigMgr.Get().GetBool('rename_game_log', true) then begin
+    RenameGameLog(PChar(xrCore+$3F438), sizeof(string_path));
+  end;
 
   if not PatchVoting() then exit;
   if not PatchConsole() then exit;

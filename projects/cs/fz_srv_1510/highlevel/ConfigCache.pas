@@ -57,14 +57,20 @@ FZCacheData = record
   hit_statistics_mode:cardinal;
   enable_maplist_sync:boolean;
   strict_hwid:boolean;
+
+  log_severity:cardinal;
+  external_log:boolean;
 end;
 pFZCacheData = ^FZCacheData;
+
+{ FZConfigCache }
 
 FZConfigCache = class
 protected
   _cs:TRTLCriticalSection;
   _data:FZCacheData;
   procedure _LL_FillData();
+  procedure _ApplyConfig();
 public
   class function Get():FZConfigCache;
   constructor Create();
@@ -72,6 +78,7 @@ public
   procedure GetDataCopy(dest:pFZCacheData); overload;
   function GetDataCopy():FZCacheData; overload;
   procedure Reload();
+  procedure OverrideConfig(cfg:FZCacheData);
 end;
 
 function Init():boolean; stdcall;
@@ -80,13 +87,6 @@ implementation
 uses ConfigMgr, LogMgr, sysutils, CommonHelper;
 var
   _instance:FZConfigCache;
-
-function Init():boolean; stdcall;
-begin
-  _instance:=FZConfigCache.Get();
-  result:=true;
-end;
-
 
 { FZConfigCache }
 
@@ -104,9 +104,7 @@ end;
 
 class function FZConfigCache.Get: FZConfigCache;
 begin
-  if _instance=nil then begin
-    _instance:=FZConfigCache.Create;
-  end;
+  assert(_instance<>nil, 'Config cache is not created yet');
   result:=_instance;
 end;
 
@@ -130,9 +128,27 @@ begin
   EnterCriticalSection(_cs);
   try
     self._LL_FillData;
+    _ApplyConfig();
   finally
     LeaveCriticalSection(_cs);
   end;
+end;
+
+procedure FZConfigCache.OverrideConfig(cfg: FZCacheData);
+begin
+  EnterCriticalSection(_cs);
+  try
+    self._data := cfg;
+    _ApplyConfig();
+  finally
+    LeaveCriticalSection(_cs);
+  end;
+end;
+
+procedure FZConfigCache._ApplyConfig;
+begin
+  FZLogMgr.Get.SetTargetSeverityLevel(self._data.log_severity);
+  FZLogMgr.Get.SetFileLoggingStatus(self._data.external_log);
 end;
 
 procedure FZConfigCache._LL_FillData;
@@ -187,8 +203,15 @@ begin
 
   self._data.strict_hwid:=FZConfigMgr.Get.GetBool('strict_hwid', false);
 
-  FZLogMgr.Get.SetTargetSeverityLevel(FZConfigMgr.Get.GetInt('log_severity',FZ_LOG_DEFAULT_SEVERITY));
+  self._data.log_severity:=FZConfigMgr.Get.GetInt('log_severity',FZ_LOG_DEFAULT_SEVERITY);
+  self._data.external_log:=FZConfigMgr.Get.GetBool('external_log', false);
 
+end;
+
+function Init():boolean; stdcall;
+begin
+  _instance:=FZConfigCache.Create();
+  result:=true;
 end;
 
 end.
