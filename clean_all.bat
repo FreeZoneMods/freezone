@@ -11,5 +11,9 @@ cd shared
 start clean.bat
 cd ..
 
+cd tools
+start clean.bat
+cd ..
+
 exit
 

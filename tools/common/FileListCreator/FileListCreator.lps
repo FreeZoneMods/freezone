@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="10"/>
+    <BuildModes Active="Default"/>
+    <Units Count="7">
+      <Unit0>
+        <Filename Value="FileListCreator.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <CursorPos X="58" Y="14"/>
+        <UsageCount Value="31"/>
+        <Loaded Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="FileLister.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="37"/>
+        <CursorPos X="32" Y="41"/>
+        <UsageCount Value="31"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="..\..\..\shared\3rdparty\FastCrc.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="22" Y="19"/>
+        <UsageCount Value="20"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="..\..\..\shared\3rdparty\FastMd5.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="232"/>
+        <UsageCount Value="20"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="..\..\..\shared\3rdparty\crc.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="31"/>
+        <CursorPos Y="3"/>
+        <UsageCount Value="31"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="..\..\..\shared\3rdparty\md5.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="122"/>
+        <CursorPos X="21" Y="148"/>
+        <UsageCount Value="28"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="G:\lazarus\fpc\3.0.2\source\packages\fcl-base\src\custapp.pp"/>
+        <UnitName Value="CustApp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="61"/>
+        <CursorPos X="14" Y="80"/>
+        <UsageCount Value="9"/>
+      </Unit6>
+    </Units>
+    <JumpHistory Count="1">
+      <Position1>
+        <Filename Value="FileListCreator.lpr"/>
+        <Caret Line="71" Column="72" TopLine="33"/>
+      </Position1>
+    </JumpHistory>
+  </ProjectSession>
+</CONFIG>
