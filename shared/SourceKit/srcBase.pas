@@ -81,7 +81,10 @@ const
   ADD_ESP_DWORD     :word   =$C481;
   MOV_EAX_DWORD     :byte   =$B8;  
   MOV_ECX_DWORD     :byte   =$B9;
+  MOV_EDX_DWORD     :byte   =$BA;
+  MOV_EBX_DWORD     :byte   =$BB;
   MOV_ESI_DWORD     :byte   =$BE;
+  MOV_EDI_DWORD     :byte   =$BF;
 
   CALL_RELATIVE     :byte   =$E8;
   JMP_RELATIVE      :byte   =$E9;
@@ -114,10 +117,10 @@ const
 
 
 implementation
-uses windows;
+uses windows, sysutils;
 
 var
-  _instance:srcKit;
+  _instance:srcKit = nil;
 
 { srcKit }
 
@@ -413,10 +416,10 @@ var
 begin
   oldprotect:=0;
   result:=(VirtualProtect(addr, sz, PAGE_EXECUTE_READWRITE, oldprotect));
+  if srcKit.Get.IsDebug then srcKit.Get.DbgLog('MakeExecutable 0x'+inttohex(uintptr(addr), 2*sizeof(addr))+', size '+inttostr(sz)+' bytes, result '+booltostr(result, true));
 end;
 
-function srcKit.FindEngineCall(name: string; visibility: string
-  ): srcBaseFunction; stdcall;
+function srcKit.FindEngineCall(name: string; visibility: string): srcBaseFunction; stdcall;
 begin
   result:=nil;
   self._functions.SearchByName(result, name, visibility);

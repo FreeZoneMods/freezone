@@ -13,7 +13,7 @@ type
     public
      constructor Create();
      destructor Destroy(); override;
-     procedure Load(FName:string);
+     function Load(FName:string):boolean;
      function GetData(Key:string; var Value:string; section:string = 'main'):boolean;
      function GetBool(Key:string; default:boolean = false; section:string = 'main'):boolean;
      function GetInt(Key:string; default:integer = 0; section:string = 'main'):integer;
@@ -46,20 +46,23 @@ begin
   inherited Destroy;
 end;
 
-procedure FZConfigBase.Load(FName:string);
+function FZConfigBase.Load(FName:string):boolean;
 begin
+  result:=false;
   _lock.Enter();
 
   self._filename:=FName;
-  self._full_path:= Utf8ToWinCP(GetCurrentDir())+'\'+FName;
+  self._full_path:=GetCurrentDir()+'\'+FName;
   if _inifile<>nil then begin
     _inifile.Free();
   end;
 
   try
     _inifile:=TIniFile.Create(_full_path, [ifoStripComments, ifoStripInvalid] );
+    result:=true;
   except
     _inifile:=nil;
+    result:=false;
   end;
 
   _lock.Leave();
@@ -125,7 +128,7 @@ var
   temp:string;
 begin
   if GetData(Key, temp, section) then begin
-    result:=strtofloatdef(temp, default);
+    result:=FZCommonHelper.StringToFloatDef(temp, default);
   end else begin
     result:=default;
   end;

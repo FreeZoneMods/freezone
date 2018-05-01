@@ -18,8 +18,8 @@ end;
 function Init:boolean; stdcall;
 
 implementation
-uses CommonHelper, sysutils, StrUtils{, Console};
-var _instance:FZTranslationMgr;
+uses CommonHelper, sysutils, StrUtils;
+var _instance:FZTranslationMgr = nil;
 
 {FZTranslationMgr}
 
@@ -83,6 +83,7 @@ end;
 
 function Init:boolean; stdcall;
 begin
+  assert(_instance=nil, 'Translation manager is already inited');
   _instance:=FZTranslationMgr.Create();
   result:=true;
 end;

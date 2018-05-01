@@ -22,6 +22,9 @@ type
     class function GetVolSN():string;
     class function HexToInt(hex:string; default:cardinal=0):cardinal;
     class function TryHexToInt(hex:string; var out_val:cardinal):boolean;
+    class function StringToFloatDef(str:string; def:single):single;
+    class function FloatToString(value: single; precision:integer = 4; digits:integer = 2): string;
+    class function ReadFileAsString(fname:string; var str:string):boolean;
 end;
 
 const
@@ -270,6 +273,48 @@ begin
   end else begin
     result := true;
     out_val:=cardinal(r);
+  end;
+end;
+
+class function FZCommonHelper.StringToFloatDef(str: string; def: single): single;
+var
+  formatSettings : TFormatSettings;
+begin
+  formatSettings.DecimalSeparator:='.';
+  formatSettings.ThousandSeparator:=' ';
+  result:=strtofloatdef(str, def, formatSettings);
+end;
+
+class function FZCommonHelper.FloatToString(value: single; precision:integer; digits:integer): string;
+var
+  formatSettings : TFormatSettings;
+begin
+  formatSettings.DecimalSeparator:='.';
+  formatSettings.ThousandSeparator:=' ';
+  result:=floattostrf(value, ffFixed, precision, digits, formatSettings);
+end;
+
+class function FZCommonHelper.ReadFileAsString(fname: string; var str: string): boolean;
+var
+  f:file;
+  b:char;
+begin
+  str:='';
+  b:=chr(0);
+  try
+    assignfile(f, fname);
+    reset(f, sizeof(b));
+    try
+      while not eof(f) do begin
+        BlockRead(f, b, 1);
+        str:=str+b;
+      end;
+    finally
+      closefile(f)
+    end;
+    result:=true;
+  except
+    result:=false;
   end;
 end;
 

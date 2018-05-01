@@ -186,8 +186,9 @@ begin
   result:=false;
 
   setlength(self._src_cut, self._length+6);                   //не забываем про возврат
-  //TODO:VirtualProtect
+
   _src_cut_addr:=@(self._src_cut[0]);
+  srcKit.Get().MakeExecutable(_src_cut_addr, length(self._src_cut));
 
   if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': srcbuf = '+inttohex(cardinal(_src_cut_addr), 8));
   if not srcKit.CopyASM(self._patch_addr, @self._src_cut[0], self._length) then exit; //копируем оригинальный код
@@ -363,7 +364,7 @@ end;
 { srcCleanupInjection }
 var
   _CleanupCode: array [0..19] of byte;
-  _cleanup_instance:srcCleanupInjection;
+  _cleanup_instance:srcCleanupInjection = nil;
 
 function srcCleanupInjection._AssembleInit(args:array of cardinal): boolean;
 var

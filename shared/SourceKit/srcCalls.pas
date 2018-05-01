@@ -35,12 +35,42 @@ srcCdeclFunction = class(srcBaseFunction)
   function _AssembleWrapper(pos:pointer; args:array of const):pointer; override;
 end;
 
+{ srcECXCallFunction }
 
 srcECXCallFunction = class(srcBaseFunction)
   protected
   _to_reg_move_opcode:byte;
+  _non_stack_args_count:byte;
   function _ArgsInit(args:array of const; pos:pointer):pointer; override;
   public
+  constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+end;
+
+{ srcECXCallFunctionWEDIArg }
+
+srcECXCallFunctionWEDIArg = class(srcECXCallFunction)
+  protected
+  _to_second_reg_move_opcode:byte;
+  function _ArgsInit(args:array of const; pos:pointer):pointer; override;
+  public
+  constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+end;
+
+{ srcECXCallFunctionWEBXEDIArg }
+
+srcECXCallFunctionWEBXEDIArg = class(srcECXCallFunction)
+  protected
+  _to_second_reg_move_opcode:byte;
+  _to_third_reg_move_opcode:byte;
+  function _ArgsInit(args:array of const; pos:pointer):pointer; override;
+  public
+  constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+end;
+
+{ srcECXCallFunctionWEDXArg }
+
+srcECXCallFunctionWEDXArg = class(srcECXCallFunctionWEDIArg)
+public
   constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
 end;
 
@@ -60,9 +90,18 @@ public
 end;
 
 srcESICallFunctionWEAXArg = class(srcBaseFunction)
-  protected
+protected
+  _mov_this_to_arg_opcode:byte;
+
   function _ArgsInit(args:array of const; pos:pointer):pointer; override;
-  public
+public
+  constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+end;
+
+{ srcEDXCallFunctionWEAXArg }
+
+srcEDXCallFunctionWEAXArg = class(srcESICallFunctionWEAXArg)
+public
   constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
 end;
 
@@ -266,24 +305,23 @@ end;
 
 { srcECXCallFunction }
 
-constructor srcECXCallFunction.Create(addr: pointer; args: array of const;
-  name: string; visibility: string);
+constructor srcECXCallFunction.Create(addr: pointer; args: array of const; name: string; visibility: string);
 begin
   inherited;
   _to_reg_move_opcode:=MOV_ECX_DWORD;
-  if (self._argc<1) and (args[low(args)].VType<>vtObject) then begin
-    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': first argument MUST have object type!', true);
+  _non_stack_args_count:=1;
+  if (self._argc<1) then begin
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': first argument MUST have pointer type!', true);
     self._isok:=false;
   end;
 end;
 
-function srcECXCallFunction._ArgsInit(args: array of const;
-  pos: pointer): pointer;
+function srcECXCallFunction._ArgsInit(args: array of const; pos: pointer): pointer;
 var
   i:integer;
   val:cardinal;
 begin
-  for i:= high(args) downto low(args)+1 do begin
+  for i:= high(args) downto low(args)+_non_stack_args_count do begin
     if args[i].VType=vtString then begin
       if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': str arg #'+inttostr(i)+' is '+inttohex(uintptr(PAnsiChar(args[i].VString)), 8), false);
       pos:=srcKit.WritePushDword(pos, uintptr(PAnsiChar(args[i].VString)));
@@ -307,6 +345,66 @@ begin
   result:=pos;
 end;
 
+{ srcECXCallFunctionWEDIArg }
+constructor srcECXCallFunctionWEDIArg.Create(addr: pointer; args: array of const; name: string; visibility: string);
+begin
+  inherited;
+  _non_stack_args_count:=2;
+  _to_second_reg_move_opcode:=MOV_EDI_DWORD;
+  if (self._argc<2) then begin
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': second argument MUST present!', true);
+    self._isok:=false;
+  end;
+end;
+
+function srcECXCallFunctionWEDIArg._ArgsInit(args: array of const; pos: pointer): pointer;
+begin
+  pos:=inherited;
+  (PByte(pos))^:=_to_second_reg_move_opcode;
+  pos:=pointer(uintptr(pos)+1);
+  (PCardinal(pos))^:=cardinal(args[low(args)+1].VInteger);
+  pos:=pointer(uintptr(pos)+4);
+  result:=pos;
+end;
+
+{ srcECXCallFunctionWEBXEDIArg }
+
+constructor srcECXCallFunctionWEBXEDIArg.Create(addr: pointer; args: array of const; name: string; visibility: string);
+begin
+  inherited;
+  _non_stack_args_count:=3;
+  _to_second_reg_move_opcode:=MOV_EBX_DWORD;
+  _to_third_reg_move_opcode:=MOV_EDI_DWORD;
+  if (self._argc<3) then begin
+    if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': wnd and 3rd arguments MUST present!', true);
+    self._isok:=false;
+  end;
+end;
+
+function srcECXCallFunctionWEBXEDIArg._ArgsInit(args: array of const; pos: pointer): pointer;
+begin
+  pos:=inherited;
+  (PByte(pos))^:=_to_second_reg_move_opcode;
+  pos:=pointer(uintptr(pos)+1);
+  (PCardinal(pos))^:=cardinal(args[low(args)+1].VInteger);
+  pos:=pointer(uintptr(pos)+4);
+
+  (PByte(pos))^:=_to_third_reg_move_opcode;
+  pos:=pointer(uintptr(pos)+1);
+  (PCardinal(pos))^:=cardinal(args[low(args)+2].VInteger);
+  pos:=pointer(uintptr(pos)+4);
+
+  result:=pos;
+end;
+
+{ srcECXCallFunctionWEDXArg }
+
+constructor srcECXCallFunctionWEDXArg.Create(addr: pointer; args: array of const; name: string; visibility: string);
+begin
+  inherited;
+  _to_second_reg_move_opcode:=MOV_EDX_DWORD;
+end;
+
 { srcESICallFunctionWEAXArg }
 
 constructor srcESICallFunctionWEAXArg.Create(addr: pointer;
@@ -317,6 +415,7 @@ begin
     if srcKit.Get.IsDebug() then srcKit.Get.DbgLog(GetSignature + ': invalid args count!', true);
     self._isok:=false;
   end;
+  _mov_this_to_arg_opcode:=MOV_ESI_DWORD;
 end;
 
 function srcESICallFunctionWEAXArg._ArgsInit(args: array of const;
@@ -349,13 +448,19 @@ begin
     pos:=pointer(uintptr(pos)+4);
   end;
 
-  (PByte(pos))^:=MOV_ESI_DWORD;
+  (PByte(pos))^:=_mov_this_to_arg_opcode;
   pos:=pointer(uintptr(pos)+1);
   (PCardinal(pos))^:=cardinal(args[low(args)].VInteger);
   pos:=pointer(uintptr(pos)+4);
   result:=pos;
 end;
 
+{ srcEDXCallFunctionWEAXArg }
+constructor srcEDXCallFunctionWEAXArg.Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+begin
+  inherited;
+  _mov_this_to_arg_opcode:=MOV_EDX_DWORD;
+end;
 
 { srcVirtualBaseFunction }
 
