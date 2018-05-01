@@ -1,7 +1,7 @@
 unit Level;
 {$mode delphi}
 interface
-uses BaseClasses, Objects, vector, Cameras, HUD, PureClient, Physics, xrstrings, Servers, Battleye, games, NET_Common, AnticheatStuff;
+uses BaseClasses, Objects, vector, Cameras, HUD, PureClient, Physics, xrstrings, Servers, Battleye, games, NET_Common, AnticheatStuff, xr_configs;
 
 type
 IGame_Level = packed record
@@ -215,14 +215,21 @@ g_ppGameLevel:ppIGame_Level;
 function Init():boolean; stdcall;
 
 function ObjectById(lvl:pIGame_Level; id:word):pCObject;
+function GetLevel():pCLevel;
 
 implementation
-uses basedefs, windows;
+uses basedefs, windows, xr_debug;
 
 function ObjectById(lvl:pIGame_Level; id:word):pCObject;
 begin
-  assert(lvl<>nil);
+  R_ASSERT(lvl<>nil, 'Cannot get object by ID - no level present');
   result:=lvl.Objects.map_NETID[id];
+end;
+
+function GetLevel():pCLevel;
+begin
+  R_ASSERT(g_ppGameLevel^<>nil, 'Cannot get level - no level found');
+  result:=pCLevel(g_ppGameLevel^);
 end;
 
 function Init():boolean; stdcall;

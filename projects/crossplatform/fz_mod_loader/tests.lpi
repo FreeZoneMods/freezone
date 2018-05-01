@@ -32,7 +32,7 @@
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
             <Libraries Value="..\..\..\shared\3rdparty\libcurl\libs"/>
-            <OtherUnitFiles Value="..\..\..\shared\3rdparty;highlevel;lowlevel;..\..\..\engine_1510;..\..\..\shared\3rdparty\libcurl"/>
+            <OtherUnitFiles Value="..\..\..\shared\3rdparty;highlevel;lowlevel;..\..\..\engine_1510;..\..\..\shared\3rdparty\libcurl;..\..\..\shared\SourceKit"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <Parsing>
@@ -75,7 +75,7 @@
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
             <Libraries Value="..\..\..\shared\3rdparty\libcurl\libs"/>
-            <OtherUnitFiles Value="..\..\..\shared\3rdparty;highlevel;lowlevel;..\..\..\engine_1510;..\..\..\shared\3rdparty\libcurl"/>
+            <OtherUnitFiles Value="..\..\..\shared\3rdparty;highlevel;lowlevel;..\..\..\engine_1510;..\..\..\shared\3rdparty\libcurl;..\..\..\shared\SourceKit"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <CodeGeneration>
@@ -108,7 +108,7 @@
         <WorkingDirectory Value="G:\stalker\stcs\original\bin\"/>
       </local>
     </RunParams>
-    <Units Count="9">
+    <Units Count="11">
       <Unit0>
         <Filename Value="tests.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -146,6 +146,14 @@
         <Filename Value="..\..\..\shared\3rdparty\libcurl\curl.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
+      <Unit9>
+        <Filename Value="lowlevel\abstractions.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="..\..\..\shared\SourceKit\srcCalls.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit10>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -157,7 +165,7 @@
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
       <Libraries Value="..\..\..\shared\3rdparty\libcurl\libs"/>
-      <OtherUnitFiles Value="..\..\..\shared\3rdparty;highlevel;lowlevel;..\..\..\engine_1510;..\..\..\shared\3rdparty\libcurl"/>
+      <OtherUnitFiles Value="..\..\..\shared\3rdparty;highlevel;lowlevel;..\..\..\engine_1510;..\..\..\shared\3rdparty\libcurl;..\..\..\shared\SourceKit"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Other>

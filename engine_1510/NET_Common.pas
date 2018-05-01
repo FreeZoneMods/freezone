@@ -22,6 +22,9 @@ NET_Queue_Event = packed record
 end;
 pNET_Queue_Event=^NET_Queue_Event;
 
+const
+  NET_Latency:cardinal = 50;
+
 implementation
 
 end.

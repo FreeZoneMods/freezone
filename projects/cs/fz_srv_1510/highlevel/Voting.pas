@@ -10,7 +10,7 @@ function IsVoteSuccess(agreed, against_explicit, total_clients:cardinal):boolean
 
 procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PChar; resVoteCommand:PChar); stdcall;
 
-function CanSafeStartVote({%H-}game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
+function CanSafeStartVoting({%H-}game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
 function CarefullyComparePlayerNames(name1:PChar; name2:PChar):cardinal; stdcall;
 
 function IterateAndComparePlayersNames(it_begin:ppIClient; it_end:ppIClient; newname:PChar; client:pIClient):ppIClient; stdcall;
@@ -21,12 +21,12 @@ function OnVote({%H-}game:pgame_sv_mp; sender_id:ClientID; {%H-}status:boolean):
 //TODO: антифлуд
 //TODO: интервал между назначений голосований для каждого из игроков
 implementation
-uses srcBase, LogMgr, math, sysutils, console, CommonHelper, TranslationMgr, ConfigCache, PureServer, Players, dynamic_caster, basedefs, chat, Level, Servers;
+uses srcBase, LogMgr, math, sysutils, console, CommonHelper, TranslationMgr, ConfigCache, PureServer, Players, dynamic_caster, basedefs, chat, Servers, MapList, HackProcessor;
 var
   votecommands:array of _votecommands;
 
 
-procedure AddVoteCommand(name:PChar; command:PChar; mask:cardinal); stdcall;
+procedure AddVoteCommand(name:PAnsiChar; command:PAnsiChar; mask:cardinal); stdcall;
 var
   i:integer;
 begin
@@ -69,92 +69,101 @@ begin
   if cld<>nil then begin
     pboolean(pbool_flag)^:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).IsAllowedStartingVoting();
     if not pboolean(pbool_flag)^ then begin
-      if (g_ppGameLevel^ <>nil) and (pCLevel(g_ppGameLevel^).Server<>nil) then begin
-        SendChatMessageByFreezone(@(pCLevel(g_ppGameLevel^).Server.base_IPureServer), pcardinal(pcardinal_id)^, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_start_voting'));
-      end;
+      SendChatMessageByFreezone(GetPureServer(), pcardinal(pcardinal_id)^, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_start_voting'));
     end;
   end else begin
     pboolean(pbool_flag)^:=false;
   end;
 end;
 
-function CanSafeStartVote(game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
+function CanSafeStartVoting(game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
 var
+  pVoteStr:PAnsiChar;
   i:integer;
-  cmd:string;
-  cmdname:string;
-  arg1:string;
-  arg2:string;
+  args:array[0..5] of string;
+  args_cnt:integer;
+  tmpstr, logstr:string;
+const
+  BannedSymbols:string = '%';
+  MAX_VOTE_STRING_SIZE: integer = 200;
 
-  can_start_voting:boolean;
 begin
-  can_start_voting:=true;
-  ForEachClientDo(CheckPlayerAllowedStartVoting, OneIDSearcher, @sender_id.id, @can_start_voting);
-  if not can_start_voting then begin
+  result:=true;
+  ForEachClientDo(CheckPlayerAllowedStartVoting, OneIDSearcher, @sender_id.id, @result);
+  if not result then begin
     FZLogMgr.Get.Write('Player '+inttostr(sender_id.id)+' denied to start voting.', FZ_LOG_IMPORTANT_INFO);
-    result:=false;
     exit;
   end;
 
-  //оставшася строка не может быть длиннее 1024 символов. Мы искусственно ограничимся 256 ;)
-  result:= (p.B.count-12)<256;
-  if result then begin
-    p.B.data[p.B.count-1]:= 0;
-    //заменим в строке голосования всякие нехорошие символы
-    //TODO:запретить всем клиентам, кроме серверного, использовать знак $ (а надо ли???)
-    for i:=p.r_pos to p.B.count-1 do begin
-      if (char(p.B.data[i])='~') or (char(p.B.data[i])='!') or (char(p.B.data[i])='#')
-      or (char(p.B.data[i])='%') or (char(p.B.data[i])='^')
-      or (char(p.B.data[i])=':') or (char(p.B.data[i])='&') or (char(p.B.data[i])='?')
-      or (char(p.B.data[i])='*') or (char(p.B.data[i])='+') or (char(p.B.data[i])='-')
-      or (char(p.B.data[i])='/') or (char(p.B.data[i])='\') then begin
-        p.B.data[i]:=byte('_');
-      end;
+  result:=false;
+  pVoteStr:=@p.B.data[p.r_pos];
+
+  //строка не может быть длиннее 1024 символов. Мы искусственно ограничимся меньшим числом ;)
+  //[bug] в нижележащей game_sv_mp::OnVoteStart идет жесткое ограничение на 256 символов! Иначе - переполнение буфера и вылет
+  //TODO:запретить всем клиентам, кроме серверного, использовать знак $ (а надо ли???)
+  i:=0;
+  while (pVoteStr[i]<>chr(0)) and (i<MAX_VOTE_STRING_SIZE) do begin
+    if pos(pVoteStr[i], BannedSymbols)<>0 then begin
+      pVoteStr[i]:='_';
+    end;
+    i:=i+1;
+  end;
+
+  if i<MAX_VOTE_STRING_SIZE then begin
+    //Заполним строки аргументов
+    i:=0;
+    tmpstr:=trim(pVoteStr);
+    logstr:='';
+    while (i<length(args)-1) and FZCommonHelper.GetNextParam(tmpstr, args[i], ' ') do begin
+       logstr:=logstr+', arg'+inttostr(i)+': '+args[i];
+       tmpstr:=trim(tmpstr);
+      i:=i+1;
     end;
 
-    //Проведем разбор строки
-    cmd:=PChar(@p.B.data[p.r_pos]);
-    cmd:=trim(cmd);
-    if not FZCommonHelper.GetNextParam(cmd, cmdname, ' ') then begin
-      cmdname:=cmd;
-      cmd:=''
+    if i<length(args)-1 then begin
+      //Последний аргумент не распарсился из-за отсутствия пробела на конце, сохраняем отдельно
+      args[i]:=trim(tmpstr);
+      logstr:=logstr+', arg'+inttostr(i)+': '+args[i];
+      i:=i+1;
     end;
+    args_cnt:=i;
+    FZLogMgr.Get.Write('VoteStart'+logstr, FZ_LOG_DBG);
 
-    cmd:=trim(cmd);
-    if not FZCommonHelper.GetNextParam(cmd, arg1, ' ') then begin
-      arg1:=cmd;
-      cmd:=''
-    end;
-
-    cmd:=trim(cmd);
-    if not FZCommonHelper.GetNextParam(cmd, arg2, ' ') then begin
-      arg2:=cmd;
-      cmd:=''
-    end;
-
-    //FZLogMgr.Get.Write('cmd="'+cmdname+'", arg1="'+arg1+'", arg2="'+arg2+'"');
-
-    if (cmdname='kick') or (cmdname='changegametype') or (cmdname='fraglimit') or (cmdname='timelimit') then begin
-      if length(arg1)=0 then begin
-        result:=false;
-      end else if (cmdname='fraglimit') or (cmdname='timelimit') then begin
-        result:=strtointdef(arg1, -1)>=0;
-      end;
-    end else if (cmdname='ban') or (cmdname='changemap') or (cmdname='changeweather') then begin
-      if (length(arg1)=0) or (length(arg2)=0) then begin
-        result:=false;
-      end else if (cmdname='changeweather') then begin
-        result:= ((arg1='clear') and (arg2='9_00')) or ((arg1='cloudy') and (arg2='13_00')) or ((arg1='night') and (arg2='01_00')) or ((arg1='rain') and (arg2='16_00'));
-      end;
-    end else if cmdname='changegametype' then begin
-      result:= (arg1='dm') or (arg1='deathmatch') or (arg1='tdm') or (arg1='teamdeathmatch') or (arg1='ah') or (arg1='artefacthunt') or (arg1='cta') or (arg1='capturetheartefact');
-    end;
+    //Проверим на корректность
+    if (args[0]='kick') then begin
+      //Один (или более) строковый аргумент, не транслируется
+      result := (length(args[1]) > 0);
+    end else if (args[0]='ban') then begin
+      //Один (или более) строковый аргумент (не транслируется) и одно число
+      result:=(length(args[1])>0) and (args_cnt > 2) and (strtointdef(args[args_cnt-1], -1)>=0);
+    end else if (args[0]='fraglimit') or (args[0]='timelimit') then begin
+      //Один числовой аргумент
+      result := strtointdef(args[1], -1) >= 0;
+    end else if (args[0]='changeweather') then begin
+      //Два строковых аргумента, первый ТРАНСЛИРУЕТСЯ!
+      result:= ((args[1]='clear')  and (args[2]='9:00'))  or
+               ((args[1]='cloudy') and (args[2]='13:00')) or
+               (((args[1]='nigth') or (args[1]='night'))  and (args[2]='01:00')) or
+               ((args[1]='rain')   and (args[2]='16:00'));
+    end else if (args[0]='changemap') then begin
+      //два строковых аргумента, первый ТРАНСЛИРУЕТСЯ!
+      //Проверяем, есть ли такая карта на сервере
+      result:=(length(args[1])>0) and (length(args[2])>0) and IsMapPresent(args[1], args[2], game.base_game_sv_GameState.base_game_GameState.m_type);
+    end else if (args[0]='changegametype') then begin
+      //Один строковый аргумент, не транслируется
+      result:= (args[1]='dm') or (args[1]='deathmatch') or (args[1]='tdm') or (args[1]='teamdeathmatch') or (args[1]='ah') or (args[1]='artefacthunt') or (args[1]='cta') or (args[1]='capturetheartefact');
+    end else if (args[0]='restart') or (args[0]='restart_fast') then begin
+      //нет аргументов
+      result:=true;
+    end else if (length(args[0])>0) and (args[0][1]='$') then begin
+      result:=true;
+    end
   end;
 
   if result then begin
-    FZLogMgr.Get.Write ('Player ID='+inttostr(sender_id.id)+' wants to start voting "'+PChar(@p.B.data[p.r_pos])+'"', FZ_LOG_IMPORTANT_INFO);
+    FZLogMgr.Get.Write(GenerateMessageForClientId(sender_id.id, ' is starting voting "'+pVoteStr+'"'), FZ_LOG_IMPORTANT_INFO);
   end else begin
-    FZLogMgr.Get.Write ('Player ID='+inttostr(sender_id.id)+' sent too long or broken vote string! Cracker?', FZ_LOG_ERROR);
+    BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender_id.id, ' is denied to start voting (parameters not parsed)'));
   end;
 end;
 
@@ -205,7 +214,7 @@ begin
   end;
 end;
 
-function CarefullyComparePlayerNames(name1:PChar; name2:PChar):cardinal; stdcall;
+function CarefullyComparePlayerNames(name1:PAnsiChar; name2:PAnsiChar):cardinal; stdcall;
 var
   tmp_name_1, tmp_name_2:string;
 begin
@@ -234,7 +243,7 @@ begin
 end;
 
 
-procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PChar; resVoteCommand:PChar); stdcall;
+procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PAnsiChar; resVoteCommand:PAnsiChar); stdcall;
 var
   total_command, console_command, arg1, arg2, descr, name, par:string;
   time:cardinal;
@@ -242,13 +251,13 @@ begin
   if game.m_bVotingReal then begin
     if game.m_pVoteCommand.p_ = nil then begin
       //заглушка на случай ЧП
-      assign_string(@game.m_voting_string.p_, 'Ooops! Something gone wrong...');
-      assign_string(@game.m_pVoteCommand.p_, 'deadbeef');
+      assign_string(@game.m_voting_string, 'Ooops! Something gone wrong...');
+      assign_string(@game.m_pVoteCommand, 'deadbeef');
       FZLogMgr.Get.Write('Running voting with unitialized m_pVoteCommand!', FZ_LOG_ERROR);
       exit;
     end;
     
-    total_command:=PChar(@game.m_pVoteCommand.p_.value);
+    total_command:=get_string_value(@game.m_pVoteCommand);
     if not FZCommonHelper.GetNextParam(total_command, console_command, ' ') then begin
       console_command:=total_command;
       total_command:='';
@@ -276,27 +285,27 @@ begin
       descr:='ban '+name+' '+arg2+' '+FZTranslationMgr.Get.TranslateSingle('minutes');
       console_command:='sv_banplayer '+ arg1 +' ' + inttostr(time);
 
-      assign_string(@game.m_pVoteCommand.p_, PChar(console_command));
-      assign_string(@game.m_voting_string.p_, PChar(descr));
+      assign_string(@game.m_pVoteCommand, PAnsiChar(console_command));
+      assign_string(@game.m_voting_string, PAnsiChar(descr));
     end else begin
       descr:= FZTranslationMgr.Get.Translate_NoSpaces(resVoteCommand);
-      assign_string(@game.m_voting_string.p_, PChar(descr));
+      assign_string(@game.m_voting_string, PAnsiChar(descr));
     end;
 
   end else begin
     //Это просто строка без какой-либо команды, начинающаяся с $
-    VoteCommand:=PChar(cardinal(VoteCommand)+1);
-    assign_string(@game.m_voting_string.p_, VoteCommand);
+    VoteCommand:=PAnsiChar(cardinal(VoteCommand)+1);
+    assign_string(@game.m_voting_string, VoteCommand);
   end;
 
   game.fz_vote_started_by_admin:=0;
   ForEachClientDo(OnPlayerStartVote, OneIDSearcher, @senderid.id, @game.fz_vote_started_by_admin);
 
-  FZLogMgr.Get.Write('Voting "'+PChar(@game.m_voting_string.p_.value)+'" is started', FZ_LOG_INFO);
+  FZLogMgr.Get.Write('Voting "'+get_string_value(@game.m_voting_string)+'" is started', FZ_LOG_INFO);
 end;
 
 
-function IterateAndComparePlayersNames(it_begin:ppIClient; it_end:ppIClient; newname:PChar; client:pIClient):ppIClient; stdcall;
+function IterateAndComparePlayersNames(it_begin:ppIClient; it_end:ppIClient; newname:PAnsiChar; client:pIClient):ppIClient; stdcall;
 var
   newname_s:string;
   player_name:string;
@@ -304,8 +313,8 @@ begin
   //проверка на то, нет ли уже не сервере игрока с ником newname
   newname_s:=trim(lowercase(newname));
   while it_begin<>it_end do begin
-    if (client<>it_begin^) and (it_begin^.name.p_<>nil) then begin
-      player_name:= PChar(@it_begin^.name.p_.value);
+    if (client<>it_begin^) then begin
+      player_name:= get_string_value(@it_begin^.name);
       player_name:=trim(lowercase(player_name));
       if player_name=newname_s then break;
     end;
@@ -337,9 +346,7 @@ begin
     FZPlayerStateAdditionalInfo(pld.ps.FZBuffer).OnVote();  
     pboolean(canvote)^:= not FZPlayerStateAdditionalInfo(pld.ps.FZBuffer).IsPlayerVoteMuted();
     if not pboolean(canvote)^ then begin
-      if (g_ppGameLevel^ <>nil) and (pCLevel(g_ppGameLevel^).Server<>nil) then begin
-        SendChatMessageByFreezone(@(pCLevel(g_ppGameLevel^).Server.base_IPureServer), pcardinal(id)^, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_vote'));
-      end;
+      SendChatMessageByFreezone(GetPureServer(), pcardinal(id)^, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_vote'));
     end;
   end;
 end;

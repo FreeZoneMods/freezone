@@ -7,9 +7,9 @@ uses ConfigBase;
 
 type
 
-  { FZItemCgfMgr }
+  { FZItemCfgMgr }
 
-  FZItemCgfMgr = class
+  FZItemCfgMgr = class
   protected
     _cfg:FZConfigBase;
   public
@@ -20,7 +20,7 @@ type
 
     procedure Reload;
 
-    class function Get():FZItemCgfMgr;
+    class function Get():FZItemCfgMgr;
 
     function IsItemNeedToBeRemoved(section:string):boolean;
     function IsItemNeedToBeTransfered(section:string):boolean;
@@ -28,31 +28,33 @@ type
 
     function ItemToReplace(src_section:string; team_id:cardinal):string;
     function SkinToReplace(team_id:cardinal; skin_id:cardinal):string;
+
+    function IsItemBannedToBuy(section:string):boolean;
   end;
 
 
   function Init:boolean; stdcall;
 implementation
-uses sysutils;
+uses sysutils, xr_debug;
 var
-  _instance:FZItemCgfMgr;
+  _instance:FZItemCfgMgr = nil;
 
-{ FZItemCgfMgr }
+{ FZItemCfgMgr }
 
-constructor FZItemCgfMgr.Create;
+constructor FZItemCfgMgr.Create;
 begin
   inherited;
   _cfg:=FZConfigBase.Create();
   Reload();
 end;
 
-destructor FZItemCgfMgr.Destroy;
+destructor FZItemCfgMgr.Destroy;
 begin
   _cfg.Free;
   inherited Destroy;
 end;
 
-function FZItemCgfMgr.IsActionOnItemNeeded(item_section: string; config_section: string; use_random:boolean): boolean;
+function FZItemCfgMgr.IsActionOnItemNeeded(item_section: string; config_section: string; use_random:boolean): boolean;
 var
   prob:single;
   mode:string;
@@ -79,32 +81,32 @@ begin
   end;
 end;
 
-procedure FZItemCgfMgr.Reload;
+procedure FZItemCfgMgr.Reload;
 begin
   _cfg.Load('fz_items_settings.ini');
 end;
 
-class function FZItemCgfMgr.Get: FZItemCgfMgr;
+class function FZItemCfgMgr.Get: FZItemCfgMgr;
 begin
   result:=_instance;
 end;
 
-function FZItemCgfMgr.IsItemNeedToBeRemoved(section: string): boolean;
+function FZItemCfgMgr.IsItemNeedToBeRemoved(section: string): boolean;
 begin
   result:=IsActionOnItemNeeded(section, 'items_to_remove_after_death',true);
 end;
 
-function FZItemCgfMgr.IsItemNeedToBeTransfered(section: string): boolean;
+function FZItemCfgMgr.IsItemNeedToBeTransfered(section: string): boolean;
 begin
   result:=IsActionOnItemNeeded(section, 'items_to_transfer_after_death',true);
 end;
 
-function FZItemCgfMgr.IsItemPotentiallyCouldBeTransfered(section: string): boolean;
+function FZItemCfgMgr.IsItemPotentiallyCouldBeTransfered(section: string): boolean;
 begin
   result:=IsActionOnItemNeeded(section, 'items_to_transfer_after_death', false);
 end;
 
-function FZItemCgfMgr.ItemToReplace(src_section: string; team_id: cardinal): string;
+function FZItemCfgMgr.ItemToReplace(src_section: string; team_id: cardinal): string;
 var
   cfg_section_name:string;
 begin
@@ -112,14 +114,20 @@ begin
   result:=_cfg.GetString(src_section, '', cfg_section_name);
 end;
 
-function FZItemCgfMgr.SkinToReplace(team_id: cardinal; skin_id: cardinal): string;
+function FZItemCfgMgr.SkinToReplace(team_id: cardinal; skin_id: cardinal): string;
 begin
   result:=_cfg.GetString('skin_'+inttostr(skin_id), '', 'team_'+inttostr(team_id)+'_skin_replacement' );
 end;
 
+function FZItemCfgMgr.IsItemBannedToBuy(section: string): boolean;
+begin
+  result:=_cfg.GetBool(section, false, 'banned_shop_items');
+end;
+
 function Init:boolean; stdcall;
 begin
-  _instance:=FZItemCgfMgr.Create();
+  R_ASSERT(_instance=nil, 'ItemsCfgMgr module is already inited');
+  _instance:=FZItemCfgMgr.Create();
   result:=true;
 end;
 

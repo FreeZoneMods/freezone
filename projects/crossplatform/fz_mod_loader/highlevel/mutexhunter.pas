@@ -230,7 +230,7 @@ begin
       if objinfo=nil then continue;
 
       if StrPosW(pUNICODE_STRING(objinfo).Buffer, MUTEX_W) <> nil then begin
-        FZLogMgr.Get.Write('Mutex found, deleting', FZ_LOG_DBG);
+        FZLogMgr.Get.Write('Mutex found, deleting', FZ_LOG_INFO);
         FreeNtInfo(objinfo);
         CloseHandle(mutex);
         break;

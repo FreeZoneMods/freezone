@@ -31,7 +31,7 @@
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
-            <OtherUnitFiles Value="..\..\..\shared;..\..\..\shared\SourceKit;..\..\..\shared\3rdparty;..\..\..\engine_1510;highlevel;lowlevel;private"/>
+            <OtherUnitFiles Value="..\..\..\shared;..\..\..\shared\SourceKit;..\..\..\shared\3rdparty;..\..\..\engine_1510;highlevel;lowlevel;..\..\crossplatform\sysmsgs"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <Parsing>
@@ -72,7 +72,7 @@
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
-            <OtherUnitFiles Value="..\..\..\shared;..\..\..\shared\SourceKit;..\..\..\shared\3rdparty;..\..\..\engine_1510;highlevel;lowlevel;private"/>
+            <OtherUnitFiles Value="..\..\..\shared;..\..\..\shared\SourceKit;..\..\..\shared\3rdparty;..\..\..\engine_1510;highlevel;lowlevel;..\..\crossplatform\sysmsgs"/>
             <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
           </SearchPaths>
           <Parsing>
@@ -126,7 +126,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="78">
+    <Units Count="88">
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -216,233 +216,282 @@
         <IsPartOfProject Value="True"/>
       </Unit21>
       <Unit22>
-        <Filename Value="..\..\..\engine_1510\Gametypes.pas"/>
+        <Filename Value="..\..\..\engine_1510\Hits.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit22>
       <Unit23>
-        <Filename Value="..\..\..\engine_1510\Hits.pas"/>
+        <Filename Value="..\..\..\engine_1510\HUD.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit23>
       <Unit24>
-        <Filename Value="..\..\..\engine_1510\HUD.pas"/>
+        <Filename Value="..\..\..\engine_1510\Keys.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit24>
       <Unit25>
-        <Filename Value="..\..\..\engine_1510\Items.pas"/>
+        <Filename Value="..\..\..\engine_1510\Level.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit25>
       <Unit26>
-        <Filename Value="..\..\..\engine_1510\Keys.pas"/>
+        <Filename Value="..\..\..\engine_1510\MatVectors.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit26>
       <Unit27>
-        <Filename Value="..\..\..\engine_1510\Level.pas"/>
+        <Filename Value="..\..\..\engine_1510\misc_stuff.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit27>
       <Unit28>
-        <Filename Value="..\..\..\engine_1510\MatVectors.pas"/>
+        <Filename Value="..\..\..\engine_1510\NET_Common.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit28>
       <Unit29>
-        <Filename Value="..\..\..\engine_1510\misc_stuff.pas"/>
+        <Filename Value="..\..\..\engine_1510\Objects.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit29>
       <Unit30>
-        <Filename Value="..\..\..\engine_1510\NET_Common.pas"/>
+        <Filename Value="..\..\..\engine_1510\Opcode.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit30>
       <Unit31>
-        <Filename Value="..\..\..\engine_1510\Objects.pas"/>
+        <Filename Value="..\..\..\engine_1510\Packets.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit31>
       <Unit32>
-        <Filename Value="..\..\..\engine_1510\Opcode.pas"/>
+        <Filename Value="..\..\..\engine_1510\Physics.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit32>
       <Unit33>
-        <Filename Value="..\..\..\engine_1510\Packets.pas"/>
+        <Filename Value="..\..\..\engine_1510\PureClient.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit33>
       <Unit34>
-        <Filename Value="..\..\..\engine_1510\Physics.pas"/>
+        <Filename Value="..\..\..\engine_1510\PureServer.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit34>
       <Unit35>
-        <Filename Value="..\..\..\engine_1510\PureClient.pas"/>
+        <Filename Value="..\..\..\engine_1510\Schedule.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit35>
       <Unit36>
-        <Filename Value="..\..\..\engine_1510\PureServer.pas"/>
+        <Filename Value="..\..\..\engine_1510\Servers.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit36>
       <Unit37>
-        <Filename Value="..\..\..\engine_1510\Schedule.pas"/>
+        <Filename Value="..\..\..\engine_1510\Synchro.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit37>
       <Unit38>
-        <Filename Value="..\..\..\engine_1510\Servers.pas"/>
+        <Filename Value="..\..\..\engine_1510\Time.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit38>
       <Unit39>
-        <Filename Value="..\..\..\engine_1510\Synchro.pas"/>
+        <Filename Value="..\..\..\engine_1510\Vector.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit39>
       <Unit40>
-        <Filename Value="..\..\..\engine_1510\Time.pas"/>
+        <Filename Value="..\..\..\engine_1510\xrstrings.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit40>
       <Unit41>
-        <Filename Value="..\..\..\engine_1510\Vector.pas"/>
+        <Filename Value="highlevel\Bans.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit41>
       <Unit42>
-        <Filename Value="..\..\..\engine_1510\xrstrings.pas"/>
+        <Filename Value="highlevel\BasicProtection.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit42>
       <Unit43>
-        <Filename Value="highlevel\Bans.pas"/>
+        <Filename Value="highlevel\Censor.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit43>
       <Unit44>
-        <Filename Value="highlevel\BasicProtection.pas"/>
+        <Filename Value="highlevel\Chat.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit44>
       <Unit45>
-        <Filename Value="highlevel\Censor.pas"/>
+        <Filename Value="highlevel\ChatCommands.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit45>
       <Unit46>
-        <Filename Value="highlevel\Chat.pas"/>
+        <Filename Value="highlevel\ConfigCache.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit46>
       <Unit47>
-        <Filename Value="highlevel\ChatCommands.pas"/>
+        <Filename Value="highlevel\ConfigMgr.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit47>
       <Unit48>
-        <Filename Value="highlevel\ConfigCache.pas"/>
+        <Filename Value="highlevel\ControlGUI.lfm"/>
         <IsPartOfProject Value="True"/>
       </Unit48>
       <Unit49>
-        <Filename Value="highlevel\ConfigMgr.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit49>
-      <Unit50>
-        <Filename Value="highlevel\ControlGUI.lfm"/>
-        <IsPartOfProject Value="True"/>
-      </Unit50>
-      <Unit51>
         <Filename Value="highlevel\ControlGUI.pas"/>
         <IsPartOfProject Value="True"/>
         <ComponentName Value="FZControlGUI"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
+      </Unit49>
+      <Unit50>
+        <Filename Value="highlevel\ControllerMgr.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit50>
+      <Unit51>
+        <Filename Value="highlevel\DownloadMgr.pas"/>
+        <IsPartOfProject Value="True"/>
       </Unit51>
       <Unit52>
-        <Filename Value="highlevel\ControllerMgr.pas"/>
+        <Filename Value="highlevel\Emergency.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit52>
       <Unit53>
-        <Filename Value="highlevel\DownloadMgr.pas"/>
+        <Filename Value="highlevel\GameSpy.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit53>
       <Unit54>
-        <Filename Value="highlevel\Emergency.pas"/>
+        <Filename Value="highlevel\LogMgr.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit54>
       <Unit55>
-        <Filename Value="highlevel\GameSpy.pas"/>
+        <Filename Value="highlevel\PacketFilter.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit55>
       <Unit56>
-        <Filename Value="highlevel\LogMgr.pas"/>
+        <Filename Value="highlevel\Players.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit56>
       <Unit57>
-        <Filename Value="highlevel\PacketFilter.pas"/>
+        <Filename Value="highlevel\PlayerSkins.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit57>
       <Unit58>
-        <Filename Value="highlevel\Players.pas"/>
+        <Filename Value="highlevel\SACE_interface.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit58>
       <Unit59>
-        <Filename Value="highlevel\PlayerSkins.pas"/>
+        <Filename Value="highlevel\ServerStuff.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit59>
       <Unit60>
-        <Filename Value="highlevel\SACE_interface.pas"/>
+        <Filename Value="highlevel\SubnetBanList.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit60>
       <Unit61>
-        <Filename Value="highlevel\ServerStuff.pas"/>
+        <Filename Value="highlevel\UpdateRate.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit61>
       <Unit62>
-        <Filename Value="highlevel\SubnetBanList.pas"/>
+        <Filename Value="highlevel\Voting.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit62>
       <Unit63>
-        <Filename Value="highlevel\UpdateRate.pas"/>
+        <Filename Value="lowlevel\badpackets.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit63>
       <Unit64>
-        <Filename Value="highlevel\Voting.pas"/>
+        <Filename Value="lowlevel\Compressor.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit64>
       <Unit65>
-        <Filename Value="lowlevel\badpackets.pas"/>
+        <Filename Value="lowlevel\ControllerParams.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit65>
       <Unit66>
-        <Filename Value="lowlevel\Compressor.pas"/>
+        <Filename Value="lowlevel\fz_injections.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit66>
       <Unit67>
-        <Filename Value="lowlevel\ControllerParams.pas"/>
+        <Filename Value="lowlevel\global_functions.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit67>
       <Unit68>
-        <Filename Value="lowlevel\fz_injections.pas"/>
+        <Filename Value="highlevel\SACE_hacks.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit68>
       <Unit69>
-        <Filename Value="lowlevel\global_functions.pas"/>
+        <Filename Value="highlevel\appinit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit69>
       <Unit70>
-        <Filename Value="highlevel\SACE_hacks.pas"/>
+        <Filename Value="..\..\..\engine_1510\MapList.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit70>
       <Unit71>
-        <Filename Value="highlevel\appinit.pas"/>
+        <Filename Value="..\..\..\engine_1510\basedefs.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit71>
       <Unit72>
-        <Filename Value="..\..\..\engine_1510\MapList.pas"/>
+        <Filename Value="..\..\..\engine_1510\dynamic_caster.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit72>
       <Unit73>
-        <Filename Value="private\sysmsgs.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit73>
-      <Unit74>
-        <Filename Value="..\..\..\engine_1510\basedefs.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit74>
-      <Unit75>
-        <Filename Value="..\..\..\engine_1510\dynamic_caster.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit75>
-      <Unit76>
         <Filename Value="highlevel\itemscfgmgr.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="ItemsCfgMgr"/>
-      </Unit76>
-      <Unit77>
+      </Unit73>
+      <Unit74>
         <Filename Value="..\..\..\engine_1510\clsids.pas"/>
         <IsPartOfProject Value="True"/>
+      </Unit74>
+      <Unit75>
+        <Filename Value="..\..\crossplatform\sysmsgs\sysmsgs.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit75>
+      <Unit76>
+        <Filename Value="..\..\..\engine_1510\buywnd.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="BuyWnd"/>
+      </Unit76>
+      <Unit77>
+        <Filename Value="..\..\..\engine_1510\weapons.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Weapons"/>
       </Unit77>
+      <Unit78>
+        <Filename Value="..\..\..\engine_1510\xr_configs.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit78>
+      <Unit79>
+        <Filename Value="highlevel\hackprocessor.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="HackProcessor"/>
+      </Unit79>
+      <Unit80>
+        <Filename Value="..\..\..\engine_1510\inventoryitems.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="InventoryItems"/>
+      </Unit80>
+      <Unit81>
+        <Filename Value="..\..\..\engine_1510\spatial.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Spatial"/>
+      </Unit81>
+      <Unit82>
+        <Filename Value="..\..\..\engine_1510\renderable.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Renderable"/>
+      </Unit82>
+      <Unit83>
+        <Filename Value="..\..\..\engine_1510\collidable.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Collidable"/>
+      </Unit83>
+      <Unit84>
+        <Filename Value="..\..\..\engine_1510\device.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Device"/>
+      </Unit84>
+      <Unit85>
+        <Filename Value="..\..\..\engine_1510\ai_sounds.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit85>
+      <Unit86>
+        <Filename Value="highlevel\playersconnectionlog.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="PlayersConnectionLog"/>
+      </Unit86>
+      <Unit87>
+        <Filename Value="..\..\..\engine_1510\xr_debug.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit87>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -453,7 +502,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="..\..\..\shared;..\..\..\shared\SourceKit;..\..\..\shared\3rdparty;..\..\..\engine_1510;highlevel;lowlevel;private"/>
+      <OtherUnitFiles Value="..\..\..\shared;..\..\..\shared\SourceKit;..\..\..\shared\3rdparty;..\..\..\engine_1510;highlevel;lowlevel;..\..\crossplatform\sysmsgs"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
@@ -469,11 +518,6 @@
         <ExecutableType Value="Library"/>
       </Options>
     </Linking>
-    <Other>
-      <OtherDefines Count="1">
-        <Define0 Value="RELEASE_BUILD"/>
-      </OtherDefines>
-    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

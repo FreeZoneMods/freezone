@@ -3,16 +3,23 @@ unit CommandLineParser;
 {$mode delphi}
 
 interface
-function GetCustomGamedataUrl(cmdline: PChar):string;
-function GetCustomBinUrl(cmdline: PChar):string;
-function GetServerIp(cmdline: PChar):string;
-function GetServerPort(cmdline: PChar):integer;
-function IsGameSpyDlForced(cmdline: PChar):boolean;
+uses LogMgr;
+
+function GetCustomGamedataUrl(cmdline: PAnsiChar):string;
+function GetCustomBinUrl(cmdline: PAnsiChar):string;
+function GetConfigsDir(cmdline: PAnsiChar; default:string):string;
+function GetExeName(cmdline: PAnsiChar; default:string):string;
+function GetServerIp(cmdline: PAnsiChar):string;
+function GetServerPort(cmdline: PAnsiChar):integer;
+function IsGameSpyDlForced(cmdline: PAnsiChar):boolean;
+function IsFullInstallMode(cmdline: PAnsiChar):boolean;
+function IsSharedPatches(cmdline: PAnsiChar):boolean;
+function GetLogSeverity(cmdline: PAnsiChar):FZLogMessageSeverity;
 
 implementation
-uses sysutils,JwaWinDNS, LogMgr;
+uses sysutils,JwaWinDNS;
 
-function GetServerPort(cmdline: PChar):integer;
+function GetServerPort(cmdline: PAnsiChar):integer;
 var
   mod_params, tmp:string;
   posit, i:integer;
@@ -35,7 +42,53 @@ begin
   end;
 end;
 
-function GetServerIp(cmdline: PChar):string;
+function GetConfigsDir(cmdline: PAnsiChar; default:string): string;
+var
+  posit:integer;
+  i:integer;
+  mod_params:string;
+const
+  KEY:string=' -configsdir ';
+begin
+  result:=default;
+  mod_params:=' '+cmdline+' ';
+  posit:=Pos(KEY, mod_params);
+  if posit>0 then begin
+    result:='';
+    for i:=posit+length(KEY) to length(mod_params) do begin
+      if mod_params[i]=' ' then begin
+        break;
+      end else begin
+        result:=result+mod_params[i];
+      end;
+    end;
+  end;
+end;
+
+function GetExeName(cmdline: PAnsiChar; default: string): string;
+var
+  posit:integer;
+  i:integer;
+  mod_params:string;
+const
+  KEY:string=' -exename ';
+begin
+  result:=default;
+  mod_params:=' '+cmdline+' ';
+  posit:=Pos(KEY, mod_params);
+  if posit>0 then begin
+    result:='';
+    for i:=posit+length(KEY) to length(mod_params) do begin
+      if mod_params[i]=' ' then begin
+        break;
+      end else begin
+        result:=result+mod_params[i];
+      end;
+    end;
+  end;
+end;
+
+function GetServerIp(cmdline: PAnsiChar):string;
 var
   i:integer;
   posit:integer;
@@ -60,13 +113,13 @@ begin
         result:=result+mod_params[i];
       end;
     end;
-    FZLogMgr.Get.Write('Use direct IP '+result, FZ_LOG_DBG);
+    FZLogMgr.Get.Write('Use direct IP '+result, FZ_LOG_INFO);
     exit;
   end;
     //если в параметрах есть доменное имя сервера - используем его
   posit:=Pos(SRV_DOMAIN, mod_params);
   if posit>0 then begin
-    FZLogMgr.Get.Write('Use domain name', FZ_LOG_DBG);
+    FZLogMgr.Get.Write('Use domain name', FZ_LOG_INFO);
     for i:=posit+length(SRV_DOMAIN) to length(mod_params) do begin
       if mod_params[i]=' ' then begin
         break;
@@ -81,7 +134,7 @@ begin
     end else begin
       ip:=rec^.Data.A.IpAddress;
       result:=inttostr(ip and $FF)+'.'+inttostr((ip and $FF00) shr 8)+'.'+inttostr((ip and $FF0000) shr 16)+'.'+inttostr((ip and $FF000000) shr 24);
-      FZLogMgr.Get.Write('Received IP '+result, FZ_LOG_DBG);
+      FZLogMgr.Get.Write('Received IP '+result, FZ_LOG_INFO);
     end;
     if (rec<>nil) then begin
       DnsRecordListFree(rec, DnsFreeRecordList);
@@ -91,14 +144,60 @@ begin
   FZLogMgr.Get.Write('Parameters contain no server address!', FZ_LOG_ERROR);
 end;
 
-function IsGameSpyDlForced(cmdline: PChar):boolean;
+function IsGameSpyDlForced(cmdline: PAnsiChar):boolean;
 const
   GS_FORCE:string= ' -gamespymode ';
 begin
   result:=Pos(GS_FORCE, ' '+cmdline+' ') > 0;
 end;
 
-function GetCustomGamedataUrl(cmdline: PChar):string;
+function IsSharedPatches(cmdline: PAnsiChar): boolean;
+const
+  KEY:string= ' -sharedpatches ';
+begin
+  result:=Pos(KEY, ' '+cmdline+' ') > 0;
+end;
+
+function GetLogSeverity(cmdline: PAnsiChar):FZLogMessageSeverity;
+const
+  PARAM:string= ' -logsev ';
+
+  def_severity:FZLogMessageSeverity = FZ_LOG_INFO;
+var
+  posit, i, tmpres:integer;
+  mod_params, tmp:string;
+begin
+  result:=def_severity;
+
+  mod_params:=cmdline+' ';
+  posit:=Pos(PARAM, mod_params);
+  if posit>0 then begin
+    tmp:='';
+    for i:=posit+length(PARAM) to length(mod_params) do begin
+      if mod_params[i]=' ' then begin
+        break;
+      end else begin
+        tmp:=tmp+mod_params[i];
+      end;
+    end;
+    tmpres:=strtointdef(tmp, integer(def_severity));
+
+    if tmpres>integer(FZ_LOG_SILENT) then begin
+      tmpres:=integer(FZ_LOG_SILENT);
+    end;
+
+    result:=FZLogMessageSeverity(tmpres);
+  end;
+end;
+
+function IsFullInstallMode(cmdline: PAnsiChar): boolean;
+const
+  FULLINSTALL: string = ' -fullinstall ';
+begin
+  result:=Pos(FULLINSTALL, ' '+cmdline+' ') > 0;
+end;
+
+function GetCustomGamedataUrl(cmdline: PAnsiChar):string;
 var
   posit:integer;
   i:integer;
@@ -121,7 +220,7 @@ begin
   end;
 end;
 
-function GetCustomBinUrl(cmdline: PChar):string;
+function GetCustomBinUrl(cmdline: PAnsiChar):string;
 var
   posit:integer;
   i:integer;

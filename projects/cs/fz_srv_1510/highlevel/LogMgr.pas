@@ -3,7 +3,7 @@ unit LogMgr;
 interface
 uses SyncObjs, SysUtils, srcBase, srcCalls, Console;
 type
-  FZLogMessageSeverity = ( FZ_LOG_DBG, FZ_LOG_INFO, FZ_LOG_IMPORTANT_INFO, FZ_LOG_ERROR, FZ_LOG_SILENT );
+  FZLogMessageSeverity = ( FZ_LOG_DBG, FZ_LOG_INFO, FZ_LOG_IMPORTANT_INFO, FZ_LOG_ERROR, FZ_LOG_USEROUT = $FFFFFFFF );
 
   { FZFileLogger }
 
@@ -46,7 +46,7 @@ type
   const FZ_LOG_DEFAULT_SEVERITY: cardinal = 1;
 
 implementation
-uses CommonHelper, strutils;
+uses CommonHelper, strutils, xr_debug;
 var
   Mgr:FZLogMgr;
 
@@ -118,7 +118,7 @@ end;
 
 class function FZLogMgr.Get(): FZLogMgr;
 begin
-  assert(Mgr<>nil, 'Log mgr is not created yet');
+  R_ASSERT(Mgr<>nil, 'Log mgr is not created yet');
   result:=Mgr;
 end;
 
@@ -129,6 +129,7 @@ begin
     FZ_LOG_INFO:            result:=1;
     FZ_LOG_IMPORTANT_INFO:  result:=2;
     FZ_LOG_ERROR:           result:=3;
+    FZ_LOG_USEROUT:         result:=$FFFFFFFF;
   else
     result:=1000;
   end;

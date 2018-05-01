@@ -1,8 +1,7 @@
 unit Games;
 {$mode delphi}
 interface
-uses BaseClasses, Packets, Vector, Items, xrstrings, Banned, Objects, Schedule, HUD, Clients, srcCalls;
-function Init():boolean; stdcall;
+uses BaseClasses, Packets, Vector, BuyWnd, xrstrings, Banned, Objects, Schedule, HUD, Clients, srcCalls, CSE;
 
 type
 game_GameState = packed record
@@ -44,7 +43,7 @@ pWeaponUsageStatistic=^WeaponUsageStatistic;
 
 game_cl_GameState = packed record
   base_game_GameState:game_GameState;
-  base_IScheduled:IScheduled;
+  base_ISheduled:ISheduled;
   m_game_type_name:shared_str;
   m_game_ui_custom:pCUIGameCustom;
   m_u16VotingEnabled:word;
@@ -158,8 +157,8 @@ pgame_sv_mp=^game_sv_mp;
 
 
 type game_sv_Deathmatch = packed record
-  game_sv_mp_base:game_sv_mp;
-  game_sv_mp:pure_relcase;
+  base_game_sv_mp:game_sv_mp;
+  pure_relcase_base:pure_relcase;
   m_vFreeRPoints:array [0..3] of xr_vector {u32};
   m_dwLastRPoints:array[0..3] of cardinal;
 
@@ -190,16 +189,24 @@ type game_sv_Deathmatch = packed record
   m_dwSM_CurViewEntity:cardinal;
   m_pSM_CurViewEntity:pCObject;
   m_dwWarmUp_CurTime:cardinal;
-  m_bInWarmUp:boolean;
+  m_bInWarmUp:byte;
   _unused3:byte;
   _unused4:word;
   m_not_free_ammo_str:shared_str;
 end;
+pgame_sv_Deathmatch=^game_sv_Deathmatch;
 
 type game_sv_TeamDeathmatch = packed record
-  game_sv_Deathmatch_base:game_sv_Deathmatch;
+  base_game_sv_Deathmatch:game_sv_Deathmatch;
   teams_swaped:boolean;
 end;
+
+type game_sv_CaptureTheArtefact = packed record
+  base_game_sv_mp:game_sv_mp;
+  _unknown:array[0..$72] of byte;
+  m_bInWarmUp:byte;//bool, offset:$4488
+end;
+pgame_sv_CaptureTheArtefact=^game_sv_CaptureTheArtefact;
 
 const
   eRoundEnd_Finish:cardinal=0;
@@ -211,28 +218,113 @@ const
   eRoundEnd_Force:cardinal=$FFFFFFFF;
 
 
+  function IsServerControlsHits():boolean;
+  procedure game_PlayerAddMoney(pgame:pgame_sv_mp; ps:pgame_PlayerState; amount:int32); stdcall;
+  procedure game_RejectGameItem(pgame:pgame_sv_mp; entity:pCSE_Abstract); stdcall;
+  procedure game_KillPlayer(pgame:pgame_sv_mp; id_who:cardinal; GameID:cardinal); stdcall;
+  function GetPlayerStateByGameID(game:pgame_sv_GameState; gameid:cardinal):pgame_PlayerState; stdcall;
+  function GetClientByGameID(gameid:cardinal):pxrClientData; stdcall;
+  function GetClientDataByPlayerState(ps:pgame_PlayerState):pxrClientData;
+  function GetCurrentGame():pgame_sv_mp;
+  procedure DestroyAllPlayerItems(game:pgame_sv_mp; client_id:cardinal); stdcall;
+  function EntityFromEid(game:pgame_sv_GameState; gameid:cardinal):pCSE_Abstract; stdcall;
+  function Init():boolean; stdcall;
+
+implementation
+uses basedefs, Level, Servers, PureServer, xr_debug, sysutils;
+
 var
   game_sv_mp__KillPlayer:srcECXCallFunction;
   game_sv_mp__RejectGameItem:srcECXCallFunction;
   virtual_game_sv_mp__Player_AddMoney:srcVirtualECXCallFunction;
+  virtual_game_sv_mp__DestroyAllPlayerItems:srcVirtualECXCallFunction;
+  game_sv_GameState__get_entity_from_eid:srcEDXCallFunctionWEAXArg;
+  virtual_game_sv_GameState__get_eid:srcVirtualECXCallFunction;
+  pnet_sv_control_hit:pboolean;
 
 const
-  game_sv_mp__Player_AddMoney_index:cardinal=$1DC;  
+  game_sv_mp__Player_AddMoney_index:cardinal=$1DC;
+  game_sv_GameState__get_eid_index:cardinal=$98;
+  game_sv_mp__DestroyAllPlayerItems_index:cardinal=$154;
 
-implementation
-uses basedefs;
+procedure game_PlayerAddMoney(pgame:pgame_sv_mp; ps:pgame_PlayerState; amount:int32); stdcall;
+begin
+  virtual_game_sv_mp__Player_AddMoney.Call([pgame, ps, amount]);
+end;
+
+function IsServerControlsHits():boolean;
+begin
+  result:=pnet_sv_control_hit^;
+end;
+
+procedure game_RejectGameItem(pgame:pgame_sv_mp; entity:pCSE_Abstract); stdcall;
+begin
+  game_sv_mp__RejectGameItem.Call([pgame,entity]);
+end;
+
+procedure game_KillPlayer(pgame:pgame_sv_mp; id_who:cardinal; GameID:cardinal); stdcall;
+begin
+  game_sv_mp__KillPlayer.Call([pgame, id_who, GameID]);
+end;
+
+function GetCurrentGame():pgame_sv_mp;
+var
+  lvl:pCLevel;
+begin
+  lvl:=GetLevel();
+  R_ASSERT(lvl<>nil, 'Cannot get current game - no level present');
+  R_ASSERT(lvl.Server<>nil, 'Cannot get current game - no server present');
+  result:=pgame_sv_mp(GetLevel().Server.game);
+end;
+
+procedure DestroyAllPlayerItems(game:pgame_sv_mp; client_id:cardinal); stdcall;
+begin
+  virtual_game_sv_mp__DestroyAllPlayerItems.Call([game, client_id]);
+end;
+
+function GetPlayerStateByGameID(game:pgame_sv_GameState; gameid:cardinal):pgame_PlayerState; stdcall;
+begin
+ result:=virtual_game_sv_GameState__get_eid.Call([game, gameid]).VPointer;
+end;
+
+function GetClientByGameID(gameid: cardinal): pxrClientData; stdcall;
+begin
+  result:=nil;
+  ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @gameid, @result);
+end;
+
+function GetClientDataByPlayerState(ps:pgame_PlayerState):pxrClientData;
+begin
+ result:=nil;
+  if ps <> nil then begin
+    ForEachClientDo(AssignFoundClientDataAction, OnePlayerStateSearcher, @ps, @result);
+  end;
+end;
+
+function EntityFromEid(game:pgame_sv_GameState; gameid:cardinal):pCSE_Abstract; stdcall;
+begin
+  result:=game_sv_GameState__get_entity_from_eid.Call([game, gameid]).VPointer;
+  R_ASSERT((result = nil) or (result.ID = gameid), 'Cannot get entity by eid ('+inttostr(gameid)+') - something gone wrong');
+end;
 
 function Init():boolean; stdcall;
 begin
   if xrGameDllType()=XRGAME_SV_1510 then begin
     game_sv_mp__KillPlayer:=srcECXCallFunction.Create(pointer(xrGame+$30ab90),[vtPointer, vtInteger, vtInteger], 'KillPlayer', 'game_sv_mp');
     game_sv_mp__RejectGameItem:=srcECXCallFunction.Create(pointer(xrGame+$30ef40),[vtPointer, vtPointer], 'RejectGameItem', 'game_sv_mp');
+    game_sv_GameState__get_entity_from_eid:=srcEDXCallFunctionWEAXArg.Create(pointer(xrGame+$2f2290), [vtPointer, vtInteger], 'get_entity_from_eid', 'game_sv_GameState');
+    pnet_sv_control_hit:=pointer(xrGame+$5e94c8);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     game_sv_mp__KillPlayer:=srcECXCallFunction.Create(pointer(xrGame+$3209E0),[vtPointer, vtInteger, vtInteger], 'KillPlayer', 'game_sv_mp');
     game_sv_mp__RejectGameItem:=srcECXCallFunction.Create(pointer(xrGame+$324de0),[vtPointer, vtPointer], 'RejectGameItem', 'game_sv_mp');
+    game_sv_GameState__get_entity_from_eid:=srcEDXCallFunctionWEAXArg.Create(pointer(xrGame+$3071c0), [vtPointer, vtInteger], 'get_entity_from_eid', 'game_sv_GameState');
+    pnet_sv_control_hit:=pointer(xrGame+$6065C8);
   end;
   virtual_game_sv_mp__Player_AddMoney:=srcVirtualECXCallFunction.Create(game_sv_mp__Player_AddMoney_index, [vtPointer, vtPointer, vtInteger], 'Player_AddMoney','game_sv_mp');
- result:=true;
+  virtual_game_sv_mp__DestroyAllPlayerItems:=srcVirtualECXCallFunction.Create(game_sv_mp__DestroyAllPlayerItems_index, [vtPointer, vtInteger], 'DestroyAllPlayerItems', 'game_sv_mp');
+
+  virtual_game_sv_GameState__get_eid:=srcVirtualECXCallFunction.Create(game_sv_GameState__get_eid_index, [vtPointer, vtInteger], 'get_eid', 'game_sv_GameState');
+  result:=true;
 end;
 
 end.

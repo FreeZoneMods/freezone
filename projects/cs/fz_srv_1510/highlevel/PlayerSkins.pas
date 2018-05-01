@@ -1,7 +1,7 @@
 unit PlayerSkins;
 {$mode delphi}
 interface
-uses CSE, Gametypes;
+uses CSE, Games;
 
 function OnSetPlayerSkin(e:pCSE_Abstract; team:cardinal; skin:cardinal): boolean; stdcall;
 function OnActorItemSpawn_ChangeItemSection(game:pgame_sv_mp; actorID:word; N:PChar; {%H-}Addons:byte):PChar; stdcall;
@@ -19,7 +19,7 @@ begin
     exit;
   end;
 
-  vis:=FZItemCgfMgr.Get.SkinToReplace(team, skin);
+  vis:=FZItemCfgMgr.Get.SkinToReplace(team, skin);
 
   if length(vis)=0 then begin
     result:= false;
@@ -42,10 +42,10 @@ begin
 
   if not FZConfigCache.Get.GetDataCopy.use_item_change then exit;
 
-  ps:=virtual_game_sv_GameState__get_eid.Call([game, actorID]).VPointer;
+  ps:=GetPlayerStateByGameID(@game.base_game_sv_GameState, actorID);
   if ps=nil then exit;
 
-  change:=FZItemCgfMgr.Get.ItemToReplace(N, ps.team);
+  change:=FZItemCfgMgr.Get.ItemToReplace(N, ps.team);
   if length(change)>0 then begin
     result:=PChar(change);
   end;

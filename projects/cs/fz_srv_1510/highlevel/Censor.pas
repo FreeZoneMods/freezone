@@ -32,18 +32,10 @@ end;
 
 function Init():boolean;
 implementation
-uses LogMgr, Sysutils;
+uses LogMgr, Sysutils, xr_debug;
 
 var
-  _instance:FZCensor;
-
-
-function Init():boolean;
-begin
-  FZLogMgr.Get.Write('Using TRegExpr library ver.'+inttostr(TREgExpr.VersionMajor)+'.'+inttostr(TREgExpr.VersionMinor), FZ_LOG_IMPORTANT_INFO);
-  _instance:=FZCensor.Create();
-  result:=true;
-end;
+  _instance:FZCensor = nil;
 
 { FZCensor }
 
@@ -196,6 +188,14 @@ begin
     self.expr:=str;
     self.is_valid:=true;
   end;
+end;
+
+function Init():boolean;
+begin
+  FZLogMgr.Get.Write('Using TRegExpr library ver.'+inttostr(TREgExpr.VersionMajor)+'.'+inttostr(TREgExpr.VersionMinor), FZ_LOG_IMPORTANT_INFO);
+  R_ASSERT(_instance=nil, 'Censor module is already initialized');
+  _instance:=FZCensor.Create();
+  result:=true;
 end;
 
 end.

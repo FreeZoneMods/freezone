@@ -30,6 +30,12 @@ type
   end;
 pSHit = ^SHit;
 
+CHitImmunity = packed record
+  vtable:pointer;
+  m_HitTypeK:array[0..10{EHitType__eHitTypeMax}] of single;
+  count:cardinal;
+end;
+
 const
   ALife__eHitTypeFireWound:cardinal = 8;
   SPECIAL_KILL_TYPE__SKT_NONE:cardinal = 0;

@@ -50,9 +50,10 @@ end;
 function Init():boolean;
 
 implementation
-uses Sysutils, Chat, TranslationMgr, LogMgr, SACE_interface, players;
+uses Sysutils, Chat, TranslationMgr, LogMgr, SACE_interface, players, xrstrings, xr_debug;
 
-var _instance:FZChatCommandList;
+var
+  _instance:FZChatCommandList = nil;
 
 
 { FZChatCommand }
@@ -112,7 +113,7 @@ var
 begin
   cmd:=@cmd[1];
 
-  FZLogMgr.Get.Write('Client '+PChar(@who.base_IClient.name.p_.value)+' is running chat command "'+cmd+'"', FZ_LOG_INFO);
+  FZLogMgr.Get.Write('Client '+get_string_value(@who.base_IClient.name)+' is running chat command "'+cmd+'"', FZ_LOG_INFO);
 
   i:=pos(' ', cmd);
   if i>0 then begin
@@ -148,12 +149,6 @@ end;
 class function FZChatCommandList.Get: FZChatCommandList;
 begin
   result:=_instance;
-end;
-
-function Init():boolean;
-begin
-  _instance:=FZChatCommandList.Create();
-  result:=true;
 end;
 
 { FZChatHelpCommand }
@@ -211,7 +206,7 @@ begin
   if (cl.flags and ICLIENT_FLAG_LOCAL)=0 then begin
     if GetSACEStatus(cl.ID.id)=SACE_OK then begin
       str:=pstring(p1);
-      str^:=str^ + PChar(@cl.name.p_.value)+' ';
+      str^:=str^ + get_string_value(@cl.name)+' ';
     end;
   end;
 end;
@@ -257,6 +252,13 @@ begin
   end;
 
   SendChatMessageByFreeZoneWSplitting(@srv.base_IPureServer, who.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_your_updrate')+' '+inttostr(FZPlayerStateAdditionalInfo(who.ps.FZBuffer).updrate));
+  result:=true;
+end;
+
+function Init():boolean;
+begin
+  R_ASSERT(_instance = nil, 'Chat commands module is already initialized');
+  _instance:=FZChatCommandList.Create();
   result:=true;
 end;
 

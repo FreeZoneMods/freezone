@@ -1,7 +1,7 @@
 object FZControlGUI: TFZControlGUI
-  Left = 16
+  Left = 408
   Height = 542
-  Top = 92
+  Top = 104
   Width = 788
   BorderStyle = bsNone
   Caption = 'FreeZone - Server Control'
@@ -553,6 +553,7 @@ object FZControlGUI: TFZControlGUI
     end
     object ActRankUp: TAction
       Caption = 'Rank Up'
+      OnExecute = ActRankUpExecute
     end
     object ActRankDown: TAction
       Caption = 'Rank Down'

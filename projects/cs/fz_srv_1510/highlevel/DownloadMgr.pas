@@ -18,6 +18,7 @@ type
    destructor Destroy(); override;
    function GetCompressionType(map:string; ver:string):FZArchiveCompressionType;
    function IsSaceFakeNeeded(map: string; ver: string):boolean;
+   function IsPatchAndReconnectAfterMapload(map: string; ver: string):boolean;
 
    class function GetCompressionTypeByIndex(i:longint):FZArchiveCompressionType;
   end;
@@ -25,9 +26,9 @@ type
 function Init():boolean; stdcall;
 
 implementation
-uses CommonHelper, sysutils;
+uses CommonHelper, sysutils, xr_debug;
 var
-  _instance:FZDownloadMgr;
+  _instance:FZDownloadMgr = nil;
 
 { FZDownloadMgr }
 
@@ -72,13 +73,6 @@ begin
   result:=self.GetString(s, '');
 end;
 
-
-function Init():boolean; stdcall;
-begin
-  _instance:=FZDownloadMgr.Create();
-  result:=true;
-end;
-
 function FZDownloadMgr.GetMapPrefix(map: string; ver: string): string;
 var
   s:string;
@@ -113,6 +107,15 @@ begin
   result:=(strtointdef(s, 1) <> 0);
 end;
 
+function FZDownloadMgr.IsPatchAndReconnectAfterMapload(map: string; ver: string): boolean;
+var
+  s:string;
+begin
+  s:='%patchengineandreconnect_'+map+'_'+ver+'%';
+  s:=self.GetString(s,'');
+  result:=(strtointdef(s, 0) <> 0);
+end;
+
 class function FZDownloadMgr.GetCompressionTypeByIndex(i: longint): FZArchiveCompressionType;
 begin
   case i of
@@ -121,6 +124,13 @@ begin
   else
     result:=FZ_COMPRESSION_NO_COMPRESSION
   end;
+end;
+
+function Init():boolean; stdcall;
+begin
+  R_ASSERT(_instance=nil, 'DoanloadMgr module is already initialized');
+  _instance:=FZDownloadMgr.Create();
+  result:=true;
 end;
 
 end.

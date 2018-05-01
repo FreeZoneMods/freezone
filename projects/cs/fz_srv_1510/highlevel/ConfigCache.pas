@@ -25,6 +25,7 @@ FZCacheData = record
   vote_mute_interval:cardinal;
   vote_first_mute_time:cardinal;
 
+  censor_names:boolean;
   censor_chat:boolean;
   chat_badwords_treasure:cardinal;
   mutetime_per_badword:cardinal;
@@ -60,6 +61,14 @@ FZCacheData = record
 
   log_severity:cardinal;
   external_log:boolean;
+  antihacker:boolean;
+
+  radmins_see_sec_events:boolean;
+  sell_items_for_shophackers:boolean;
+  banned_symbols:string;
+
+  ip_checker_time_delta:cardinal;
+  ip_checker_max_connections_per_delta_count:cardinal;
 end;
 pFZCacheData = ^FZCacheData;
 
@@ -84,9 +93,9 @@ end;
 function Init():boolean; stdcall;
 
 implementation
-uses ConfigMgr, LogMgr, sysutils, CommonHelper;
+uses ConfigMgr, LogMgr, sysutils, CommonHelper, sysmsgs, xr_debug;
 var
-  _instance:FZConfigCache;
+  _instance:FZConfigCache = nil;
 
 { FZConfigCache }
 
@@ -104,7 +113,7 @@ end;
 
 class function FZConfigCache.Get: FZConfigCache;
 begin
-  assert(_instance<>nil, 'Config cache is not created yet');
+  R_ASSERT(_instance<>nil, 'Config cache is not created yet');
   result:=_instance;
 end;
 
@@ -146,9 +155,17 @@ begin
 end;
 
 procedure FZConfigCache._ApplyConfig;
+var
+  sysmsgs_flags:FZSysmsgsCommonFlags;
 begin
   FZLogMgr.Get.SetTargetSeverityLevel(self._data.log_severity);
   FZLogMgr.Get.SetFileLoggingStatus(self._data.external_log);
+
+  sysmsgs_flags:=GetCommonSysmsgsFlags() and (FZ_SYSMSGS_FLAGS_ALL_ENABLED - FZ_SYSMSGS_ENABLE_LOGS);
+  if self._data.log_severity <= FZLogMgr.NumberForSeverity(FZ_LOG_DBG) then begin
+    sysmsgs_flags:=sysmsgs_flags or FZ_SYSMSGS_ENABLE_LOGS;
+  end;
+  SetCommonSysmsgsFlags(sysmsgs_flags);
 end;
 
 procedure FZConfigCache._LL_FillData;
@@ -169,6 +186,7 @@ begin
   self._data.vote_mute_interval:=FZConfigMgr.Get.GetInt('vote_mute_interval', 0);
   self._data.vote_series_for_mute:=FZConfigMgr.Get.GetInt('vote_series_for_mute', 0);
   self._data.vote_first_mute_time:=FZConfigMgr.Get.GetInt('vote_first_mute_time', 0);
+  self._data.censor_names:=FZConfigMgr.Get.GetBool('censor_names', false);
   self._data.censor_chat:=FZConfigMgr.Get.GetBool('censor_chat', true);
   self._data.chat_badwords_treasure:=FZConfigMgr.Get.GetInt('chat_badwords_treasure', 0);
   self._data.mutetime_per_badword:=FZConfigMgr.Get.GetInt('mutetime_per_badword', 0);
@@ -205,11 +223,20 @@ begin
 
   self._data.log_severity:=FZConfigMgr.Get.GetInt('log_severity',FZ_LOG_DEFAULT_SEVERITY);
   self._data.external_log:=FZConfigMgr.Get.GetBool('external_log', false);
+  self._data.antihacker:=FZConfigMgr.Get.GetBool('antihacker', false);
 
+  self._data.radmins_see_sec_events:=FZConfigMgr.Get.GetBool('radmins_see_sec_events', true);
+  self._data.sell_items_for_shophackers:=FZConfigMgr.Get.GetBool('sell_items_for_shophackers', false);
+
+  if not FZConfigMgr.Get.GetData('banned_symbols', self._data.banned_symbols) then self._data.banned_symbols:='/|\"%$#@!&?'':*~ ';
+
+  self._data.ip_checker_time_delta:=FZConfigMgr.Get.GetInt('ip_checker_time_delta', 60000);
+  self._data.ip_checker_max_connections_per_delta_count:=FZConfigMgr.Get.GetInt('ip_checker_max_connections_per_delta_count', 3);
 end;
 
 function Init():boolean; stdcall;
 begin
+  R_ASSERT(_instance=nil, 'Config cache module is already initialized');
   _instance:=FZConfigCache.Create();
   result:=true;
 end;

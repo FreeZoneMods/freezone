@@ -1,7 +1,7 @@
 unit Players;
 {$mode delphi}
 interface
-uses Clients, windows, Servers,PureServer,MatVectors,Packets, xrstrings;
+uses Clients, windows, Servers,PureServer,MatVectors,Packets, xrstrings, Games, Vector,InventoryItems, CSE;
 
 type
 
@@ -53,6 +53,7 @@ public
   property updrate:cardinal read _updrate write SetUpdrate;
   property last_ready:cardinal read _last_ready_time write _last_ready_time;
   property valid:boolean read _valid write _valid;
+  property connected_and_ready: boolean read _connected_and_ready write _connected_and_ready;
 
   function IsAllowedStartingVoting():boolean;
   procedure OnVoteStarted();
@@ -75,7 +76,6 @@ public
 
   function OnBadWordsInChat():cardinal;
   destructor Destroy; override;
-
 end;
 //pFZPlayerStateAdditionalInfo=^FZPlayerStateAdditionalInfo;
 
@@ -90,11 +90,14 @@ function UnMutePlayer(id:ClientID):boolean; stdcall;
 procedure SetUpdRate(id:ClientID; updrate:cardinal); stdcall;
 procedure KillPlayer(id:ClientID); stdcall;
 procedure AddMoney(id:ClientID; amount:integer); stdcall;
+function ChangePlayerRank(id:ClientID; delta:integer):boolean; stdcall;
 
 procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
 function GetHwId(cl: pxrClientData): string; stdcall;
 
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
+procedure CheckClientConnectData(data:pSClientConnectData); stdcall;
+procedure CheckClientConnectionName(str: PAnsiChar; msg: pDPNMSG_CREATE_PLAYER); stdcall;
 
 function CheckPlayerReadySignalValidity(cl:pxrClientData):boolean; stdcall;
 function OnPingWarn(cl:pxrClientData):boolean; stdcall;
@@ -110,8 +113,21 @@ function game_sv_mp__OnPlayerDisconnect_is_message_needed(name:PAnsiChar):boolea
 
 procedure SendMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word; pos:pFVector3; dir:pFVector3); stdcall;
 
+function BeforeSpawnBoughtItems_DM(ps:pgame_PlayerState; game:pgame_sv_Deathmatch):boolean; stdcall;
+function BeforeSpawnBoughtItems_CTA(ps:pgame_PlayerState; game:pgame_sv_CaptureTheArtefact):boolean; stdcall;
+procedure DestroyAllItemsFromPlayersInventoryDeforeBuying(game:pgame_sv_mp; client_id:cardinal); stdcall;
+function CanPlayerBuyNow(cl:pxrClientData):boolean;stdcall;
+function IsSpawnFreeAmmoAllowedForGametype(game:pgame_sv_mp):boolean; stdcall;
+
+function GenerateMessageForClientId(id:cardinal; message: string):string;
+
+function IsWeaponKnife(item:pCSE_Abstract):boolean;stdcall;
+
 implementation
-uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, Games, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList;
+uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug;
+
+const
+  SHOP_GROUP = '[SHOP] ';
 
 procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
 begin
@@ -123,8 +139,6 @@ begin
   result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId();
 end;
 
-
-
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
 const
   allowed_symbols:string = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_[]';
@@ -132,10 +146,17 @@ const
   max_len:integer=20;
 var
   i:integer;
+  cfg:FZCacheData;
 begin
+  cfg:=FZConfigCache.Get.GetDataCopy();
+  if cfg.censor_names and FZCensor.Get().CheckAndCensorString(name, false, 'Name censored:' ) then begin
+    strcopy(new_name, 'BadName');
+    exit;
+  end;
+
   i:=0;
   while (i<max_len) and (name[i]<>chr(0)) do begin
-    if (pos(name[i], allowed_symbols)<>0) or (FZConfigCache.Get.GetDataCopy.allow_russian_nicknames and (pos(name[i], russian_symbols) <> 0)) then begin
+    if (pos(name[i], allowed_symbols)<>0) or (cfg.allow_russian_nicknames and (pos(name[i], russian_symbols) <> 0)) then begin
       new_name[i]:=name[i];
     end else begin
     //пробуем исправить русские буквы на англ
@@ -150,18 +171,38 @@ begin
   new_name[i]:=chr(0);
 end;
 
+procedure CheckClientConnectData(data:pSClientConnectData); stdcall;
+begin
+  CheckIfPCharZStringIsLesserThan(@data.name[0], length(data.name), data.clientID, true, $FF, true);
+  CheckIfPCharZStringIsLesserThan(@data.pass[0], length(data.pass), data.clientID, true, $FF, true);
+end;
+
+procedure CheckClientConnectionName(str: PAnsiChar; msg: pDPNMSG_CREATE_PLAYER); stdcall;
+var
+  clid:ClientID;
+  addr:ip_address;
+  port:dword;
+const
+  BUF_SZ:cardinal=64;
+begin
+  clid.id:=0;
+  if not CheckIfPCharZStringIsLesserThan(str, BUF_SZ, clid, false, $FF, false) then begin
+    str[BUF_SZ-1]:=chr(0);
+    if GetClientAddress(GetPureServer(), msg.dpnidPlayer, @addr, @port) then begin
+      BadEventsProcessor(FZ_SEC_EVENT_ATTACK, 'Player (ID='+inttostr(msg.dpnidPlayer)+', IP='+ip_address_to_str(addr)+') sent too long nickname');
+    end;
+  end;
+end;
 
 /////////////////////////////////////////////////////
 function DoAddMoney(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; amount:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
-  lvl:pCLevel;
 begin
   result:=false;
   cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if (cl_d<>nil) and (g_ppGameLevel^<>nil) then begin
-    lvl:=pCLevel(g_ppGameLevel^);
-    virtual_game_sv_mp__Player_AddMoney.Call([lvl.Server.game, cl_d.ps, pcardinal(amount)^])
+  if (cl_d<>nil) then begin
+    game_PlayerAddMoney(GetCurrentGame(), cl_d.ps, pcardinal(amount)^);
   end;
 end;
 
@@ -174,19 +215,36 @@ end;
 function DoKillPlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; {%H-}junk:pointer):boolean; stdcall;
 var
   cl_d:pxrClientData;
-  lvl:pCLevel;
 begin
   result:=false;
   cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if (cl_d<>nil) and (g_ppGameLevel^<>nil) then begin
-    lvl:=pCLevel(g_ppGameLevel^);
-    game_sv_mp__KillPlayer.Call([lvl.Server.game, cl_d.base_IClient.ID.id, cl_d.ps.GameID])
+  if (cl_d<>nil) then begin
+    game_KillPlayer(GetCurrentGame(), cl_d.base_IClient.ID.id, cl_d.ps.GameID);
   end;
 end;
 
 procedure KillPlayer(id:ClientID); stdcall;
 begin
   ForEachClientDo(DoKillPlayer, OneIDSearcher, @id.id);
+end;
+/////////////////////////////////////////////////////
+
+function ChangePlayerRank(id:ClientID; delta:integer):boolean; stdcall;
+var
+  cld:pxrClientData;
+  newrank:integer;
+begin
+  result:=false;
+  LockServerPlayers();
+  cld:=ID_to_client(id.id);
+  if (cld<>nil) and (cld.ps<>nil) then begin
+    newrank:=cld.ps.rank+delta;
+    if (newrank >= 0) and (newrank < integer(_RANK_COUNT)) then begin
+      cld.ps.rank:=byte(newrank);
+      result:=true;
+    end;
+  end;
+  UnlockServerPlayers();
 end;
 
 /////////////////////////////////////////////////////
@@ -253,27 +311,16 @@ begin
 end;
 
 /////////////////////////////////////////////////////
-function DoDisconnectPlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; pchar_reason:pointer):boolean; stdcall;
-var
-  l:pCLevel;
-  sv:pxrServer;
-begin
-  result:=true;
-  if pchar_reason=nil then exit;
-
-  l:=pCLevel(g_ppGameLevel^);
-  if l=nil then exit;
-
-  sv:=l.Server;
-  if sv=nil then exit;
-
-  virtual_IPureServer__DisconnectClient.Call([@sv.base_IPureServer, player, PChar(pchar_reason)]);
-  result:=false;
-end;
-
 procedure DisconnectPlayer(id:ClientID; reason:string); stdcall;
+var
+  cld:pxrClientData;
 begin
-  ForEachClientDo(DoDisconnectPlayer, OneIDSearcher, @id.id, PChar(reason));
+  LockServerPlayers();
+  cld:=ID_to_client(id.id);
+  if (cld<>nil) then begin
+    IPureServer__DisconnectClient(GetPureServer(), @cld.base_IClient, PAnsiChar(reason));
+  end;
+  UnlockServerPlayers();
 end;
 /////////////////////////////////////////////////////
 
@@ -650,7 +697,7 @@ begin
   WriteToPacket(@p, @M_CHANGE_LEVEL, sizeof(M_CHANGE_LEVEL)); //хидер
   s:='sace';
   WriteToPacket(@p, PChar(s), length(s)+1);
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 procedure SendMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word; pos:pFVector3; dir:pFVector3); stdcall;
@@ -667,15 +714,14 @@ begin
   WriteToPacket(@p, pos, sizeof(FVector3));
   WriteToPacket(@p, dir, sizeof(FVector3));
 
-
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 function CanChangeName(client:pxrClientData):boolean; stdcall;
 begin
   result:=FZConfigCache.Get.GetDataCopy.can_player_change_name;
   if not result then begin
-    SendChatMessageByFreeZone(@(pCLevel(g_ppGameLevel^).Server.base_IPureServer), client.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_cant_change_name'));
+    SendChatMessageByFreeZone(GetPureServer(), client.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_cant_change_name'));
   end;
 end;
 
@@ -693,7 +739,7 @@ var
 begin
   data:=pFZSysMsgSendCallbackData(userdata);
   //DPNSEND_IMMEDIATELLY + DPNSEND_GUARANTEED + DPNSEND_PRIORITY_HIGH
-  IPureServer__SendTo_LL.Call([data.srv, data.cl_id.id, msg, len, $100+$8+$80, 0]);
+  SendPacketToClient_LL(data.srv, data.cl_id.id, msg, len, $100+$8+$80, 0);
 end;
 
 procedure ExportMapListToClient(srv:pIPureServer; cl_id:ClientID; gameid:cardinal); stdcall;
@@ -740,8 +786,8 @@ begin
   elements[0].mapver:=nil;
 
   for i:=1 to maplist.count-1 do begin
-    elements[i].mapname:=@mapitm_cur.map_name.p_.value;
-    elements[i].mapver:=@mapitm_cur.map_ver.p_.value;
+    elements[i].mapname:=get_string_value(@mapitm_cur.map_name);
+    elements[i].mapver:=get_string_value(@mapitm_cur.map_ver);
     translations[i]:=FZTranslationMgr.Get().TranslateOrEmptySingle(elements[i].mapname);
     if length(translations[i])>0 then begin
       elements[i].description:=PAnsiChar(translations[i]);
@@ -756,7 +802,7 @@ begin
   userdata.cl_id:=cl_id;
 
   while(maplist.count>0) do begin
-    SendSysMessage(@ProcessClientVotingMaplist, @maplist, @SysMsg_SendCallback, @userdata);
+    SendSysMessage_CS(@ProcessClientVotingMaplist, @maplist, @SysMsg_SendCallback, @userdata);
     maplist.count:=maplist.count-maplist.was_sent;
     maplist.maps:=pointer(maplist.maps)+maplist.was_sent*sizeof(FZClientVotingElement);
   end;
@@ -776,7 +822,7 @@ var
   filename:string;
   need_dl:boolean;
   userdata:FZSysMsgSendCallbackData;
-
+  flags:FZSysmsgsCommonFlags;
 begin
   xrCriticalSection__Enter(@srv.base_IPureServer.net_players.csPlayers);
   try
@@ -788,9 +834,9 @@ begin
 
     if length(dat.mod_name)>0 then begin
       filename:=dat.mod_name+'.mod';
-      dl_msg:=FZTranslationMgr.Get().Translate('fz_mod_downloading');
-      err_msg:=FZTranslationMgr.Get().Translate('fz_already_has_download');
-      incompatible_mod_msg:=FZTranslationMgr.Get().Translate('fz_incompatible_mod');
+      dl_msg:=FZTranslationMgr.Get().TranslateOrEmptySingle('fz_mod_downloading');
+      err_msg:=FZTranslationMgr.Get().TranslateOrEmptySingle('fz_already_has_download');
+      incompatible_mod_msg:=FZTranslationMgr.Get().TranslateOrEmptySingle('fz_incompatible_mod');
 
       moddllinfo.fileinfo.filename:=PAnsiChar(filename);
       moddllinfo.fileinfo.url:=PAnsiChar(dat.mod_link);
@@ -804,18 +850,23 @@ begin
       moddllinfo.dsign:=PAnsiChar(dat.mod_dsign);
       moddllinfo.name_lock:=PAnsiChar(dat.mod_name);
       moddllinfo.incompatible_mod_message:=PAnsiChar(incompatible_mod_msg);
+      moddllinfo.mod_is_applying_message:=PAnsiChar(dl_msg);
 
       if dat.mod_is_reconnect_needed then begin
-        moddllinfo.is_reconnect_needed:=1;
+        moddllinfo.modding_policy:=FZ_MODDING_WHEN_CONNECTING;
       end else begin
-        moddllinfo.is_reconnect_needed:=0;
+        moddllinfo.modding_policy:=FZ_MODDING_WHEN_NOT_CONNECTING;
       end;
       moddllinfo.reconnect_addr.ip:=PAnsiChar(dat.reconnect_ip);
       moddllinfo.reconnect_addr.port:=dat.reconnect_port;
 
-      if length(dat.mod_dsign)>0 then begin
-        FZLogMgr.Get.Write('Send MODLOAD packet for '+dat.mod_name, FZ_LOG_INFO);
-        SendSysMessage(@ProcessClientModDll, @moddllinfo, @SysMsg_SendCallback ,@userdata);
+      if (length(dat.mod_link) = 0) or (length(dat.mod_dsign) > 0) then begin
+        if (length(dat.mod_link) = 0) then begin
+          FZLogMgr.Get.Write('Send MODLOAD packet for '+dat.mod_name+' (default loader)', FZ_LOG_INFO);
+        end else begin
+          FZLogMgr.Get.Write('Send MODLOAD packet for '+dat.mod_name, FZ_LOG_INFO);
+        end;
+        SendSysMessage_CS(@ProcessClientModDll, @moddllinfo, @SysMsg_SendCallback ,@userdata);
       end else begin
         FZLogMgr.Get.Write('MOD_DSIGN parameter not specified!'+dat.mod_name, FZ_LOG_ERROR);
       end;
@@ -832,8 +883,8 @@ begin
         dlinfo.fileinfo.url:=PAnsiChar(maplink);
       end;
       filename:=FZDownloadMgr.Get.GetMapPrefix(mapname, mapver)+mapname+'_'+mapver+'.map';
-      dl_msg:=FZTranslationMgr.Get().Translate('fz_map_downloading');
-      err_msg:=FZTranslationMgr.Get().Translate('fz_already_has_download');
+      dl_msg:=FZTranslationMgr.Get().TranslateOrEmptySingle('fz_map_downloading');
+      err_msg:=FZTranslationMgr.Get().TranslateOrEmptySingle('fz_already_has_download');
       xml:=FZDownloadMgr.Get.GetXMLName(mapname, mapver);
 
       dlinfo.fileinfo.filename:=PAnsiChar(filename);
@@ -848,13 +899,28 @@ begin
       dlinfo.mapver:=PAnsiChar(mapver);
       dlinfo.mapname:=PAnsiChar(mapname);
       dlinfo.xmlname:=PAnsiChar(xml);
+      dlinfo.flags := 0;
+
+      flags:=GetCommonSysmsgsFlags();
+      if FZDownloadMgr.Get.IsPatchAndReconnectAfterMapload(mapname, mapver) then begin
+        if flags and FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE <> FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE then begin
+          flags:=flags or FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE;
+          SetCommonSysmsgsFlags(flags);
+        end;
+        dlinfo.flags:=dlinfo.flags or FZ_MAPLOAD_MANDATORY_RECONNECT;
+      end else begin
+        if flags and FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE <> 0 then begin
+          flags:=flags and (FZ_SYSMSGS_FLAGS_ALL_ENABLED - FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE);
+          SetCommonSysmsgsFlags(flags);
+        end;
+      end;
 
       if not need_dl then begin
         //Контрольная сумма не найдена, просто сообщаем
         FZLogMgr.Get.Write('No CRC32 for map '+mapname+', ver '+mapver, FZ_LOG_INFO);
       end else begin
         FZLogMgr.Get.Write('Send DOWNLOAD packet for '+mapname+', ver.='+mapver, FZ_LOG_INFO);
-        SendSysMessage(@ProcessClientMap, @dlinfo, @SysMsg_SendCallback ,@userdata);
+        SendSysMessage_CS(@ProcessClientMap, @dlinfo, @SysMsg_SendCallback ,@userdata);
       end;
     end;
 
@@ -889,18 +955,18 @@ begin
   write_empty_name:=true;
 
   if cl<>nil then begin
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).OnDisconnected();
-    if FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid then begin
+    if FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).connected_and_ready then begin
       write_empty_name:=false;
     end;
+    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).OnDisconnected();
   end;
 
   if write_empty_name then begin
     //make 'empty' name if we don't need to show 'disconnect' message to clients
-    FZLogMgr.Get.Write('CL (not ready) disconnecting: '+PAnsiChar(@pname^.p_.value)+', id='+inttostr(cl.base_IClient.ID.id), FZ_LOG_INFO);
+    FZLogMgr.Get.Write('CL (not ready) disconnecting: '+get_string_value(pname^)+', id='+inttostr(cl.base_IClient.ID.id), FZ_LOG_INFO);
     pname^:=GetGlobalUndockedEmptyStr();
   end else begin
-    FZLogMgr.Get.Write('CL disconnecting: '+PAnsiChar(@pname^.p_.value)+', id='+inttostr(cl.base_IClient.ID.id), FZ_LOG_INFO);
+    FZLogMgr.Get.Write('CL disconnecting: '+get_string_value(pname^)+', id='+inttostr(cl.base_IClient.ID.id), FZ_LOG_INFO);
   end;
 
 end;
@@ -911,6 +977,609 @@ var
 begin
   empty_name:='';
   result:= empty_name <> name;
+end;
+
+function CheckItemRank(rank:cardinal; item_sect:string):boolean;
+begin
+  result:=(GetRankForItem(item_sect) <= rank);
+end;
+
+type FZAddonDescription = record
+  flag:EWeaponAddonState;
+  oldFlag:EWeaponAddonState;
+  name_param:string;
+  status_param:string;
+end;
+FZAddonDescrArray = array[0..2] of FZAddonDescription;
+
+function GetAddonsDescription():FZAddonDescrArray;
+begin
+  result[0].flag := eWeaponAddonScope; result[0].name_param:='scope_name'; result[0].status_param:='scope_status'; result[0].oldFlag:=fzBuyItemOldScopeStateBit;
+  result[1].flag := eWeaponAddonGrenadeLauncher; result[1].name_param:='grenade_launcher_name'; result[1].status_param:='grenade_launcher_status'; result[1].oldFlag:=fzBuyItemOldGlStateBit;
+  result[2].flag := eWeaponAddonSilencer; result[2].name_param:='silencer_name'; result[2].status_param:='silencer_status'; result[2].oldFlag:=fzBuyItemOldSilencerStateBit
+end;
+
+function GetItemCostForRank(name_for_log:string; rank:cardinal; mgr:pCItemMgr; item_sect:PAnsiChar; addons:byte; item_rebuying:boolean; warmup:boolean):integer; stdcall;
+var
+  addons_descr:FZAddonDescrArray;
+  i:integer;
+
+  addon_cost:integer;
+  total_cost:integer;
+  addon_sect:string;
+begin
+  //-1 значит, что покупать нельзя
+  result:=-1;
+  R_ASSERT(item_sect<>nil, 'Cannot calculate cost for rank - item is nil');
+
+  if (not item_rebuying) and not (warmup) and (not CheckItemRank(rank, item_sect)) then begin
+    if length(name_for_log) > 0 then BadEventsProcessor(FZ_SEC_EVENT_WARN, SHOP_GROUP+'Player '+name_for_log+' with rank '+inttostr(rank)+' wants to buy item "'+item_sect+'"');
+    exit;
+  end;
+
+  total_cost:=CItemMgr__GetItemCost(mgr, item_sect, rank);
+  if total_cost < 0 then exit;
+
+  //Проверим аддоны
+  addons_descr:=GetAddonsDescription();
+  for i:=0 to length(addons_descr)-1 do begin
+    if addons and addons_descr[i].flag <> 0 then begin
+      if game_ini_read_int_def(PAnsiChar(item_sect), addons_descr[i].status_param, -1) <> eAddonAttachable then exit;
+      addon_sect:=game_ini_read_string_def(PAnsiChar(item_sect), addons_descr[i].name_param);
+      if length(addon_sect) = 0 then exit;
+
+      if (not warmup) and (addons and addons_descr[i].oldFlag = 0) and (not CheckItemRank(rank, addon_sect)) then begin
+        if length(name_for_log) > 0 then BadEventsProcessor(FZ_SEC_EVENT_WARN, SHOP_GROUP+'Player '+name_for_log+' with rank '+inttostr(rank)+' wants to buy addon "'+addon_sect+'"');
+        exit;
+      end;
+
+      addon_cost:=CItemMgr__GetItemCost(mgr, addon_sect, rank);
+      if addon_cost < 0 then exit;
+      total_cost:=total_cost+addon_cost;
+    end;
+  end;
+
+  result:=total_cost;
+end;
+
+function CouldItemBeBought(name_for_log:string; rank:cardinal; game:pgame_sv_mp; item_id:cardinal; warmup:boolean; max_cost:integer; all_items:pxr_vector):integer;
+var
+  cost:integer;
+  item, item_second:pCItemMgr__m_items_pair;
+
+  item_second_id:word;
+
+  group:string;
+  count_remains:integer;
+  i:integer;
+
+  rebuying:boolean;
+begin
+  result:=-1;
+
+  //Проверяем, не идет ли сейчас перезакуп проданного (он разрешен)
+  rebuying:=((item_id shr 8) and fzBuyItemRenewing) <> 0;
+
+  //Проверим, разрешено ли игроку покупать этот предмет
+  item:=CItemMgr__GetElement(game.m_strWeaponsData, item_id and $00FF);
+  cost:=GetItemCostForRank(name_for_log, rank, game.m_strWeaponsData, get_string_value(@item.first), (item_id and $FF00) shr 8, rebuying, warmup);
+
+  if length(name_for_log) > 0 then begin
+    FZLogMgr.Get.Write('Player '+name_for_log+' buys item with description 0x'+inttohex(item_id, 4)+', cost='+inttostr(cost), FZ_LOG_DBG);
+  end;
+
+  if cost < 0 then exit;
+
+  //Смотрим, хватает ли у нас денег на покупку
+  if (not warmup) and (cost > max_cost) then begin
+    if length(name_for_log) > 0 then BadEventsProcessor(FZ_SEC_EVENT_WARN, SHOP_GROUP+'Player '+name_for_log+' tries to spend more money than really has');
+    exit;
+  end;
+
+  if not rebuying then begin
+    //Смотрим ограничение на число закупаемых предметов
+    group:=GetItemGroup(get_string_value(@item.first));
+    if not warmup then begin
+      count_remains:=GetItemGroupMaxCounter(group, rank);
+    end else begin
+      count_remains:=GetItemGroupMaxCounter(group, _RANK_COUNT-1);
+    end;
+
+    if count_remains <= 0 then begin
+      if length(name_for_log) > 0 then BadEventsProcessor(FZ_SEC_EVENT_WARN, SHOP_GROUP+'Player '+name_for_log+' tries to buy item ['+get_string_value(@item.first)+'] which is unavailable for him!');
+      exit;
+    end;
+
+    //Проверяем, что игрок не закупил больше предметов, чем разрешено
+    //В общем счетчике учитываются и перезакупаемые предметы! Если все предметы - перезакуп, то сюда мы не попадем, иначе - нефиг
+    for i:=0 to items_count_in_vector(all_items, sizeof(word))-1 do begin
+      item_second_id:=pword(get_item_from_vector(all_items, i, sizeof(word)))^;
+      item_second_id:=item_second_id and $00FF;
+      item_second:=CItemMgr__GetElement(game.m_strWeaponsData, item_second_id );
+      if group = GetItemGroup(get_string_value(@item_second.first)) then begin
+        if count_remains = 0 then begin
+          if length(name_for_log) > 0 then BadEventsProcessor(FZ_SEC_EVENT_WARN, SHOP_GROUP+'Player '+name_for_log+' tries to override count restrictions for ['+get_string_value(@item_second.first)+']');
+          exit;
+        end;
+        count_remains:=count_remains-1;
+      end;
+    end;
+  end;
+
+  result:=cost;
+end;
+
+function CheckForShopItemBanned(game:pgame_sv_mp; var item_id:word; player_name:PAnsiChar):boolean;
+var
+  sect_pair:pCItemMgr__m_items_pair;
+  addons:byte;
+  addons_descr:FZAddonDescrArray;
+  sect, addon_sect:string;
+  i:integer;
+begin
+  sect_pair:=CItemMgr__GetElement(game.m_strWeaponsData, item_id and $00FF);
+  sect:=get_string_value(@sect_pair.first);
+
+  result:=false;
+  if FZItemCfgMgr.Get().IsItemBannedToBuy(sect) then begin
+    FZLogMgr.Get.Write('Removing banned item '+sect+' from buy vector of player '+player_name, FZ_LOG_DBG);
+
+    result:=true;
+  end else begin
+    addons:=(item_id and $FF00) shr 8;
+    addons_descr:=GetAddonsDescription();
+
+    for i:=0 to length(addons_descr)-1 do begin
+      if addons and addons_descr[i].flag <> 0 then begin
+        if game_ini_read_int_def(PAnsiChar(sect), addons_descr[i].status_param, -1) <> eAddonAttachable then continue;
+
+        addon_sect:=game_ini_read_string_def(PAnsiChar(sect), addons_descr[i].name_param);
+        if length(addon_sect) = 0 then continue;
+
+        if FZItemCfgMgr.Get().IsItemBannedToBuy(addon_sect) then begin
+          FZLogMgr.Get.Write('Removing banned addon '+addon_sect+' for item '+sect+' from buy vector of player '+player_name, FZ_LOG_DBG);
+          item_id:=item_id and (not (word(addons_descr[i].flag) shl 8));
+        end;
+      end;
+    end;
+  end;
+end;
+
+function BeforeSpawnBoughtItems(ps:pgame_PlayerState; game:pgame_sv_mp; warmup:boolean):boolean; stdcall;
+var
+  i:integer;
+  pidx:pword;
+  idx:word;
+  cost:integer;
+
+  cl:pxrClientData;
+begin
+  result:=true;
+
+  R_ASSERT(ps<>nil, 'Checking bought items failed - PlayerState is NIL');
+  ps.LastBuyAcount:=0;
+
+  FZLogMgr.Get.Write('Start processing bought items for player '+PAnsiChar(@ps.name[0])+', money = '+ inttostr(ps.money_for_round)+', warmup='+booltostr(warmup), FZ_LOG_DBG);
+
+  //Сначала проверим на DoS для гарантированной раздачи ништяков хакерам
+  for i:=0 to items_count_in_vector(@ps.pItemList, sizeof(word))-1 do begin
+    idx:= pWord(get_item_from_vector(@ps.pItemList, i, sizeof(word)))^;
+    if CItemMgr__GetItemsCount(game.m_strWeaponsData) <= (integer(idx) and $00FF) then begin
+      if FZConfigCache.Get().GetDataCopy().antihacker then begin
+        ActiveDefence(ps);
+      end else begin
+        BadEventsProcessor(FZ_SEC_EVENT_ATTACK, SHOP_GROUP+'DoS from player '+PAnsiChar(@ps.name[0]));
+      end;
+      result:=false;
+      break;
+    end;
+  end;
+
+  //Теперь проверяем на валидность закупа
+  i:=items_count_in_vector(@ps.pItemList, sizeof(word))-1;
+  while result and (i >= 0)  do begin
+    pidx:=pWord(get_item_from_vector(@ps.pItemList, i, sizeof(word)));
+    idx:= pidx^;
+
+    if CheckForShopItemBanned(game, idx, PAnsiChar(@ps.name[0])) then begin
+      //Предмет запрещено покупать!
+      cl:=PS_to_client(ps);
+      if cl<>nil then begin
+        SendChatMessageByFreeZone(GetPureServer(), cl.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_banned_item_removed'));
+      end;
+      remove_item_from_vector(@ps.pItemList, i, sizeof(word));
+    end else begin
+      cost:= CouldItemBeBought(PAnsiChar(@ps.name[0]), ps.rank, game, idx, warmup, ps.money_for_round + ps.LastBuyAcount, @ps.pItemList);
+
+      if cost < 0 then begin
+        //Предмет купить нельзя. Разбираемся, что нам делать теперь
+        if FZConfigCache.Get().GetDataCopy().sell_items_for_shophackers then begin
+          //Удаляем этот предмет из списка закупа
+          FZLogMgr.Get.Write('Removing item  with description 0x'+inttohex(idx, 0)+' ('+inttostr(i)+') from buy vector', FZ_LOG_DBG);
+          remove_item_from_vector(@ps.pItemList, i, sizeof(word));
+        end else begin
+          //Отменяем весь закуп
+          result:=false;
+          break;
+        end;
+      end else begin
+        //Покупать можно, докинем стоимость этого предмета к общей стоимости покупок в этот раз
+        if not warmup then begin
+          ps.LastBuyAcount:=ps.LastBuyAcount - cost;
+        end;
+        //сбросим все наши дополнительные флаги у закупаемого предмета для гарантии чистоты
+        pidx^:=idx and (((word(eWeaponAddonScope or eWeaponAddonGrenadeLauncher or eWeaponAddonSilencer)) shl 8) or $FF);
+      end;
+    end;
+    i:=i-1;
+  end;
+
+  if not result then begin
+    //Закупа не будет, очищаем вектор
+    ps.pItemList.last:=ps.pItemList.start;
+    ps.LastBuyAcount:=0;
+  end;
+
+  //Если что-то стоящее купили - сбрасываем бонус за респавн голышом
+  if ps.LastBuyAcount<>0 then begin
+    ps.m_bClearRun:=0;
+  end;
+end;
+
+////////////////////
+//Helper class
+type
+  SSectionAmmoCount = record
+    name:string;
+    count:integer;
+  end;
+
+  { CAmmoSectionContainer }
+
+  CAmmoSectionContainer = class
+    _ammos:array of SSectionAmmoCount;
+  public
+    constructor Create();
+    destructor Destroy(); override;
+    procedure AddAmmoCount(section:string; cnt:integer);
+    function GetAmmoCount(section:string):integer;
+    function GetRefundCost(game:pgame_sv_mp; ps:pgame_PlayerState; client_id:cardinal; itemsDesired:pxr_vector):integer;
+  end;
+
+{ CAmmoSectionContainer }
+
+constructor CAmmoSectionContainer.Create;
+begin
+  setlength(_ammos, 0);
+end;
+
+destructor CAmmoSectionContainer.Destroy;
+begin
+  setlength(_ammos, 0);
+  inherited Destroy;
+end;
+
+procedure CAmmoSectionContainer.AddAmmoCount(section: string; cnt: integer);
+var
+  i:integer;
+  flag:boolean;
+begin
+  flag:=false;
+  for i:=0 to length(_ammos)-1 do begin
+    if _ammos[i].name = section then begin
+      _ammos[i].count := _ammos[i].count + cnt;
+      flag:=true;
+      break;
+    end;
+  end;
+
+  if not flag then begin
+    i:=length(_ammos);
+    setlength(_ammos, i+1);
+    _ammos[i].name:=section;
+    _ammos[i].count:=cnt;
+  end;
+end;
+
+function CAmmoSectionContainer.GetAmmoCount(section: string): integer;
+var
+  i:integer;
+begin
+  result:=0;
+  for i:=0 to length(_ammos)-1 do begin
+    if _ammos[i].name = section then begin
+      result:=_ammos[i].count;
+      break;
+    end;
+  end;
+end;
+
+function CAmmoSectionContainer.GetRefundCost(game: pgame_sv_mp; ps: pgame_PlayerState; client_id: cardinal; itemsDesired: pxr_vector): integer;
+var
+  i, j:integer;
+  idToBuy:smallint;
+  pIdOfDesired:psmallint;
+  box_size:integer;
+  box_cost:integer;
+  box_count:integer;
+begin
+  result:=0;
+  for i:=0 to length(_ammos)-1 do begin
+    box_cost:=CItemMgr__GetItemCost(game.m_strWeaponsData, _ammos[i].name, ps.rank);
+    if box_cost < 0 then continue;
+
+    //Если цена нашлась, то сам предмет обязательно должен уже быть в магазине!
+    idToBuy:=CItemMgr__GetItemIdx(game.m_strWeaponsData, _ammos[i].name);
+    R_ASSERT(idToBuy>0, 'Cannot get item, but refund cost is not 0');
+
+    box_size:=game_ini_read_int_def(_ammos[i].name, 'box_size', 1);
+    box_count:=_ammos[i].count div box_size;
+
+    FZLogMgr.Get.Write(GenerateMessageForClientId(client_id, ' got refund '+inttostr(box_count)+'x'+inttostr(box_cost)+' for "'+_ammos[i].name+'", lost '+inttostr(_ammos[i].count mod box_size)+' cartridges'), FZ_LOG_DBG);
+    result:=result + box_count * box_cost;
+
+    //Пробегаемся по вектору желаемых покупок и отмечаем там перезакупаемые пачки
+    for j:=0 to items_count_in_vector(itemsDesired, sizeof(idToBuy))-1 do begin
+      //Если больше коробок нет, то и ловить тут нечего
+      if box_count = 0 then break;
+
+      pIdOfDesired:=get_item_from_vector(itemsDesired, j, sizeof(idToBuy));
+      if (pIdOfDesired^ and $00FF) = idToBuy then begin
+        //Если пачка с таким ИД нашлась, бит переиспользования в ней должен еще быть неактивен, иначе что-то у нас пошло не так
+        R_ASSERT( (pIdOfDesired^ shr 8) and fzBuyItemRenewing = 0, 'Reusage bit is already set for ammo box' );
+
+        //Взведем бит и пойдем проверять далее
+        pIdOfDesired^:=(smallint(fzBuyItemRenewing) shl 8) or (pIdOfDesired^);
+        box_count:=box_count-1;
+
+        FZLogMgr.Get().Write('Player '+PAnsiChar(@ps.name[0])+' re-buys ammo '+_ammos[i].name+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
+      end;
+    end;
+  end;
+end;
+
+////////////////////
+
+procedure BeforeDestroyingSoldItem(itm:pCInventoryItem; game:pgame_sv_mp; warmup:boolean; ps:pgame_PlayerState; itemsDesired:pxr_vector); stdcall;
+var
+  sect:PAnsiChar;
+  i:integer;
+  idToBuy:smallint;
+  pIdOfDesired:psmallint;
+  addons_mask, old_addons:smallint;
+  pwpn:pCWeapon;
+  cost:integer;
+begin
+  //В разминке деньги не возвращаем
+  if warmup then exit;
+
+  cost:=0;
+
+  old_addons:=0;
+  pwpn:=dynamic_cast(itm, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CWeapon, false);
+  if pwpn<>nil then begin
+    //На оружии могут быть аддоны
+    old_addons:=pwpn.m_flagsAddOnState;
+  end;
+
+  //Посмотрим на секцию удаляемого предмета и получим ее ИДшник в магазине
+  sect:=get_string_value(@itm.m_section_id);
+  idToBuy:=CItemMgr__GetItemIdx(game.m_strWeaponsData, sect);
+  if idToBuy<0 then begin
+    FZLogMgr.Get.Write('Item "'+sect+' is not registered in the shop, cannot return money to player; avoid false-positives!', FZ_LOG_IMPORTANT_INFO);
+    exit;
+  end;
+
+  //пробежимся по предметам, которые будут приобретаться, попробуем найти предмет с таким ID и невзведенным битом переиспользования
+  for i:=0 to items_count_in_vector(itemsDesired, sizeof(idToBuy))-1 do begin
+    pIdOfDesired:=get_item_from_vector(itemsDesired, i, sizeof(idToBuy));
+    //Если предмет с таким ИД нашелся и бит переиспользования неактивен - выставим этот бит и, если это оружие, выставим старую конфигурацию аддонов
+    if ((pIdOfDesired^ and $00FF) = idToBuy) and (((pIdOfDesired^ shr 8) and fzBuyItemRenewing) = 0) then begin
+      addons_mask:=fzBuyItemRenewing or ((pIdOfDesired^ and $FF00) shr 8);
+      if (old_addons and eWeaponAddonScope) <> 0 then addons_mask:=addons_mask or fzBuyItemOldScopeStateBit;
+      if (old_addons and eWeaponAddonGrenadeLauncher) <> 0 then addons_mask:=addons_mask or fzBuyItemOldGlStateBit;
+      if (old_addons and eWeaponAddonSilencer) <> 0 then addons_mask:=addons_mask or fzBuyItemOldSilencerStateBit;
+      pIdOfDesired^:= (addons_mask shl 8) or idToBuy;
+
+      FZLogMgr.Get().Write('Player '+PAnsiChar(@ps.name[0])+' re-buys (upgrades) '+sect+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
+      break;
+    end;
+  end;
+
+  //Посчитаем стоимость удаляемого и вернем сумму игроку
+  cost:=cost+GetItemCostForRank('', ps.rank, game.m_strWeaponsData, sect, old_addons, true, true);
+  FZLogMgr.Get().Write('Return '+inttostr(cost)+' credits to player '+PAnsiChar(@ps.name[0])+' for item '+sect+', full mask 0x'+inttohex(word(idToBuy), 4), FZ_LOG_DBG);
+  if cost > 0 then begin
+    ps.m_bClearRun:=0;
+    game_PlayerAddMoney(game, ps, cost);
+  end;
+end;
+
+function BeforeSpawnBoughtItems_DM(ps:pgame_PlayerState; game:pgame_sv_Deathmatch):boolean; stdcall;
+begin
+  FZLogMgr.Get.Write('BeforeSpawnBoughtItems_DM: ps='+inttohex(uintptr(ps), 8)+', game='+inttohex(uintptr(game), 8), FZ_LOG_DBG);
+  result:=BeforeSpawnBoughtItems(ps, @game.base_game_sv_mp, game.m_bInWarmUp<>0);
+end;
+
+function BeforeSpawnBoughtItems_CTA(ps:pgame_PlayerState; game:pgame_sv_CaptureTheArtefact):boolean; stdcall;
+begin
+  FZLogMgr.Get.Write('BeforeSpawnBoughtItems_CTA: ps='+inttohex(uintptr(ps), 8)+', game='+inttohex(uintptr(game), 8), FZ_LOG_DBG);
+  result:=BeforeSpawnBoughtItems(ps, @game.base_game_sv_mp, game.m_bInWarmUp<>0);
+end;
+
+procedure DestroyAllItemsFromPlayersInventoryDeforeBuying(game:pgame_sv_mp; client_id:cardinal); stdcall;
+var
+  obj:pCObject;
+  owner:pCInventoryOwner;
+  cl:pxrClientData;
+  itm:ppCInventoryItem;
+  i:integer;
+  gameid:cardinal;
+  packet:NET_Packet;
+  warmup:boolean;
+  game_dm:pgame_sv_Deathmatch;
+  game_cta:pgame_sv_CaptureTheArtefact;
+
+  wpnMag:pCWeaponMagazined;
+  wpnMagGl:pCWeaponMagazinedWGrenade;
+  sect, ammosect:string;
+  pammosect:pshared_str;
+  ammos:CAmmoSectionContainer;
+  ammobox:pCWeaponAmmo;
+  total_cost:integer;
+begin
+  warmup:=false;
+  game_cta:=nil;
+  total_cost:=0;
+
+  game_dm:=dynamic_cast(game, 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_Deathmatch, false);
+  if game_dm = nil then begin
+    game_cta:=dynamic_cast(game, 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_CaptureTheArtefact, false);
+    if game_cta<>nil then begin
+      warmup:=game_cta.m_bInWarmUp<>0;
+    end;
+  end else begin
+    warmup:=game_dm.m_bInWarmUp<>0;
+  end;
+
+  cl:=ID_to_client(client_id);
+  if (cl = nil) or (cl.ps = nil) then exit;
+
+  obj:=ObjectById(@GetLevel.base_IGame_Level, cl.ps.GameID);
+  if obj = nil then exit;
+
+  owner:=dynamic_cast(obj, 0, xrGame+RTTI_CObject, xrGame+RTTI_CInventoryOwner, false);
+  if (owner=nil) or (owner.m_inventory=nil) then exit;
+
+  FZLogMgr.Get.Write('DestroyAllItemsFromPlayersInventoryDeforeBuying: game='+inttohex(uintptr(game), 8)+', clid='+inttostr(client_id)+', owner='+inttohex(uintptr(obj), 8), FZ_LOG_DBG);
+
+
+  //НАЧИНАЯ С ЭТОЙ ТОЧКИ ПРОСТО ИСПОЛЬЗОВАТЬ exit НЕЛЬЗЯ - НАДО ТАКЖЕ УДАЛЯТЬ ammos!
+  //Сначала пробежимся по предметам, не удаляя их, с целью подсчета имеющихся боеприпасов
+  ammos:=CAmmoSectionContainer.Create();
+  for i:=0 to items_count_in_vector(@owner.m_inventory.m_all, sizeof(pCInventoryItem))-1 do begin
+    itm:=get_item_from_vector(@owner.m_inventory.m_all, i, sizeof(pCInventoryItem));
+    if itm^=nil then continue;
+    sect:=get_string_value(@itm^.m_section_id);
+
+    ammobox:= dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CWeaponAmmo, false);
+    if ammobox<>nil then begin
+      if ammobox.m_boxCurr <= ammobox.m_boxSize then begin
+        FZLogMgr.Get.Write(GenerateMessageForClientId(client_id, ' has box of "'+sect+'" (max size is '+inttostr(ammobox.m_boxSize)+', current size is '+inttostr(ammobox.m_boxCurr)+')' ), FZ_LOG_DBG);
+        ammos.AddAmmoCount(sect, ammobox.m_boxCurr);
+      end else begin
+        FZLogMgr.Get.Write(GenerateMessageForClientId(client_id, ' has strange box of "'+sect+'" (max size is '+inttostr(ammobox.m_boxSize)+', current size is '+inttostr(ammobox.m_boxCurr)+')'), FZ_LOG_ERROR);
+        ammos.AddAmmoCount(sect, ammobox.m_boxSize);
+      end;
+    end else begin
+      wpnMag := dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CWeaponMagazined, false);
+      if (wpnMag <> nil) and (wpnMag.base_CWeapon.iAmmoElapsed <> 0) then begin
+        pammosect:= get_item_from_vector(@wpnMag.base_CWeapon.m_ammoTypes, wpnMag.base_CWeapon.m_ammoType, sizeof(shared_str));
+        ammosect:=get_string_value(pammosect);
+        FZLogMgr.Get.Write(GenerateMessageForClientId(client_id, ' has '+inttostr(wpnMag.base_CWeapon.iAmmoElapsed)+' ammos of type "'+ammosect+'" in the weapon "'+sect+'"'), FZ_LOG_DBG);
+        ammos.AddAmmoCount(ammosect, wpnMag.base_CWeapon.iAmmoElapsed);
+      end;
+
+      wpnMagGl := dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CWeaponMagazinedWGrenade, false);
+      if (wpnMagGl <> nil) and (wpnMagGl.iAmmoElapsed2 <> 0) then begin
+        pammosect:= get_item_from_vector(@wpnMagGl.m_ammoTypes2, wpnMagGl.m_ammoType2, sizeof(shared_str));
+        ammosect:=get_string_value(pammosect);
+        FZLogMgr.Get.Write(GenerateMessageForClientId(client_id, ' has '+inttostr(wpnMagGl.iAmmoElapsed2)+' ammos of type "'+ammosect+'" in the weapon "'+sect+'"'), FZ_LOG_DBG);
+        ammos.AddAmmoCount(ammosect, wpnMagGl.iAmmoElapsed2);
+      end;
+    end;
+  end;
+
+  for i:=0 to items_count_in_vector(@owner.m_inventory.m_all, sizeof(pCInventoryItem))-1 do begin
+    itm:=get_item_from_vector(@owner.m_inventory.m_all, i, sizeof(pCInventoryItem));
+    if itm^=nil then continue;
+
+    if dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CMPPlayersBag, false) <> nil then continue;
+    if dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CArtefact, false) <> nil then continue;
+
+    //в CTA также нельзя удалять и ножи (они не приходят в векторе на перезакуп, так сделано почему-то в оригинале)
+    if (game_cta<>nil) and (dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CWeaponKnife, false) <> nil) then continue;
+
+    if itm^.m_object = nil then continue;
+
+    gameid:=itm^.m_object.base_CGameObject.base_CObject.Props.net_ID;
+    sect:=get_string_value(@itm^.m_section_id);
+
+    //Возврат денег за пачки патронов обрабатывается далее отдельно
+    if dynamic_cast(itm^, 0, xrGame+RTTI_CInventoryItem, xrGame+RTTI_CWeaponAmmo, false) = nil then begin
+      BeforeDestroyingSoldItem(itm^, game, warmup, cl.ps, @cl.ps.pItemList);
+    end;
+
+    MakeDestroyGameItemPacket(@packet, gameid, GetDevice().dwTimeGlobal - NET_Latency - NET_Latency);
+    IPureClient_Send(@GetLevel.base_IPureClient, @packet, DPNSEND_GUARANTEED);
+  end;
+
+  //Теперь смотрим, какие боеприпасы остались непроданными, и считаем стоимость
+  total_cost:=total_cost+ammos.GetRefundCost(game, cl.ps, client_id, @cl.ps.pItemList);
+
+  if total_cost > 0 then begin
+    cl.ps.m_bClearRun:=0;
+    game_PlayerAddMoney(game, cl.ps, total_cost);
+  end;
+
+  ammos.Free();
+end;
+
+function CanPlayerBuyNow(cl:pxrClientData):boolean;stdcall;
+begin
+ result:=false;
+ if (cl=nil) or (cl.ps=nil) then exit;
+ FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'send buy request, flags='+inttostr(cl.ps.flags__)), FZ_LOG_DBG);
+ result:=(cl.ps.flags__ and (GAME_PLAYER_FLAG_ONBASE or GAME_PLAYER_FLAG_VERY_VERY_DEAD)<>0);
+ if not result then begin
+   FZLogMgr.Get.Write('Buy attempt of "'+PAnsiChar(@cl.ps.name[0])+'" cancelled', FZ_LOG_INFO);
+ end;
+end;
+
+function IsSpawnFreeAmmoAllowedForGametype(game:pgame_sv_mp):boolean; stdcall;
+begin
+  result:=false;
+
+  //В артханте и CTA спавнить патроны бесплатно нельзя - они ограничены и вполне продаваемы
+  if dynamic_cast(game, 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_ArtefactHunt, false) <> nil then exit;
+  if dynamic_cast(game, 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_CaptureTheArtefact, false) <> nil then exit;
+
+  result:=true;
+end;
+
+function IsWeaponKnife(item: pCSE_Abstract): boolean; stdcall;
+begin
+  result:=item.m_tClassID = GetClassId('W_KNIFE');
+end;
+
+function GetNameAndIpByClientId(id:cardinal; var ip:string):string;
+var
+  cld:pxrClientData;
+begin
+  ip:='0.0.0.0';
+  result:='(null)';
+
+  cld:=ID_to_client(id);
+  if (cld=nil) then exit;
+
+  ip:=ip_address_to_str(cld.base_IClient.m_cAddress);
+
+  if (cld.ps <> nil) then begin
+    result:=PAnsiChar(@cld.ps.name[0]);
+  end;
+
+  if length(result) = 0 then begin
+    result:=get_string_value(@cld.base_IClient.name);
+  end;
+end;
+
+function GenerateMessageForClientId(id:cardinal; message: string):string;
+var
+  name, ip:string;
+begin
+  ip:='';
+  name:=GetNameAndIpByClientId(id, ip);
+  result:='Player "'+name+'" (ID='+inttostr(id)+', IP='+ip+') '+message;
 end;
 
 end.

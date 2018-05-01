@@ -34,6 +34,7 @@ pCMapListHelper=^CMapListHelper;
 function Init():boolean; stdcall;
 function GetMapList():pCMapListHelper; stdcall;
 procedure LoadMapList(); stdcall;
+function IsMapPresent(mapname:string; mapver:string; gametype_id:cardinal):boolean; stdcall;
 
 implementation
 uses basedefs, srcCalls;
@@ -49,6 +50,38 @@ end;
 procedure LoadMapList(); stdcall;
 begin
   CMapListHelper__Load.Call([]);
+end;
+
+function IsMapPresent(mapname:string; mapver:string; gametype_id:cardinal):boolean; stdcall;
+var
+  i:integer;
+  helper:pCMapListHelper;
+  gtMaps:pSGameTypeMaps;
+  pMapItm:pSGameTypeMaps_SMapItm;
+begin
+  result:=false;
+
+  helper:=GetMapList();
+  if helper.m_storage.start = nil then begin
+    LoadMapList();
+  end;
+
+  gtMaps:=nil;
+  for i:=0 to items_count_in_vector(@helper.m_storage, sizeof(SGameTypeMaps))-1 do begin
+    gtMaps:=get_item_from_vector(@helper.m_storage, i, sizeof(SGameTypeMaps));
+    if gtMaps.m_game_type_id = gametype_id then break;
+    gtMaps:=nil;
+  end;
+
+  if gtMaps<>nil then begin
+    for i:=0 to items_count_in_vector(@gtMaps.m_map_names, sizeof(SGameTypeMaps_SMapItm))-1 do begin
+      pMapItm:=get_item_from_vector(@gtMaps.m_map_names, i, sizeof(SGameTypeMaps_SMapItm));
+      if (get_string_value(@pMapItm.map_name)=mapname) and (get_string_value(@pMapItm.map_ver)=mapver) then begin
+        result:=true;
+        break;
+      end;
+    end;
+  end;
 end;
 
 function Init():boolean; stdcall;

@@ -4,6 +4,7 @@ del *.dcu
 del *.dll
 del *.dbg
 del *.exe
+del *.lps
 
 del highlevel\*.~pas
 del highlevel\*.bak

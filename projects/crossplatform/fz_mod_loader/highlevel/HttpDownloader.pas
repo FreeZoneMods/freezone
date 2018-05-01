@@ -27,6 +27,7 @@ type
     function DownloadedBytes():cardinal;
     function IsSuccessful():boolean;
     function RequestStop():boolean;
+    procedure Flush(); virtual; abstract;
   private
     _lock:TRTLCriticalSection;
     _request:uintptr;
@@ -55,6 +56,7 @@ type
     public
       constructor Create(url: string; filename: string; compression_type: cardinal; thread:FZDownloaderThread);
       function IsDownloading():boolean; override;
+      procedure Flush(); override;
   end;
 
   { FZCurlFileDownloader }
@@ -65,6 +67,7 @@ type
       constructor Create(url: string; filename: string; compression_type: cardinal; thread:FZDownloaderThread);
       function IsDownloading():boolean; override;
       destructor Destroy; override;
+      procedure Flush(); override;
   end;
 
 
@@ -102,7 +105,7 @@ type
       function CreateDownloader(url:string; filename:string; compression_type:cardinal ):FZFileDownloader; virtual; abstract;
 
       function StartDownload(dl:FZFileDownloader): boolean; virtual; abstract;
-      procedure ProcessDownloads(); virtual; abstract;
+      function ProcessDownloads():boolean; virtual; abstract;
       function CancelDownload(dl:FZFileDownloader): boolean; virtual; abstract;
       destructor Destroy; override;
     private
@@ -135,7 +138,7 @@ type
       destructor Destroy; override;
       function CreateDownloader(url:string; filename:string; compression_type:cardinal ):FZFileDownloader; override;
       function StartDownload(dl:FZFileDownloader): boolean; override;
-      procedure ProcessDownloads(); override;
+      function ProcessDownloads(): boolean; override;
       function CancelDownload(dl:FZFileDownloader): boolean; override;
   end;
 
@@ -148,16 +151,13 @@ type
     destructor Destroy; override;
     function CreateDownloader(url:string; filename:string; compression_type:cardinal ):FZFileDownloader; override;
     function StartDownload(dl:FZFileDownloader): boolean; override;
-    procedure ProcessDownloads(); override;
+    function ProcessDownloads(): boolean; override;
     function CancelDownload(dl:FZFileDownloader): boolean; override;
   end;
 
 implementation
 uses
-{$IFNDEF TESTS}
-  global_functions,
-{$ENDIF}
-  windows, LogMgr, sysutils, Decompressor;
+  abstractions, windows, LogMgr, sysutils, Decompressor;
 
 const
   GHTTPSuccess:cardinal=0;
@@ -170,48 +170,39 @@ const
 
 { Thread functions & Callbacks }
 procedure CreateThreadedFun(proc:pointer; param:pointer);
-{$IFDEF TESTS}
-var
-  id:cardinal;
-  hndl:THandle;
-{$ENDIF}
 begin
-{$IFNDEF TESTS}
-  fz_thread_spawn(proc, param);
-{$ELSE}
-  id:=0;
-  hndl:=CreateThread(nil, 0, proc,param,0,id);
-  assert(hndl<>0, 'Cannot create thread');
-{$ENDIF}
+  VersionAbstraction().ThreadSpawn(uintptr(proc), uintptr(param));
 end;
 
 procedure DownloaderThreadBody(th:FZDownloaderThread); stdcall;
 var
   need_stop:boolean;
   i,last:integer;
+  immediate_call:boolean;
 begin
-  FZLogMgr.Get.Write(TH_LBL+'DL thread started', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(TH_LBL+'DL thread started', FZ_LOG_INFO);
   need_stop:=false;
   while (not need_stop) do begin
     th._ProcessCommands();
+    immediate_call:=false;
 
     windows.EnterCriticalSection(th._lock);
     try
       for i:=length(th._downloaders)-1 downto 0 do begin
         if not th._downloaders[i].IsDownloading() then begin
-          FZLogMgr.Get.Write(TH_LBL+'Removing from active list DL '+th._downloaders[i].GetFilename(), FZ_LOG_DBG);
+          FZLogMgr.Get.Write(TH_LBL+'Removing from active list DL '+th._downloaders[i].GetFilename(), FZ_LOG_INFO);
           th._downloaders[i].Release();
           last:=length(th._downloaders)-1;
           if i<last then begin
             th._downloaders[i]:=th._downloaders[last];
           end;
           setlength(th._downloaders, last);
-          FZLogMgr.Get.Write(TH_LBL+'Active downloaders count '+inttostr(length(th._downloaders)), FZ_LOG_DBG);
+          FZLogMgr.Get.Write(TH_LBL+'Active downloaders count '+inttostr(length(th._downloaders)), FZ_LOG_INFO);
         end;
       end;
 
       if length(th._downloaders)>0 then begin
-        th.ProcessDownloads();
+        immediate_call:=th.ProcessDownloads();
       end;
 
       need_stop:=th._need_terminate and (length(th._downloaders)=0);
@@ -219,9 +210,11 @@ begin
       windows.LeaveCriticalSection(th._lock);
     end;
 
-    Sleep(10);
+    if not immediate_call then begin
+      Sleep(1);
+    end;
   end;
-  FZLogMgr.Get.Write(TH_LBL+'DL thread finished', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(TH_LBL+'DL thread finished', FZ_LOG_INFO);
   th._thread_active:=false;
 end;
 
@@ -237,7 +230,7 @@ procedure UnpackerThreadBody(downloader:FZFileDownloader); stdcall;
 var
   size:cardinal;
 begin
-  FZLogMgr.Get.Write(CB_LBL+'Unpacker thread started', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(CB_LBL+'Unpacker thread started', FZ_LOG_INFO);
   if (downloader.GetCompressionType()<>0) then begin
     size:=DecompressFile(downloader.GetFilename(), downloader.GetCompressionType());
     if size=0 then begin
@@ -248,7 +241,7 @@ begin
     end;
   end;
   downloader.Release();
-  FZLogMgr.Get.Write(CB_LBL+'Unpacker thread finished', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(CB_LBL+'Unpacker thread finished', FZ_LOG_INFO);
 end;
 
 procedure UnpackerThreadBodyWrapper(); cdecl;
@@ -270,7 +263,7 @@ end;
 procedure OnDownloadFinished(downloader:FZFileDownloader; dlresult:FZDownloadResult);
 begin
   downloader.Lock();
-  FZLogMgr.Get.Write(CB_LBL+'Download finished for '+downloader.GetFileName()+' with result '+inttostr(cardinal(dlresult)), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(CB_LBL+'Download finished for '+downloader.GetFileName()+' with result '+inttostr(cardinal(dlresult)), FZ_LOG_INFO);
   downloader.SetStatus(dlresult);
   if (dlresult=DOWNLOAD_SUCCESS) and (downloader.GetCompressionType()<>0) then begin
     downloader.Acquire();
@@ -343,14 +336,16 @@ begin
     end else if _FindDownloader(dl)<0 then begin
       fname:=PAnsiChar(dl.GetFilename());
 
-      FZLogMgr.Get.Write(TH_LBL+'Opening file '+fname, FZ_LOG_DBG);
-      FZCurlFileDownloader(dl)._file_hndl:=CreateFile(fname, GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+      FZLogMgr.Get.Write(TH_LBL+'Opening file '+fname, FZ_LOG_INFO);
+
+      FZCurlFileDownloader(dl)._file_hndl:=CreateFile(fname, GENERIC_WRITE, FILE_SHARE_READ, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL or FILE_FLAG_SEQUENTIAL_SCAN, 0);
       if FZCurlFileDownloader(dl)._file_hndl = INVALID_HANDLE_VALUE then begin
         FZLogMgr.Get.Write(TH_LBL+'File creation failed for '+dl.GetFilename(), FZ_LOG_ERROR);
         exit;
       end;
+      FZLogMgr.Get.Write(TH_LBL+'File '+fname+' opened, handle is '+inttostr(FZCurlFileDownloader(dl)._file_hndl), FZ_LOG_INFO);
 
-      FZLogMgr.Get.Write(TH_LBL+'Setting up DL handle', FZ_LOG_DBG);
+      FZLogMgr.Get.Write(TH_LBL+'Setting up DL handle', FZ_LOG_INFO);
       purl:=curl_easy_init();
       if purl = nil then begin
         FZLogMgr.Get.Write(TH_LBL+'Failed to create dl handle!', FZ_LOG_ERROR );
@@ -369,7 +364,7 @@ begin
       curl_easy_setopt(purl, CURLOPT_XFERINFOFUNCTION, uintptr(@CurlProgressCb));
       dl.SetRequestId(uintptr(purl));
       curl_multi_add_handle(_multi_handle, purl);
-      FZLogMgr.Get.Write(TH_LBL+'Download started for dl '+inttostr(cardinal(dl))+', handle '+inttostr(cardinal(purl)), FZ_LOG_DBG);
+      FZLogMgr.Get.Write(TH_LBL+'Download started for dl '+inttostr(cardinal(dl))+', handle '+inttostr(cardinal(purl)), FZ_LOG_INFO);
 
       dl_i:=length(_downloaders);
       setlength(_downloaders, dl_i+1);
@@ -381,13 +376,16 @@ begin
   end;
 end;
 
-procedure FZCurlDownloaderThread.ProcessDownloads;
+function FZCurlDownloaderThread.ProcessDownloads():boolean;
 var
   cnt, inprogress, i:integer;
   msg:pCURLMsg;
   dl:FZFileDownloader;
+
+  dl_result:CURLcode;
+  dl_handle:pTCURL;
 begin
-  curl_multi_perform(_multi_handle, @inprogress);
+  result:=curl_multi_perform(_multi_handle, @inprogress) = CURLM_CALL_MULTI_PERFORM;
 
   repeat
     msg :=curl_multi_info_read(_multi_handle, @cnt);
@@ -400,23 +398,31 @@ begin
             break;
           end;
         end;
+
+        //Скопируем статус закачки и хендл (после закрытия хендла доступ к ним пропадет)
+        dl_result:=msg.data.result;
+        dl_handle:=msg.easy_handle;
+
+        //Оптимизация - закрываем соединение, дабы оно не "висело" во время распаковки
+        curl_multi_remove_handle(_multi_handle, msg.easy_handle);
+        curl_easy_cleanup(msg.easy_handle);
+
         if dl<>nil then begin
           if (FZCurlFileDownloader(dl)<>nil) and (INVALID_HANDLE_VALUE<>FZCurlFileDownloader(dl)._file_hndl) then begin
+            FZLogMgr.Get.Write(TH_LBL+'Close file handle '+inttostr(FZCurlFileDownloader(dl)._file_hndl), FZ_LOG_INFO);
             CloseHandle(FZCurlFileDownloader(dl)._file_hndl);
+            FZCurlFileDownloader(dl)._file_hndl:=INVALID_HANDLE_VALUE;
           end;
-          if msg.data.result = CURLE_OK then begin
+          if dl_result = CURLE_OK then begin
             OnDownloadFinished(dl, DOWNLOAD_SUCCESS);
           end else begin
-            FZLogMgr.Get.Write(TH_LBL+'Curl Download Error  ('+inttostr(msg.data.result)+')', FZ_LOG_ERROR);
+            FZLogMgr.Get.Write(TH_LBL+'Curl Download Error  ('+inttostr(dl_result)+')', FZ_LOG_ERROR);
             OnDownloadFinished(dl, DOWNLOAD_ERROR);
           end;
           dl.SetRequestId(0);
         end else begin
-          FZLogMgr.Get.Write(TH_LBL+'Downloader not found for handle '+inttostr(uintptr(msg.easy_handle)), FZ_LOG_ERROR);
+          FZLogMgr.Get.Write(TH_LBL+'Downloader not found for handle '+inttostr(uintptr(dl_handle)), FZ_LOG_ERROR);
         end;
-
-        curl_multi_remove_handle(_multi_handle, msg.easy_handle);
-        curl_easy_cleanup(msg.easy_handle);
       end;
     end;
   until cnt = 0 ;
@@ -435,9 +441,10 @@ begin
       dl.Lock();
       purl:=pointer(dl.GetRequestId());
       if purl<>nil then begin
-        FZLogMgr.Get.Write(TH_LBL+'Cancelling request '+inttostr(uintptr(purl)), FZ_LOG_DBG);
+        FZLogMgr.Get.Write(TH_LBL+'Cancelling request '+inttostr(uintptr(purl)), FZ_LOG_INFO);
         if (FZCurlFileDownloader(dl)<>nil) and (INVALID_HANDLE_VALUE<>FZCurlFileDownloader(dl)._file_hndl) then begin
           CloseHandle(FZCurlFileDownloader(dl)._file_hndl);
+          FZCurlFileDownloader(dl)._file_hndl:=INVALID_HANDLE_VALUE;
         end;
         OnDownloadFinished(dl, DOWNLOAD_ERROR);
         code:=curl_multi_remove_handle(_multi_handle, purl);
@@ -453,7 +460,7 @@ begin
       dl.Unlock();
     end;
   end else begin
-    FZLogMgr.Get.Write(TH_LBL+'Downloader not found', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(TH_LBL+'Downloader not found', FZ_LOG_INFO);
   end;
 end;
 
@@ -479,6 +486,16 @@ begin
   inherited Destroy;
 end;
 
+procedure FZCurlFileDownloader.Flush;
+begin
+  Lock();
+  if _file_hndl<>INVALID_HANDLE_VALUE then begin
+    FZLogMgr.Get.Write(DL_LBL+'Flushing file '+_filename+' ('+inttostr(_file_hndl)+')', FZ_LOG_INFO);
+    FlushFileBuffers(_file_hndl);
+  end;
+  Unlock();
+end;
+
 { FZGameSpyFileDownloader }
 
 constructor FZGameSpyFileDownloader.Create(url: string; filename: string;
@@ -493,6 +510,11 @@ begin
   Lock();
   result:=(_request<>GHTTPRequestError);
   Unlock();
+end;
+
+procedure FZGameSpyFileDownloader.Flush;
+begin
+  FZLogMgr.Get.Write(DL_LBL+'Flush request for '+_filename, FZ_LOG_INFO);
 end;
 
 { FZGameSpyDownloaderThread }
@@ -519,7 +541,7 @@ end;
 
 destructor FZGameSpyDownloaderThread.Destroy;
 begin
-  FZLogMgr.Get.Write(TH_LBL+'Destroying GS downloader thread', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(TH_LBL+'Destroying GS downloader thread', FZ_LOG_INFO);
 
   windows.EnterCriticalSection(_lock);
   _need_terminate:=true;
@@ -527,7 +549,7 @@ begin
 
   _WaitForThreadTermination();
   if _good then begin
-    FZLogMgr.Get.Write(TH_LBL+'Turn off GS service', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(TH_LBL+'Turn off GS service', FZ_LOG_INFO);
     _xrGS_ghttpCleanup();
   end;
   FreeLibrary(_dll_handle);
@@ -555,7 +577,7 @@ var
 begin
   downloader:=param;
   if requestResult = GHTTPSuccess then begin
-    FZLogMgr.Get.Write(CB_LBL+'OnGamespyDownloadFinished ('+inttostr(requestResult)+')', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(CB_LBL+'OnGamespyDownloadFinished ('+inttostr(requestResult)+')', FZ_LOG_INFO);
   end else begin
     FZLogMgr.Get.Write(CB_LBL+'OnGamespyDownloadFinished ('+inttostr(requestResult)+')', FZ_LOG_ERROR);
   end;
@@ -599,13 +621,13 @@ begin
                                  PAnsiChar(dl.GetFilename()),
                                  nil, nil,0, 0, progresscb, finishcb, dl);
       if request<>GHTTPRequestError then begin
-        FZLogMgr.Get.Write(TH_LBL+'Download started, request '+inttostr(request), FZ_LOG_DBG);
+        FZLogMgr.Get.Write(TH_LBL+'Download started, request '+inttostr(request), FZ_LOG_INFO);
         dl_i:=length(_downloaders);
         setlength(_downloaders, dl_i+1);
         _downloaders[dl_i]:=dl;
         result:=true;
       end else begin
-        FZLogMgr.Get.Write(TH_LBL+'Failed to start download', FZ_LOG_DBG);
+        FZLogMgr.Get.Write(TH_LBL+'Failed to start download', FZ_LOG_INFO);
       end;
 
       dl.SetRequestId(request);
@@ -615,9 +637,10 @@ begin
   end;
 end;
 
-procedure FZGameSpyDownloaderThread.ProcessDownloads;
+function FZGameSpyDownloaderThread.ProcessDownloads:boolean;
 begin
   _xrGS_ghttpThink();
+  result:=false; //Don't call immediately
 end;
 
 function FZGameSpyDownloaderThread.CancelDownload(dl: FZFileDownloader): boolean;
@@ -635,7 +658,7 @@ begin
     //Анлок необходим тут, так как во время работы функции отмены реквеста может начать работу колбэк прогресса (из потока мейнменю) и зависнуть на получении мьютекса - дедлок
     dl.Unlock();
     if request<>GHTTPRequestError then begin
-      FZLogMgr.Get.Write(TH_LBL+'Cancelling request '+inttostr(request), FZ_LOG_DBG);
+      FZLogMgr.Get.Write(TH_LBL+'Cancelling request '+inttostr(request), FZ_LOG_INFO);
       _xrGS_ghttpCancelRequest(request);
       //Автоматически не вызывается при отмене - приходится вручную
       OnGamespyDownloadFinished(GHTTPRequestError, GHTTPRequestError, nil, 0, 0, dl);
@@ -643,7 +666,7 @@ begin
     dl.Release();
     result:=true;
   end else begin
-    FZLogMgr.Get.Write(TH_LBL+'Downloader not found', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(TH_LBL+'Downloader not found', FZ_LOG_INFO);
   end;
 end;
 
@@ -669,7 +692,7 @@ begin
   result:=true;
   item.downloader.Acquire();
   item.downloader.Lock();
-  FZLogMgr.Get.Write(QUEUE_LBL+'Put command '+inttostr(cardinal(item.cmd))+' into DL queue for '+item.downloader.GetFilename(), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(QUEUE_LBL+'Put command '+inttostr(cardinal(item.cmd))+' into DL queue for '+item.downloader.GetFilename(), FZ_LOG_INFO);
   cap:=Capacity();
   i:=Count();
   if (i+1>=cap) then begin
@@ -677,7 +700,7 @@ begin
   end;
   _queue[i]:=item;
   _cur_items_cnt:=_cur_items_cnt+1;
-  FZLogMgr.Get.Write(QUEUE_LBL+'Command in queue, count='+inttostr(_cur_items_cnt)+', capacity='+inttostr(length(_queue)));
+  FZLogMgr.Get.Write(QUEUE_LBL+'Command in queue, count='+inttostr(_cur_items_cnt)+', capacity='+inttostr(length(_queue)), FZ_LOG_INFO);
   item.downloader.Unlock();
 end;
 
@@ -686,7 +709,7 @@ var
   i, cnt:integer;
 begin
   cnt:=Count();
-  FZLogMgr.Get.Write(QUEUE_LBL+'Flush commands');
+  FZLogMgr.Get.Write(QUEUE_LBL+'Flush commands', FZ_LOG_INFO);
   if cnt > 0 then begin
     for i:=0 to cnt-1 do begin
       _queue[i].downloader.Release();
@@ -724,17 +747,17 @@ begin
   _status:=DOWNLOAD_SUCCESS;
   _acquires_count:=0;
   _thread:=thread;
-  FZLogMgr.Get.Write(DL_LBL+'Created downloader for '+_filename+', compression '+inttostr(_compression_type), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Created downloader for '+_filename+' from '+url+', compression '+inttostr(_compression_type), FZ_LOG_INFO);
 end;
 
 destructor FZFileDownloader.Destroy;
 begin
-  FZLogMgr.Get.Write(DL_LBL+'Wait for DL finished for '+_filename, FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Wait for DL finished for '+_filename, FZ_LOG_INFO);
   while IsBusy() do begin
     sleep(100);
   end;
 
-  FZLogMgr.Get.Write(DL_LBL+'Destroying downloader for '+_filename, FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Destroying downloader for '+_filename, FZ_LOG_INFO);
   windows.DeleteCriticalSection(_lock);
   inherited Destroy;
 end;
@@ -774,12 +797,12 @@ begin
   result:=false;
   Lock();
   if IsBusy() then begin
-    FZLogMgr.Get.Write(DL_LBL+'Downloader is busy - cannot start async DL of '+_filename, FZ_LOG_DBG);
+    FZLogMgr.Get.Write(DL_LBL+'Downloader is busy - cannot start async DL of '+_filename, FZ_LOG_INFO);
     Unlock();
     exit;
   end;
 
-  FZLogMgr.Get.Write(DL_LBL+'Start async DL of '+_filename, FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Start async DL of '+_filename, FZ_LOG_INFO);
   Acquire(); //вызов показывает, что даунлоадер приписан к треду, тред зарелизит его перед удалением из списка
   try
     info.downloader:=self;
@@ -793,10 +816,10 @@ end;
 
 function FZFileDownloader.StartSyncDownload: boolean;
 begin
-  FZLogMgr.Get.Write(DL_LBL+'Start sync DL of '+_filename, FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Start sync DL of '+_filename, FZ_LOG_INFO);
   result:=StartAsyncDownload();
   if result then begin
-    FZLogMgr.Get.Write(DL_LBL+'Waiting for DL finished '+_filename, FZ_LOG_DBG);
+    FZLogMgr.Get.Write(DL_LBL+'Waiting for DL finished '+_filename, FZ_LOG_INFO);
     while(IsBusy()) do begin
       Sleep(100);
     end;
@@ -824,7 +847,7 @@ var
 begin
   result:=true;
   Lock();
-  FZLogMgr.Get.Write(DL_LBL+'RequestStop for downloader '+GetFilename()+', request='+inttostr(self._request));
+  FZLogMgr.Get.Write(DL_LBL+'RequestStop for downloader '+GetFilename()+', request='+inttostr(self._request), FZ_LOG_INFO);
   Acquire(); //To avoid removing before command is sent
   info.downloader:=self;
   info.cmd:=FZDownloaderStop;
@@ -836,7 +859,7 @@ end;
 procedure FZFileDownloader.SetRequestId(id: uintptr);
 begin
   Lock();
-  FZLogMgr.Get.Write(DL_LBL+'Set request id='+inttostr(id)+' for '+GetFileName(), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Set request id='+inttostr(id)+' for '+GetFileName(), FZ_LOG_INFO);
   _request:=id;
   Unlock();
 end;
@@ -853,7 +876,7 @@ var
   i:cardinal;
 begin
   i:=InterlockedIncrement(_acquires_count);
-  FZLogMgr.Get.Write(DL_LBL+'Downloader acquired (cnt='+inttostr(i)+') '+GetFileName(), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Downloader acquired (cnt='+inttostr(i)+') '+GetFileName(), FZ_LOG_INFO);
 end;
 
 procedure FZFileDownloader.Release;
@@ -863,7 +886,7 @@ var
 begin
   name:=GetFileName();
   i:=InterlockedDecrement(_acquires_count);
-  FZLogMgr.Get.Write(DL_LBL+'Downloader released (cnt='+inttostr(i)+') '+name, FZ_LOG_DBG);
+  FZLogMgr.Get.Write(DL_LBL+'Downloader released (cnt='+inttostr(i)+') '+name, FZ_LOG_INFO);
 end;
 
 procedure FZFileDownloader.Lock;
@@ -908,7 +931,7 @@ begin
   _thread_active:=false;
   _good:=true;
 
-  FZLogMgr.Get.Write(TH_LBL+'Creating downloader thread fun', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(TH_LBL+'Creating downloader thread fun', FZ_LOG_INFO);
   _thread_active:=true;
   CreateThreadedFun(@DownloaderThreadBodyWrapper, self);
 end;
@@ -927,7 +950,7 @@ end;
 
 destructor FZDownloaderThread.Destroy;
 begin
-  FZLogMgr.Get.Write(TH_LBL+'Destroying base downloader thread', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(TH_LBL+'Destroying base downloader thread', FZ_LOG_INFO);
 
   //Make sure that thread is terminated
   windows.EnterCriticalSection(_lock);
@@ -945,7 +968,7 @@ var
   active:boolean;
 begin
   active:=true;
-  FZLogMgr.Get.Write(TH_LBL+'Waiting for DL thread termination', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(TH_LBL+'Waiting for DL thread termination', FZ_LOG_INFO);
   while(active) do begin
     windows.EnterCriticalSection(_lock);
     active:=_thread_active;
@@ -977,26 +1000,26 @@ begin
   windows.EnterCriticalSection(_lock);
   queue_cnt:=_commands_queue.Count();
   if queue_cnt>0 then begin
-    FZLogMgr.Get.Write(TH_LBL+'Start processing commands ('+inttostr(queue_cnt)+')', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(TH_LBL+'Start processing commands ('+inttostr(queue_cnt)+')', FZ_LOG_INFO);
     for i:=0 to queue_cnt-1 do begin
       command:=_commands_queue.Get(i);
       case command.cmd of
         FZDownloaderAdd:begin
-              FZLogMgr.Get.Write(TH_LBL+'Command "Add" for downloader '+command.downloader.GetFilename(), FZ_LOG_DBG);
+              FZLogMgr.Get.Write(TH_LBL+'Command "Add" for downloader '+command.downloader.GetFilename(), FZ_LOG_INFO);
               StartDownload(command.downloader);
         end;
         FZDownloaderStop: begin
-              FZLogMgr.Get.Write(TH_LBL+'Command "Stop" for downloader '+command.downloader.GetFilename(), FZ_LOG_DBG);
+              FZLogMgr.Get.Write(TH_LBL+'Command "Stop" for downloader '+command.downloader.GetFilename(), FZ_LOG_INFO);
               CancelDownload(command.downloader);
         end;
         else begin
           FZLogMgr.Get.Write(TH_LBL+'Unknown command!', FZ_LOG_ERROR);
         end;
       end;
-      FZLogMgr.Get.Write(TH_LBL+'Command processed, active downloaders count '+inttostr(length(_downloaders)), FZ_LOG_DBG);
+      FZLogMgr.Get.Write(TH_LBL+'Command processed, active downloaders count '+inttostr(length(_downloaders)), FZ_LOG_INFO);
     end;
     _commands_queue.Flush();
-    FZLogMgr.Get.Write(TH_LBL+'Processing commands finished', FZ_LOG_DBG);
+    FZLogMgr.Get.Write(TH_LBL+'Processing commands finished', FZ_LOG_INFO);
   end;
   windows.LeaveCriticalSection(_lock);
 end;

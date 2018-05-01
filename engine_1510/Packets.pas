@@ -1,12 +1,19 @@
 unit Packets;
 {$mode delphi}
 interface
-uses BaseClasses, srcCalls, Synchro,Vector;
+uses srcCalls, Synchro, Vector, xr_configs;
 function Init():boolean; stdcall;
 
 
 type
 //Direct Play structs
+
+DPNMSG_CREATE_PLAYER = packed record
+  dwSize:cardinal;
+  dpnidPlayer:cardinal;
+  pvPlayerContext:pointer;
+end;
+pDPNMSG_CREATE_PLAYER = ^DPNMSG_CREATE_PLAYER;
 
 DPNMSG_RECEIVE = packed record
   dwSize:cardinal;
@@ -116,10 +123,13 @@ end;
 pNET_Compressor=^NET_Compressor;
 
 function ip_address_to_str(a:ip_address):string; stdcall;
+function ip_address_equal(ip1: ip_address; ip2: ip_address): boolean; stdcall;
 
 procedure ClearPacket(p:pNET_Packet); stdcall;
 function WriteToPacket(p:pNET_Packet; buf:pointer; size:cardinal):boolean; stdcall;
 procedure InvalidatePacket(p:pNET_Packet); stdcall;
+
+procedure MakeDestroyGameItemPacket(p:pNET_Packet; gameid:word; time:cardinal);
 
 var
   pCompressor:pNET_Compressor;
@@ -133,10 +143,12 @@ const
   M_SPAWN:word=1;
   M_SV_CONFIG_NEW_CLIENT:word=2;//<---------------------------!!!
   M_CHAT:word=7; //<------------------------------------???
+  M_EVENT:word=8;
   M_CHANGE_LEVEL:word=13;
   M_LOAD_GAME:word=14;
   M_SAVE_GAME: word=16;
   M_GAMEMESSAGE:word=19;
+  M_EVENT_PACK:word = 20;
   M_GAMESPY_CDKEY_VALIDATION_CHALLENGE:word=21;//<------------------------------------???
   M_CLIENT_CONNECT_RESULT:word=23;
   M_CHAT_MESSAGE: word = 25;
@@ -155,6 +167,7 @@ const
   GAME_EVENT_MAKE_DATA:cardinal=42;
 
 
+  GE_DESTROY:cardinal = 8;
   GE_HIT_STATISTIC:cardinal = 47;
 
 
@@ -179,6 +192,11 @@ uses sysutils, srcBase, basedefs, windows;
 function ip_address_to_str(a:ip_address):string; stdcall;
 begin
   result:=inttostr(a.a1)+'.'+inttostr(a.a2)+'.'+inttostr(a.a3)+'.'+inttostr(a.a4);
+end;
+
+function ip_address_equal(ip1: ip_address; ip2: ip_address): boolean; stdcall;
+begin
+  result:=(ip1.a1 = ip2.a1) and (ip1.a2 = ip2.a2) and (ip1.a3 = ip2.a3) and (ip1.a4 = ip2.a4);
 end;
 
 function Init():boolean; stdcall;
@@ -235,5 +253,13 @@ begin
   result:=true;
 end;
 
+procedure MakeDestroyGameItemPacket(p:pNET_Packet; gameid:word; time:cardinal);
+begin
+  ClearPacket(p);
+  WriteToPacket(p, @M_EVENT, sizeof(word));
+  WriteToPacket(p, @time, sizeof(cardinal));
+  WriteToPacket(p, @GE_DESTROY, sizeof(word));
+  WriteToPacket(p, @gameid, sizeof(word));
+end;
 
 end.

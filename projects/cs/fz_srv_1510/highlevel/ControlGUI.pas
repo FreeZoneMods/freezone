@@ -30,6 +30,8 @@ const
   STR_TEST_CENSOR:PChar = 'Check censor';
   STR_KILL_PLAYER:PChar = 'Kill player';
   STR_ADD_MONEY:PChar = 'Add money';
+  STR_RANK_UP:PChar = 'Rank Up';
+  STR_RANK_DOWN:PChar = 'Rank Down';
 
   //Строки для лейблов под комбобоксом
   STR_REASON:PChar = 'Reason:';
@@ -183,6 +185,7 @@ type
     lbl_deathes: TLabel;
     procedure ActBanExecute(Sender: TObject);
     procedure ActRankDownExecute(Sender: TObject);
+    procedure ActRankUpExecute(Sender: TObject);
     procedure ActRefreshExecute(Sender: TObject);
     procedure ActStopServerExecute(Sender: TObject);
     procedure btn_clear_chatClick(Sender: TObject);
@@ -254,7 +257,7 @@ procedure Clean();
 var
   FZControlGUI: TFZControlGUI;
 implementation
-uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr;
+uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog;
 
 {$R *.lfm}
 
@@ -314,10 +317,12 @@ procedure ReloadFZConfigs_execute({%H-}arg:PChar); stdcall;
 begin
   FZConfigCache.Get.Reload;
   FZTranslationMgr.Get.Reload;
+  FZDownloadMgr.Get.Reload;
   FZCensor.Get.ReloadDefaultFile;
   FZSubnetBanList.Get.ReloadDefaultFile();
-  FZItemCgfMgr.Get.Reload;
-  FZLogMgr.Get.Write('Configs reloaded.', FZ_LOG_INFO);
+  FZItemCfgMgr.Get.Reload;
+  FZPlayersConnectionMgr.Get.Reset;
+  FZLogMgr.Get.Write('Configs reloaded.', FZ_LOG_USEROUT);
 end;
 
 function Init():boolean; stdcall;
@@ -383,10 +388,17 @@ end;
 
 procedure TFZControlGUI.ActRankDownExecute(Sender: TObject);
 begin
-
+  if ListPlayers.ItemIndex>=0 then begin
+    ChangePlayerRank((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, -1);
+  end;
 end;
 
-
+procedure TFZControlGUI.ActRankUpExecute(Sender: TObject);
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    ChangePlayerRank((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, 1);
+  end;
+end;
 
 procedure TFZControlGUI._ClearListPlayers;
 var
@@ -669,6 +681,9 @@ begin
   combo_options.AddItem(STR_KILL_PLAYER, FZOptionsItem.Create(ActOptDisableAll, ActKill) as TObject);
   combo_options.AddItem(STR_ADD_MONEY, FZOptionsItem.Create(ActOptValue, ActMoneyAdd) as TObject);
 
+  combo_options.AddItem(STR_RANK_UP, FZOptionsItem.Create(ActOptDisableAll, ActRankUp) as TObject);
+  combo_options.AddItem(STR_RANK_DOWN, FZOptionsItem.Create(ActOptDisableAll, ActRankDown) as TObject);
+
 {$IFDEF REVO}
   combo_options.AddItem(STR_TELEPORT_PLAYER, FZOptionsItem.Create(ActOptPosDir, ActTeleport) as TObject);
 
@@ -944,23 +959,23 @@ begin
     tmp:=edit1.Text;
 
     FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.x:=strtofloatdef(coord, 0);
+    vp.x:=FZCommonHelper.StringToFloatDef(coord, 0);
 
     FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.y:=strtofloatdef(coord, 0);
+    vp.y:=FZCommonHelper.StringToFloatDef(coord, 0);
 
     FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.z:=strtofloatdef(coord, 0);
+    vp.z:=FZCommonHelper.StringToFloatDef(coord, 0);
 
     tmp:=edit2.Text;
     FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.x:=strtofloatdef(coord, 0);
+    vd.x:=FZCommonHelper.StringToFloatDef(coord, 0);
 
     FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.y:=strtofloatdef(coord, 0);
+    vd.y:=FZCommonHelper.StringToFloatDef(coord, 0);
 
     FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.z:=strtofloatdef(coord, 0);
+    vd.z:=FZCommonHelper.StringToFloatDef(coord, 0);
 
     SendMovePlayersPacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).game_id, @vp, @vd);
   end;

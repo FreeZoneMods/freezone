@@ -9,6 +9,14 @@ ClientID = packed record
   id:cardinal;
 end;
 
+SClientConnectData = packed record
+  clientID:ClientID;
+  name:array[0..63] of char;
+  pass:array[0..63] of char;
+  process_id:cardinal;
+end;
+pSClientConnectData = ^SClientConnectData;
+
 IClientStatistics = packed record
   ci_last:DPN_CONNECTION_INFO;
   mps_recive:cardinal;
@@ -79,7 +87,7 @@ game_PlayerState = packed record
   pSpawnPointsList:xr_vector{<s16>};
   m_s16LastSRoint:smallint;
   LastBuyAcount:integer;
-  m_bClearRun:boolean;
+  m_bClearRun:byte;
   _unused1:byte;
   _unused2:word;
 end;
@@ -136,6 +144,10 @@ pxrGameSpyClientData=^xrGameSpyClientData;
 const
   ICLIENT_FLAG_LOCAL:cardinal = 1;
   ICLIENT_FLAG_RECONNECT:cardinal = 4;
+
+  GAME_PLAYER_FLAG_VERY_VERY_DEAD:cardinal=4;
+  GAME_PLAYER_FLAG_SPECTATOR:cardinal = 8;
+  GAME_PLAYER_FLAG_ONBASE:cardinal = 64;
 
 implementation
 

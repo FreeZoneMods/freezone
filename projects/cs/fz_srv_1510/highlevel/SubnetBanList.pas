@@ -34,10 +34,10 @@ end;
 function Init():boolean; stdcall;
 
 implementation
-uses CommonHelper, SysUtils, StrUtils;
+uses CommonHelper, SysUtils, StrUtils, xr_debug;
 
 var
-  _instance:FZSubnetBanList;
+  _instance:FZSubnetBanList = nil;
 
 { FZSubnetBanList }
 
@@ -66,7 +66,7 @@ end;
 
 function FZSubnetBanList.ConvertIpToCardinal(ip: ip_address): cardinal;
 begin
-  result:=ip.a4+ip.a3*(1 shl 8)+ip.a2*(1 shl 16)+ip.a1*(1 shl 24);
+  result:=cardinal(ip.a4) + cardinal(ip.a3)*(1 shl 8) + cardinal(ip.a2)*(1 shl 16) + cardinal(ip.a1)*(1 shl 24);
 end;
 
 function FZSubnetBanList.Count: integer;
@@ -193,6 +193,7 @@ end;
 
 function Init():boolean; stdcall;
 begin
+  R_ASSERT(_instance=nil, 'SubnetBanList is already initialized');
   _instance:=FZSubnetBanList.Create;
   _instance.ReloadDefaultFile();  
   result:=true;

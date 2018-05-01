@@ -40,6 +40,11 @@ interface
     max:FVector3;
   end;
 
+  type Fsphere = packed record
+    P:FVector3;
+    R:single;
+  end;
+
   type PFVector2 = ^FVector2;
   type PFVector3 = ^FVector3;
   type PFVector4 = ^FVector4;

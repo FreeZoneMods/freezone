@@ -37,6 +37,7 @@ end;
 
 procedure init_string(str:pshared_str); stdcall;
 procedure assign_string(str:pshared_str; text:PChar); stdcall;
+function get_string_value(str:pshared_str):PAnsiChar; stdcall;
 function GetGlobalUndockedEmptyStr():pshared_str; stdcall;
 
 implementation
@@ -74,6 +75,14 @@ end;
 procedure init_string(str:pshared_str); stdcall;
 begin
   str.p_:=nil;
+end;
+
+function get_string_value(str:pshared_str):PAnsiChar; stdcall;
+begin
+  result:='';
+  if str=nil then exit;
+  if str.p_=nil then exit;
+  result:=PAnsiChar(@str.p_.value);
 end;
 
 function Init():boolean; stdcall;

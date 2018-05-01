@@ -26,6 +26,28 @@ IPureClient = packed record
 end;
 pIPureClient = ^IPureClient;
 
+procedure IPureClient_Send(cl:pIPureClient; packet:pNET_Packet; dwFlags:cardinal; dwTimeout:cardinal = 0);
+
+function Init():boolean;
+
 implementation
+uses srcCalls;
+
+var
+  virtual_IPureClient__Send:srcVirtualECXCallFunction;
+
+const
+  virtual_IPureClient__Send_index:cardinal=$10;
+
+procedure IPureClient_Send(cl:pIPureClient; packet:pNET_Packet; dwFlags:cardinal; dwTimeout:cardinal = 0);
+begin
+  virtual_IPureClient__Send.Call([cl, packet, dwFlags, dwTimeout]);
+end;
+
+function Init():boolean;
+begin
+  virtual_IPureClient__Send:=srcVirtualECXCallFunction.Create(virtual_IPureClient__Send_index, [vtPointer, vtPointer, vtInteger, vtInteger], 'Send', 'IPureClient');
+  result:=true;
+end;
 
 end.

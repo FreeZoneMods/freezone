@@ -1,7 +1,7 @@
 unit CSE;
 {$mode delphi}
 interface
-uses xrstrings, vector, BaseClasses, MatVectors, srcCalls;
+uses xrstrings, vector, BaseClasses, MatVectors, srcCalls, xr_configs;
 function Init():boolean; stdcall;
 
 type
@@ -10,30 +10,52 @@ GameTypeChooser = packed record
   m_GameType:word;
 end;
 
-CSE_Abstract = packed record
+IPureLoadableObject = packed record
+  vtable:pointer;
+end;
+
+IPureSavableObject = packed record
+  vtable:pointer;
+end;
+
+IPureSerializeObject = packed record
+  base_IPureLoadableObject:IPureLoadableObject;
+  base_IPureSavableObject:IPureSavableObject;
+end;
+
+IPureServerObject = packed record
+  base_IPureSerializeObject:IPureSerializeObject;
+end;
+
+CPureServerObject = packed record
+  base_IPureServerObject:IPureServerObject;
+end;
+
+CScriptValueContainer = packed record
   vftable:pointer;
-  _flags_ISE:cardinal;
+  m_values:xr_vector;
+end;
 
-  _v:xr_vector;
+ISE_Abstract = packed record
+  vftable:pointer;
+  m_editor_flags:cardinal;
+end;
 
-  _unk1:cardinal;
-  _unk2:cardinal;
-  _unk3:cardinal;
+CSE_Abstract = packed record
+  base_ISE_Abstract:ISE_Abstract;
+  base_CPureServerObject:CPureServerObject;
+  base_CScriptValueContainer:CScriptValueContainer;
+
   s_name_replace:PChar;
-
-  net_Ready:word;
-  _unused1:word;
-
-  net_Processed:word;
-  _unused2:word;
-
+  net_Ready:cardinal;
+  net_Processed:cardinal;
   m_wVersion:word;
   m_script_version:word;
   RespawnTime:word;
   ID:word;
   ID_Parent:word;
   ID_Phantom:word;
-  owner:pointer; {xrClientData}
+  owner:pointer; {pxrClientData}
   s_name:shared_str;
   m_gameType:GameTypeChooser;
   s_RP:byte;

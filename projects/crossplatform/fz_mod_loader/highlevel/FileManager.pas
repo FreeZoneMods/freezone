@@ -8,7 +8,7 @@ uses
 
 type
   //////////////////////////////////////////
-  FZActualizingStatus=(FZ_ACTUALIZING_BEGIN, FZ_ACTUALIZING_IN_PROGRESS, FZ_ACTUALIZING_FINISHED );
+  FZActualizingStatus=(FZ_ACTUALIZING_BEGIN, FZ_ACTUALIZING_IN_PROGRESS, FZ_ACTUALIZING_VERIFYING_START, FZ_ACTUALIZING_VERIFYING, FZ_ACTUALIZING_FINISHED, FZ_ACTUALIZING_FAILED );
 
   FZFileActualizingProgressInfo = record
     status:FZActualizingStatus;
@@ -125,7 +125,7 @@ begin
   out_check_params.md5:='';
   readbytes:=0;
 
-  file_handle:=CreateFile(PAnsiChar(path), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+  file_handle:=CreateFile(PAnsiChar(path), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL or FILE_FLAG_SEQUENTIAL_SCAN, 0);
   if (file_handle<>INVALID_HANDLE_VALUE) then begin
     out_check_params.size:=GetFileSize(file_handle, nil);
   end else begin
@@ -151,7 +151,7 @@ begin
     out_check_params.crc32:=CRC32End(crc32_ctx, ptr, readbytes);
     FreeMem(ptr);
   end else begin
-    FZLogMgr.Get.Write('Cannot allocate memory, exiting', FZ_LOG_DBG);
+    FZLogMgr.Get.Write('Cannot allocate memory, exiting', FZ_LOG_ERROR);
     exit;
   end;
 
@@ -276,7 +276,7 @@ begin
                      ', crc='+inttohex(targetParams.crc32, 8)+
                      ', md5=['+targetParams.md5+']'+
                      ', url='+url+
-                     ', compression '+inttostr(compression_type), FZ_LOG_DBG);
+                     ', compression '+inttostr(compression_type), FZ_LOG_INFO);
   result:=false;
   filename:=trim(filename);
 
@@ -298,7 +298,7 @@ begin
     //Файла нет в списке. Однозначно надо качать.
     filedata:=_CreateFileData(filename, url, compression_type, targetParams);
     filedata.required_action:=FZ_FILE_ACTION_DOWNLOAD;
-    FZLogMgr.Get.Write(FM_LBL+'Created new file list entry', FZ_LOG_DBG );
+    FZLogMgr.Get.Write(FM_LBL+'Created new file list entry', FZ_LOG_INFO );
   end else begin
     //Файл есть в списке. Проверяем.
     if IsDummy(filedata.real) then begin
@@ -308,15 +308,15 @@ begin
         filedata.real.size:=0;
         filedata.real.md5:='';
       end;
-      FZLogMgr.Get.Write(FM_LBL+'Current file info: CRC32='+inttohex(filedata.real.crc32, 8)+', size='+inttostr(filedata.real.size)+', md5=['+filedata.real.md5+']', FZ_LOG_DBG );
+      FZLogMgr.Get.Write(FM_LBL+'Current file info: CRC32='+inttohex(filedata.real.crc32, 8)+', size='+inttostr(filedata.real.size)+', md5=['+filedata.real.md5+']', FZ_LOG_INFO );
     end;
 
     if  CompareFiles(filedata.real, targetParams) then begin
       filedata.required_action:=FZ_FILE_ACTION_NO;
-      FZLogMgr.Get.Write(FM_LBL+'Entry exists, file up-to-date', FZ_LOG_DBG );
+      FZLogMgr.Get.Write(FM_LBL+'Entry exists, file up-to-date', FZ_LOG_INFO );
     end else begin
       filedata.required_action:=FZ_FILE_ACTION_DOWNLOAD;
-      FZLogMgr.Get.Write(FM_LBL+'Entry exists, file outdated', FZ_LOG_DBG );
+      FZLogMgr.Get.Write(FM_LBL+'Entry exists, file outdated', FZ_LOG_INFO );
     end;
     filedata.target:=targetParams;
     filedata.url:=url;
@@ -350,7 +350,7 @@ begin
     if filedata=nil then continue;
     if filedata.required_action=FZ_FILE_ACTION_UNDEFINED then begin
       //такого файла не было в списке. Сносим.
-      FZLogMgr.Get.Write(FM_LBL+'Deleting file '+filedata.name, FZ_LOG_DBG);
+      FZLogMgr.Get.Write(FM_LBL+'Deleting file '+filedata.name, FZ_LOG_INFO);
       if not SysUtils.DeleteFile(_parent_path+filedata.name)then begin
         FZLogMgr.Get.Write(FM_LBL+'Failed to delete '+filedata.name, FZ_LOG_ERROR);
         exit;
@@ -370,17 +370,16 @@ begin
     end else if filedata.required_action=FZ_FILE_ACTION_NO then begin
       total_actual_size:=total_actual_size+filedata.target.size;
     end else if filedata.required_action=FZ_FILE_ACTION_IGNORE then begin
-      FZLogMgr.Get.Write(FM_LBL+'Ignoring file '+filedata.name, FZ_LOG_DBG);
+      FZLogMgr.Get.Write(FM_LBL+'Ignoring file '+filedata.name, FZ_LOG_INFO);
     end else begin
       FZLogMgr.Get.Write(FM_LBL+'Unknown action for '+filedata.name, FZ_LOG_ERROR);
       exit;
     end;
   end;
-  FZLogMgr.Get.Write(FM_LBL+'Total up-to-date size '+inttostr(total_actual_size), FZ_LOG_DBG);
-  FZLogMgr.Get.Write(FM_LBL+'Total downloads size '+inttostr(total_dl_size), FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Total up-to-date size '+inttostr(total_actual_size), FZ_LOG_INFO);
+  FZLogMgr.Get.Write(FM_LBL+'Total downloads size '+inttostr(total_dl_size), FZ_LOG_INFO);
 
-
-  FZLogMgr.Get.Write(FM_LBL+'Starting downloads', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Starting downloads', FZ_LOG_INFO);
   result:=true;
 
   //Вызовем колбэк для сообщения о начале стадии загрузки
@@ -422,7 +421,7 @@ begin
           last_file_index:=last_file_index-1; //сдвигаем индекс на необработанный файл
           if (filedata<>nil) and (filedata.required_action=FZ_FILE_ACTION_DOWNLOAD) then begin
             //файл для загрузки найден, помещаем его в слот.
-            FZLogMgr.Get.Write(FM_LBL+'Starting download of '+filedata.url, FZ_LOG_DBG);
+            FZLogMgr.Get.Write(FM_LBL+'Starting download of '+filedata.url, FZ_LOG_INFO);
             finished:=false;
             downloaders[i]:=thread.CreateDownloader(filedata.url, _parent_path+filedata.name, filedata.compression_type);
             result:=downloaders[i].StartAsyncDownload();
@@ -440,7 +439,7 @@ begin
         downloaded_now:=downloaded_now+downloaders[i].DownloadedBytes();
       end else begin
         //Слот завершил работу. Освободим его.
-        FZLogMgr.Get.Write(FM_LBL+'Need free slot contained '+downloaders[i].GetFilename(), FZ_LOG_DBG);
+        FZLogMgr.Get.Write(FM_LBL+'Need free slot contained '+downloaders[i].GetFilename(), FZ_LOG_INFO);
         result:=downloaders[i].IsSuccessful();
         downloaded_total:=downloaded_total+downloaders[i].DownloadedBytes();
         if not result then begin
@@ -462,7 +461,7 @@ begin
   end;
 
   //Останавливаем всех их
-  FZLogMgr.Get.Write(FM_LBL+'Request stop', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Request stop', FZ_LOG_INFO);
   for i:=0 to length(downloaders)-1 do begin
     if downloaders[i]<>nil then begin
       downloaders[i].RequestStop();
@@ -470,7 +469,7 @@ begin
   end;
 
   //и удаляем их
-  FZLogMgr.Get.Write(FM_LBL+'Delete downloaders', FZ_LOG_DBG);
+  FZLogMgr.Get.Write(FM_LBL+'Delete downloaders', FZ_LOG_INFO);
   for i:=0 to length(downloaders)-1 do begin
     if downloaders[i]<>nil then begin
       downloaders[i].Free();
@@ -479,19 +478,18 @@ begin
   setlength(downloaders,0);
   thread.Free();
 
-  //вызываем колбэк окончания
-  if result then begin
-    FZLogMgr.Get.Write(FM_LBL+'Run finish callback', FZ_LOG_DBG);
-    cb_info.status:=FZ_ACTUALIZING_FINISHED;
-    cb_info.total_downloaded:=downloaded_total;
-    result := _callback(cb_info, _cb_userdata)
-  end;
-
   if result then begin
     //убедимся, что все требуемое скачалось корректно
     if (total_dl_size>0) then begin
-      FZLogMgr.Get.Write(FM_LBL+'Verifying downloaded', FZ_LOG_DBG);
+      FZLogMgr.Get.Write(FM_LBL+'Verifying downloaded', FZ_LOG_INFO);
+
+      cb_info.status:=FZ_ACTUALIZING_VERIFYING_START;
+      cb_info.total_downloaded:=0;
+      result := _callback(cb_info, _cb_userdata);
+
       for i:=_files.Count-1 downto 0 do begin
+        if not result then break;
+
         filedata:=_files.Items[i];
         if (filedata<>nil) and (filedata.required_action=FZ_FILE_ACTION_VERIFY) then begin
           if GetFileChecks(_parent_path+filedata.name, @filedata.real, length(filedata.target.md5)>0) then begin
@@ -509,10 +507,29 @@ begin
           FZLogMgr.Get.Write(FM_LBL+'File '+filedata.name+' has FZ_FILE_ACTION_DOWNLOAD state after successful synchronization??? A bug suspected!', FZ_LOG_ERROR);
           result:=false;
         end;
+
+        if result then begin
+          cb_info.status:=FZ_ACTUALIZING_VERIFYING;
+          cb_info.total_downloaded:=cb_info.total_downloaded+filedata.target.size;
+          result := _callback(cb_info, _cb_userdata)
+        end;
       end;
     end;
 
-    FZLogMgr.Get.Write(FM_LBL+'All downloads finished', FZ_LOG_DBG);
+    //вызываем колбэк окончания
+    if result then begin
+      FZLogMgr.Get.Write(FM_LBL+'Run finish callback', FZ_LOG_INFO);
+      cb_info.status:=FZ_ACTUALIZING_FINISHED;
+      cb_info.total_downloaded:=downloaded_total;
+      result := _callback(cb_info, _cb_userdata)
+    end else begin
+      FZLogMgr.Get.Write(FM_LBL+'Run fail callback', FZ_LOG_INFO);
+      cb_info.status:=FZ_ACTUALIZING_FAILED;
+      cb_info.total_downloaded:=0;
+      _callback(cb_info, _cb_userdata)
+    end;
+
+    FZLogMgr.Get.Write(FM_LBL+'All downloads finished', FZ_LOG_INFO);
   end;
 end;
 

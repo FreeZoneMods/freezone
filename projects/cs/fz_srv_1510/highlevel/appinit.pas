@@ -10,8 +10,8 @@ function Free():boolean; stdcall;
 implementation
 uses basedefs, dynamic_caster, global_functions, LogMgr, ConfigMgr, Console, Emergency, ConfigCache, TranslationMgr, DownloadMgr, SACE_Interface,
      ServerStuff, PacketFilter, UpdateRate, Bans, SubnetBanList, Censor, ChatCommands, Chat, fz_injections, ControlGUI, sysmsgs, Compressor, SACE_Hacks,
-     BaseClasses, xrstrings, Packets, Clients, Time, PureServer, Level, CSE, Vector, MatVectors, GameMessages, misc_stuff, Banned, Servers, Items,
-     Objects, Games, Gametypes, MapList, ItemsCfgMgr, clsids;
+     BaseClasses, xrstrings, Packets, Clients, Time, PureServer, Level, CSE, Vector, MatVectors, GameMessages, misc_stuff, Banned, Servers, BuyWnd,
+     Objects, Games, MapList, ItemsCfgMgr, clsids, xr_configs, Device, PureClient, PlayersConnectionLog, xr_debug;
 
 function Init():boolean; stdcall;
 var
@@ -24,11 +24,13 @@ begin
   ////////////////////////////////////
   //Не трогать!
   if not basedefs.Init then exit;
+  if not xr_debug.Init then exit;
   if not dynamic_caster.Init then exit;
 
   if not global_functions.Init then exit;
 
   if not LogMgr.Init then exit;
+  if not sysmsgs.Init then exit;
   if not ConfigMgr.Init then exit;
   if not ConfigCache.Init then exit;
 
@@ -74,21 +76,24 @@ begin
   if not BaseClasses.Init then exit;
   if not clsids.Init then exit;
   if not xrstrings.Init then exit;
+  if not xr_configs.Init then exit;
   if not Packets.Init then exit;
   if not Clients.Init then exit;
   if not Time.Init then exit;
   if not PureServer.Init then exit;
+  if not PureClient.Init then exit;
   if not Level.Init then exit;
   if not CSE.Init then exit;
   if not Vector.Init then exit;
   if not MatVectors.Init then exit;
   if not GameMessages.Init then exit;
+  if not Device.Init then exit;
 
   if not misc_stuff.Init then exit;
 
   if not Banned.Init then exit;
   if not Servers.Init then exit;
-  if not Items.Init then exit;
+  if not BuyWnd.Init then exit;
   if not Objects.Init then exit;
   if not Games.Init then exit;
   if not MapList.Init then exit;
@@ -97,10 +102,9 @@ begin
 
   if not ServerStuff.Init then exit;
 
-  if not Gametypes.Init then exit;
-
   if not UpdateRate.Init then exit;
 
+  if not PlayersConnectionLog.Init then exit;
   if not Bans.Init then exit;
   if not SubnetBanList.Init then exit;
   if not Censor.Init then exit;
@@ -109,7 +113,6 @@ begin
 
   if not fz_injections.Init then exit;
   if not ControlGUI.Init then exit;
-  if not sysmsgs.Init then exit;
   if not Compressor.Init then exit;
 
   if not SACE_Hacks.Init then exit;
@@ -122,7 +125,6 @@ begin
   //не нарушать порядок!
   result:=true;
   ControlGUI.Clean;
-  sysmsgs.Free();
   SACE_Hacks.Free();
   ServerStuff.Clean;
   FZChatCommandList.Get.Free;
@@ -135,6 +137,7 @@ begin
   FZConfigCache.Get.Free;
   FZConfigMgr.Get.Free;
   FZLogMgr.Get.Free;
+  sysmsgs.Free();
 
   basedefs.Free;
 end;

@@ -55,7 +55,7 @@ var
   new_name:string;
 begin
   GetMapStatus(name, ver, link);
-  new_name:=FZTranslationMgr.Get.Translate(name);
+  new_name:=FZTranslationMgr.Get.TranslateSingle(name);
   BufWriter(buf, PChar(new_name));
 end;
 

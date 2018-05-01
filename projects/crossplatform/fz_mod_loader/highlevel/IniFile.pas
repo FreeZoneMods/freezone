@@ -130,6 +130,7 @@ var
   flag:boolean;
   tmp:string;
 begin
+  result:=false;
   i:=128;
   repeat
     i:=i*2;

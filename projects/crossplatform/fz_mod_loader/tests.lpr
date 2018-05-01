@@ -1,5 +1,5 @@
 program tests;
-uses FastMd5, FastCrc, strutils, sysutils, LogMgr, CommandLineParser, HttpDownloader, windows, curl;
+uses FastMd5, FastCrc, strutils, sysutils, LogMgr, CommandLineParser, HttpDownloader, windows, curl, abstractions;
 
 
 type TMd5Info = record
@@ -389,6 +389,7 @@ var
   SuiteResult:boolean;
 begin
   SuiteResult:=false;
+  abstractions.Init;
   LogMgr.Init;
   try
     //if not Md5Tests() then exit;

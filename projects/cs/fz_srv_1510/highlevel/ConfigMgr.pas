@@ -16,9 +16,10 @@ end;
 function Init():boolean; stdcall;
 
 implementation
-uses sysutils;
+uses sysutils, xr_debug;
 var
-   _instance:FZConfigMgr;
+   _instance:FZConfigMgr = nil;
+
 constructor FZConfigMgr.Create();
 begin
   inherited;
@@ -33,7 +34,7 @@ end;
 
 class function FZConfigMgr.Get(): FZConfigMgr;
 begin
-  assert(_instance<>nil, 'Config mgr is not created yet');
+  R_ASSERT(_instance<>nil, 'Config mgr is not created yet');
   result:=_instance;
 end;
 
@@ -44,6 +45,7 @@ end;
 
 function Init():boolean; stdcall;
 begin
+  R_ASSERT(_instance=nil, 'Config manager module is already initialized');
   _instance:=FZConfigMgr.Create();
   result:=true;
 end;

@@ -1,9 +1,6 @@
 unit LogMgr;
 {$mode delphi}
 interface
-{$IFNDEF TESTS}
-uses srcCalls;
-{$ENDIF}
 type
   FZLogMessageSeverity = ( FZ_LOG_DBG, FZ_LOG_INFO, FZ_LOG_IMPORTANT_INFO, FZ_LOG_ERROR, FZ_LOG_SILENT );
 
@@ -11,108 +8,73 @@ type
 
   FZLogMgr = class
   private
-{$IFNDEF TESTS}
-    _logfun:srcBaseFunction;
     _is_log_enabled:boolean;
+    _severity:FZLogMessageSeverity;
     _lock:TRTLCriticalSection;
-{$ENDIF}
+
     {%H-}constructor Create();
   public
     class function Get():FZLogMgr;
-    procedure Write(data:string; {%H-}severity:FZLogMessageSeverity = FZ_LOG_INFO);
+    procedure Write(data:string; severity:FZLogMessageSeverity);
+    procedure SetSeverity(sev:FZLogMessageSeverity);
     destructor Destroy(); override;
   end;
+  pFZLogMgr = ^FZLogMgr;
 
   function Init():boolean;
   function Free():boolean;
 
 implementation
-{$IFNDEF TESTS}
-uses srcBase, windows;
-{$ENDIF}
-
+uses abstractions, windows, sysutils;
 var
   Mgr:FZLogMgr;
 
 {FZLogMgr}
 
 constructor FZLogMgr.Create();
-{$IFNDEF TESTS}
-var
-  f:textfile;
-{$ENDIF}
 begin
   inherited;
-{$IFNDEF TESTS}
-  _is_log_enabled := true;
   InitializeCriticalSection(_lock);
-  {$IFNDEF RELEASE}
-  {assignfile(f, 'fz_loader_log.txt');
-  rewrite(f);
-  closefile(f);}
-  {$ENDIF}
-{$ENDIF}
+  _is_log_enabled := false;
+  _severity:=FZ_LOG_DBG;
 end;
 
 class function FZLogMgr.Get(): FZLogMgr;
 begin
+  assert(Mgr<>nil);
   result:=Mgr;
 end;
 
 procedure FZLogMgr.Write(data:string; severity:FZLogMessageSeverity);
-{$IFNDEF TESTS}
 var
-  f:textfile;
-{$ENDIF}
+  s:string;
 begin
-{$IFNDEF TESTS}
-  {$IFDEF RELEASE}
-//  if severity = FZ_LOG_DBG then exit;
-  {$ENDIF}
   EnterCriticalSection(_lock);
   try
-    if _logfun=nil then begin
-      //Первое сообщение. Пробуем закешировать функцию.
-      _logfun:=srcKit.Get.FindEngineCall('Log');
-    end;
+    if (not _is_log_enabled) or (severity < _severity) then exit;
 
-    {$IFNDEF RELEASE}
-{
-      assignfile(f, 'fz_loader_log.txt');
-      try
-        append(f);
-      except
-        rewrite(f);
-      end;
-      writeln(f, data);
-      closefile(f);
-}
-    {$ENDIF}
+    data:='('+inttostr(GetThreadId())+') ('+inttostr(GetCurrentTime())+') '+data;
+    if severity = FZ_LOG_ERROR then
+      s:='! FZ: '+data
+    else
+      s:='~ FZ: '+data;
 
-    if _logfun<>nil then begin
-      if severity = FZ_LOG_ERROR then
-        _logfun.Call(['! FZ: '+data])
-      else
-        _logfun.Call(['~ FZ: '+data]);
-    end;
-
+    VersionAbstraction().Log(PAnsiChar(s));
   finally
     LeaveCriticalSection(_lock);
   end;
-{$ELSE}
-  if severity = FZ_LOG_ERROR then
-    writeln('[LogMgr][ERROR] '+data)
-  else
-     writeln('[LogMgr] '+data);
-{$ENDIF}
+end;
+
+procedure FZLogMgr.SetSeverity(sev: FZLogMessageSeverity);
+begin
+  _is_log_enabled:=true;
+  _severity:=sev;
 end;
 
 destructor FZLogMgr.Destroy();
 begin
-{$IFNDEF TESTS}
   DeleteCriticalSection(_lock);
   inherited;
-{$ENDIF}
 end;
 
 function Init():boolean;
@@ -124,8 +86,10 @@ end;
 function Free: boolean;
 begin
   result:=true;
-  Mgr.Free();
-  Mgr:=nil;
+  if Mgr<>nil then begin
+    Mgr.Free();
+    Mgr:=nil;
+  end;
 end;
 
 end.

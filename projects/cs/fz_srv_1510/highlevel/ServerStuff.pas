@@ -15,18 +15,18 @@ end;
 
 
 procedure xrGameSpyServer_constructor_reserve_zerogameid(srv:pxrServer); stdcall;
-function game_sv_GameState__OnEvent_CheckHit(src_id:cardinal; dest_id:cardinal; packet:pNET_Packet; senderid:cardinal):boolean; stdcall;
+function OnGameEventDelayedHitProcessing(src_id:cardinal; dest_id:cardinal; packet:pNET_Packet; senderid:cardinal):boolean; stdcall;
 function game__OnEvent_SelfKill_Check(target:pxrClientData; senderid:cardinal):boolean; stdcall;
-function CheckKillMessage(p:pNET_Packet; sender_id:cardinal):boolean; stdcall;
-function CheckHitMessage(p:pNET_Packet; sender_id:cardinal):boolean; stdcall;
+function OnGameEventPlayerKilled(p:pNET_Packet; clid:cardinal):boolean; stdcall;
+function OnGameEventPlayerHitted(p:pNET_Packet; clid:cardinal):boolean; stdcall;
 
-function game_sv_mp__OnPlayerHit_preventlocal({%H-}victim:pgame_PlayerState; hitter:pgame_PlayerState):boolean; stdcall;
-procedure game_sv_mp__OnPlayerKilled_preventlocal(victim:pgame_PlayerState; hitter:ppgame_PlayerState; weaponid:pword; specialkilltype:pbyte); stdcall;
+function Check_xrClientData_owner_valid(ptr:pxrClientData):boolean; stdcall;
+
 function game_sv__OnDetach_isitemremovingneeded(item:pCSE_Abstract):boolean; stdcall;
 function game_sv__OnDetach_isitemtransfertobagneeded(item:pCSE_Abstract):boolean; stdcall;
 procedure game_sv_Deathmatch__OnDetach_destroyitems(game:pgame_sv_mp; pfirst_item:ppCSE_Abstract; plast_item:ppCSE_Abstract); stdcall;
 
-function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_mp; corpse:pCSE_Abstract):boolean; stdcall;
+function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_GameState; corpse:pCSE_Abstract):boolean; stdcall;
 
 procedure GetMapStatus(var name:string; var ver:string; var link:string); stdcall;
 procedure xrServer__Connect_updatemapname(gdd:pGameDescriptionData); stdcall;
@@ -35,11 +35,17 @@ procedure xrServer__OnMessage_additional(srv:pIPureServer; p:pNET_Packet; sender
 
 function IPureServer__GetClientAddress_check_arg(pClientAddress:pointer; Address:pip_address; pPort:pcardinal):boolean; stdcall;
 
+procedure NET_Packet__w_checkOverflow(p:pNET_Packet; count:cardinal); stdcall;
+procedure SplitEventPackPackets(packet:pNET_Packet); stdcall;
+
 function Init():boolean; stdcall;
 procedure Clean(); stdcall;
 
 implementation
-uses LogMgr, sysutils, Hits, ConfigCache, Windows, ItemsCfgMgr, clsids;
+uses LogMgr, sysutils, Hits, ConfigCache, Windows, ItemsCfgMgr, clsids, xrstrings, HackProcessor, Players, CommonHelper, Level, Objects, xr_debug;
+
+const
+  HITS_GROUP:string='[HIT] ';
 
 var
   _serverstate:FZServerState;
@@ -47,7 +53,7 @@ var
 procedure xrGameSpyServer_constructor_reserve_zerogameid(srv:pxrServer); stdcall;
 begin
   FZLogMgr.Get.Write('Reserving zero game ID', FZ_LOG_INFO);
-  CID_Generator__tfGetID.Call([@srv.m_tID_Generator, 0]);
+  ReserveGameID(srv, 0);
 end;
 
 function game__OnEvent_SelfKill_Check(target:pxrClientData; senderid:cardinal):boolean; stdcall;
@@ -64,155 +70,152 @@ begin
   result:=(target.base_IClient.ID.id = senderid);
 end;
 
-function CheckKillMessage(p:pNET_Packet; sender_id:cardinal):boolean; stdcall;
+function GetNameFromClientdata(cld:pxrClientData; gameid:word):string;
 var
-  cld:pxrClientData;
-  killer_id:word;
-  target_id:word;
-begin
-  result:=false;
-
-  //GAME_EVENT_PLAYER_KILLED имеет право отправлять только локальный клиент!
-  cld:=GetServerClient();
-  if (cld = nil) or (cld.base_IClient.ID.id <> sender_id) then begin
-    fzlogmgr.get.write('Player id='+inttostr(sender_id)+' tried to send GAME_EVENT_PLAYER_KILLED message!', FZ_LOG_ERROR);
-    exit;
-  end;
-
-  //кроме того, локальный клиент не может быть убийцей либо быть убит!
-  killer_id:=pword(@p.B.data[p.r_pos+3])^;
-  target_id:=pword(@p.B.data[p.r_pos])^;
-  FZLogMgr.Get.Write('Killer id = '+inttostr(killer_id)+', victim id = '+inttostr(target_id), FZ_LOG_IMPORTANT_INFO);
-
-
-  if (cld.ps.GameID = killer_id) or (cld.ps.GameID = target_id) then begin
-    FZLogMgr.Get.Write('Local player cannot be victim or killer!', FZ_LOG_ERROR);
-    exit;
-  end;
-
-  result:=true;
-end;
-
-function GetNameFromClientdata(cld:pxrClientData):string;
+  obj:pCSE_Abstract;
+  game:pgame_sv_mp;
 begin
   if cld = nil then begin
     result := '(null)';
+    game:=GetCurrentGame();
+    obj:=EntityFromEid(@game.base_game_sv_GameState, gameid);
+    if obj<>nil then begin
+      result:='['+get_string_value(@obj.s_name)+']';
+    end;
   end else begin
     result:= cld.ps.name;
   end;
 end;
 
-function CheckHitMessage(p:pNET_Packet; sender_id:cardinal):boolean; stdcall;
+//Проверка корректности сообщения GAME_EVENT_PLAYER_HITTED и GAME_EVENT_PLAYER_KILLED
+function CheckForLocalHitterOrVictim(sender_clid:cardinal; victim_gameid:pword; killer_gameid:pword; onlylocalsender:boolean; try_correct_hitter:boolean):boolean;
 var
-  cld, victim, hitter:pxrClientData;
-  killer_id:word;
-  target_id:word;
-  health_dec:single;
-  victim_str, hitter_str:string;
+  local_client:pxrClientData;
+  victim_ps, killer_ps:pgame_PlayerState;
+  pGame:pgame_sv_mp;
 begin
   result:=false;
-
-  //GAME_EVENT_PLAYER_HITTED имеет право отправлять только локальный клиент!
-  cld:=GetServerClient();
-  if (cld = nil) or (cld.base_IClient.ID.id <> sender_id) then begin
-    fzlogmgr.get.write('Player id='+inttostr(sender_id)+' tried to send GAME_EVENT_PLAYER_HITTED message!', FZ_LOG_ERROR);
+  local_client:=GetServerClient();
+  if (local_client = nil) or (local_client.ps = nil) then begin
+    FZLogMgr.Get().Write('Cannot get local player while checking hit / kill!', FZ_LOG_ERROR);
+    result:=true;
     exit;
   end;
 
-  //кроме того, локальный клиент не может быть убийцей либо быть убит!
-  killer_id:=pword(@p.B.data[p.r_pos+2])^;
-  target_id:=pword(@p.B.data[p.r_pos])^;
-  health_dec:=psingle(@p.B.data[p.r_pos+4])^;
-  if (cld.ps.GameID = killer_id) or (cld.ps.GameID = target_id) then begin
-    FZLogMgr.Get.Write('Local player cannot be victim or hitter!', FZ_LOG_ERROR);
+  if onlylocalsender and (sender_clid <> local_client.base_IClient.ID.id) then begin
+    BadEventsProcessor(FZ_SEC_EVENT_WARN, HITS_GROUP + GenerateMessageForClientId(sender_clid, '" tries to send server-only hit message'));
     exit;
-  end else begin
-    victim:=nil;
-    hitter:=nil;
-    ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @target_id, @victim);
-    ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @killer_id, @hitter);
+  end;
 
-    victim_str := GetNameFromClientdata(victim);
-    hitter_str := GetNameFromClientdata(hitter);
+  pGame:=GetCurrentGame();
+  R_ASSERT(pGame<>nil, 'Cannot get game while checking hit for local player');
 
-    FZLogMgr.Get.Write('Hitter '+hitter_str+' (id='+inttostr(killer_id)+'), victim = '+victim_str+' (id='+inttostr(target_id)+'), health dec = '+floattostr(health_dec), FZ_LOG_IMPORTANT_INFO);
+  victim_ps := GetPlayerStateByGameID(@pGame.base_game_sv_GameState, victim_gameid^);
+  killer_ps := GetPlayerStateByGameID(@pGame.base_game_sv_GameState, killer_gameid^);
+
+  //Теперь убедимся, что локальный клиент не захитован и не сделал хит. Опасность возникает только в случае, когда там напрямую указан GameID локального клиента-спектатора!
+  //В противном случае game_sv_GameState::get_eid никогда не вернет локального клиента.
+  //Но все-таки лучше сделать и через get_eid... На всякий
+  if (local_client.ps.GameID = victim_gameid^) or (victim_ps = local_client.ps) then begin
+    FZLogMgr.Get.Write('Local client is a victim in the hit message, skip the message', FZ_LOG_ERROR );
+    exit;
+  end;
+
+  if (local_client.ps.GameID = killer_gameid^) or (killer_ps = local_client.ps) then begin
+    if try_correct_hitter then begin
+      FZLogMgr.Get.Write('Local client is a hitter in the hit message, force victim to be self-killed', FZ_LOG_ERROR );
+      killer_gameid^:=victim_gameid^;
+    end else begin
+      FZLogMgr.Get.Write('Local client is a hitter in the hit message, skip the message', FZ_LOG_ERROR );
+      exit;
+    end;
   end;
 
   result:=true;
 end;
 
-function game_sv_GameState__OnEvent_CheckHit(src_id:cardinal; dest_id:cardinal; packet:pNET_Packet; senderid:cardinal):boolean; stdcall;
-var
-  cld, victim, hitter:pxrClientData;
-  hit:SHit;
-  hit_stat_mode:cardinal;
-  victim_str, hitter_str:string;
+function OnGameEventPlayerHitted(p:pNET_Packet; clid:cardinal):boolean; stdcall;
 begin
-//  FZLogMgr.Get.Write('hit by '+inttostr(senderid));
+  //GAME_EVENT_PLAYER_HITTED серверу может отправлять только локальный клиент!
+  result:=CheckForLocalHitterOrVictim(clid, pword(@p.B.data[p.r_pos]), pword(@p.B.data[p.r_pos+sizeof(word)]), true, true);
+end;
 
+function OnGameEventPlayerKilled(p:pNET_Packet; clid:cardinal):boolean; stdcall;
+begin
+  //GAME_EVENT_PLAYER_KILLED серверу может отправлять только локальный клиент!
+  result:=CheckForLocalHitterOrVictim(clid, pword(@p.B.data[p.r_pos]), pword(@p.B.data[p.r_pos+sizeof(word)+sizeof(byte)]), true, true);
+end;
+
+procedure HitLogger(victim:pxrClientData; hitter:pxrClientData; hit:pSHit);
+var
+  hit_stat_mode:cardinal;
+  victim_str, hitter_str, weapon_str:string;
+begin
+  //1 - Пишем стату по всем хитам
+  //2 - Пишем стату по хитам, прилетающим от одного игрока в другого
+  hit_stat_mode:=FZConfigCache.Get.GetDataCopy.hit_statistics_mode;
+
+  if (hit_stat_mode = 1) or ((hit_stat_mode = 2) and (hitter<>nil) and (victim<>nil) ) then begin
+    victim_str := GetNameFromClientdata(victim, hit.DestID);
+    hitter_str := GetNameFromClientdata(hitter, hit.whoID);
+
+    if (hit.whoID <> hit.weaponID) then begin
+      weapon_str := GetNameFromClientdata(nil, hit.weaponID);
+      hitter_str:=hitter_str+' '+weapon_str;
+    end;
+
+    FZLogMgr.Get.Write( HITS_GROUP+hitter_str+' -> '+victim_str+
+                        ' (T='+inttostr(hit.hit_type)+
+                        ', P='+FZCommonHelper.FloatToString(hit.power, 4,2)+
+                        ', I='+FZCommonHelper.FloatToString(hit.impulse, 4,2)+
+                        ', B='+inttostr(hit.boneID)+
+                        ')', FZ_LOG_IMPORTANT_INFO);
+  end;
+end;
+
+//Обработчик GAME_EVENT_ON_HIT
+function OnGameEventDelayedHitProcessing(src_id:cardinal; dest_id:cardinal; packet:pNET_Packet; senderid:cardinal):boolean; stdcall;
+var
+  local_client, victim, hitter:pxrClientData;
+  hit:SHit;
+begin
   result:=false;
+  hitter:=nil;
+  victim:=nil;
 
+  //[bug] Если в пакете в качестве источника хита окажется GameID уже несуществующего объекта - сервак развалится, а клиенты вылетят
+  //Так как src_id был проверен в движке и гарантированно существует (уже заменен на отправителя в случае необходимости),
+  //то обновим на него тот, который в пакете
+  (pword(@packet.B.data[packet.r_pos-2]))^ := word(src_id);
 
-  cld:=GetServerClient();
-  if cld = nil then begin
-    FZLogMgr.Get.Write('No local player in OnHit!', FZ_LOG_ERROR);
-    result:=true;
-    exit;
-  end;
+  //Сообщения могут прилетать как от локального клиента (взрывы гранат, огонь, ...), так и от самих игроков
+  //Но вот быть захитованным или наносить хит локальному клиенту нельзя!
+  if not CheckForLocalHitterOrVictim(senderid, @dest_id, @src_id, IsServerControlsHits(), false) then exit;
 
-  if cld.base_IClient.ID.id<>senderid then begin
-    //Хит отправлен не локальным клиентом.
-    //Проверяем, что хит нам отправил сам отправитель, а не кто-то левый
-    LockServerPlayers();
-    try
-      hitter:=nil;
-      ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @src_id, @hitter);
-      if hitter=nil then begin
-        FZLogMgr.Get.Write('Hit from unexistent client???', FZ_LOG_ERROR);
-        exit;
-      end;
+  //Если хит отправлен не локальным клиентом, надо убедиться, что игровой ИД нанесшего хит соответствует отправителю
+  LockServerPlayers();
+  try
+    local_client:=GetServerClient();
+    hitter:=GetClientByGameID(src_id);
+    victim:=GetClientByGameID(dest_id);
 
-      if hitter.ps.GameID<>src_id then begin
-        FZLogMgr.Get.Write('Player id='+inttostr(senderid)+' sent not own hit!!!', FZ_LOG_ERROR);
-        exit;
-      end;
-    finally
-      UnLockServerPlayers();
-    end;
-  end;
-
-  //локальный игрок может отправлять хиты от окружающей среды, но не может быть хиттером или жертвой
-  result:= not ((cld.ps.GameID = src_id) or (cld.ps.GameID = dest_id));
-  if not result then begin
-    if (cld.ps.GameID = src_id) then begin
-      FZLogMgr.Get.Write('Local player makes hit? Rejecting!', FZ_LOG_ERROR);
-    end else if (cld.ps.GameID = dest_id) then begin
-      FZLogMgr.Get.Write('Local player has been hitted? Rejecting!', FZ_LOG_ERROR);
-    end;
-  end else begin
     ReadHitFromPacket(packet, @hit);
+    HitLogger(victim, hitter, @hit);
 
-    victim:=nil;
-    hitter:=nil;
-    ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @dest_id, @victim);
-    ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @src_id, @hitter);
-
-    hit_stat_mode:=FZConfigCache.Get.GetDataCopy.hit_statistics_mode;
-    if hit_stat_mode = 1 then begin
-      //Пишем стату по всем хитам, прилетающим в клиента
-      victim_str := GetNameFromClientdata(victim);
-      hitter_str := GetNameFromClientdata(hitter);
-
-      FZLogMgr.Get.Write( hitter_str+'->'+victim_str+
-                          ' (T='+inttostr(hit.hit_type)+
-                          ', P='+floattostrf(hit.power, ffFixed,4,2)+
-                          ', I='+floattostrf(hit.impulse, ffFixed,4,2)+
-                          ', B='+inttostr(hit.boneID)+
-                          ')', FZ_LOG_INFO);
-
-      //todo:анализ хита
+    if (local_client=nil) or (local_client.base_IClient.ID.id<>senderid) then begin
+      //Если отправитель не является ни жертвой, ни киллером - что-то тут не так.
+      if ((hitter<>nil) and (hitter.base_IClient.ID.id <> senderid)) and ((victim<>nil) and (victim.base_IClient.ID.id <> senderid)) then begin
+        BadEventsProcessor(FZ_SEC_EVENT_INFO, GenerateMessageForClientId(senderid, 'sent not own hit?'));
+        exit;
+      end;
     end;
+
+    result:=true;
+  finally
+    UnlockServerPlayers();
   end;
+
+  //todo:анализ хита
 end;
 
 procedure xrServer__Connect_updatemapname(gdd:pGameDescriptionData); stdcall;
@@ -234,47 +237,16 @@ begin
   LeaveCriticalSection(_serverstate.lock);
 end;
 
-procedure game_sv_mp__OnPlayerKilled_checkkiller(victim:pxrClientData; pkiller:ppxrClientData); stdcall;
-var
-  killer:pxrClientData;
+function Check_xrClientData_owner_valid(ptr: pxrClientData): boolean;
+  stdcall;
 begin
-  if (pkiller<>nil) then begin
-    killer:=pkiller^;
-    if (killer<>nil) then begin
-      if killer.base_IClient.flags and ICLIENT_FLAG_LOCAL<>0 then begin
-        pkiller^ := victim;
-      end;
-    end;
-  end;
-end;
-
-function game_sv_mp__OnPlayerHit_preventlocal(victim:pgame_PlayerState; hitter:pgame_PlayerState):boolean; stdcall;
-var
-  cld:pxrClientData;
-begin
-  result:=false;
-  cld:=GetServerClient();
-
-  if (cld<>nil) and (hitter<>nil) and (cld.ps = hitter) then begin
-    result:=true;
-  end;
-
-end;
-
-procedure game_sv_mp__OnPlayerKilled_preventlocal(victim:pgame_PlayerState; hitter:ppgame_PlayerState; weaponid:pword; specialkilltype:pbyte); stdcall;
-var
-  cld:pxrClientData;
-begin
-  cld:=GetServerClient();
-
-  if (cld<>nil) and (hitter<>nil) and (cld.ps = hitter^) then begin
-    hitter^:=victim;
-    specialkilltype^:=SPECIAL_KILL_TYPE__SKT_NONE;
-    weaponid^:=$FFFF;
-  end;
+  result:=(ptr<>nil) and (ptr.owner<>nil);
 end;
 
 function game_sv__OnDetach_isitemtransfertobagneeded(item: pCSE_Abstract): boolean; stdcall;
+var
+  obj:pCObject;
+  section_name:string;
 begin
   //Игрок умер, этот предмет в его инвентаре
   //Если вернем true - предмет будет перемещен в рюкзак, став доступным для поднятия другими
@@ -283,10 +255,21 @@ begin
   //Если предмет - рюкзак, возвращаем false
   if item.m_tClassID = CLSID_OBJECT_PLAYERS_BAG then exit;
 
-  result:=FZItemCgfMgr.Get.IsItemNeedToBeTransfered(PAnsiChar(@item.s_name.p_.value));
+  obj:=ObjectById(@GetLevel.base_IGame_Level, item.ID);
+  if obj<>nil then begin
+    section_name:=get_string_value(@obj.NameSection);
+  end else begin
+    section_name:=get_string_value(@item.s_name);
+  end;
+
+  result:=FZItemCfgMgr.Get.IsItemNeedToBeTransfered(section_name);
+  FZLogMgr.Get.Write('TransferCheck for ' + get_string_value(@item.s_name)+', id= '+inttostr(item.ID)+' is '+booltostr(result, true), FZ_LOG_DBG );
 end;
 
 function game_sv__OnDetach_isitemremovingneeded(item: pCSE_Abstract): boolean; stdcall;
+var
+  obj:pCObject;
+  section_name:string;
 begin
   //Игрок умер, этот предмет в его инвентаре
   //Если вернем true - предмет будет удален из симуляции
@@ -295,21 +278,30 @@ begin
   //Если предмет - рюкзак, возвращаем false
   if item.m_tClassID = CLSID_OBJECT_PLAYERS_BAG then exit;
 
+  obj:=ObjectById(@GetLevel.base_IGame_Level, item.ID);
+  if obj<>nil then begin
+    section_name:=get_string_value(@obj.NameSection);
+  end else begin
+    section_name:=get_string_value(@item.s_name);
+  end;
+
   //перед этим уже было проверено, нуждается ли предмет в перемещении, и если нуждается - нас бы не вызвали
-  result:=FZItemCgfMgr.Get.IsItemNeedToBeRemoved(PAnsiChar(@item.s_name.p_.value));
+  result:=FZItemCfgMgr.Get.IsItemNeedToBeRemoved(section_name);
+
+  FZLogMgr.Get.Write('RemoveCheck for ' + get_string_value(@item.s_name)+', id= '+inttostr(item.ID)+' is '+booltostr(result, true), FZ_LOG_DBG );
 end;
 
 procedure game_sv_Deathmatch__OnDetach_destroyitems(game: pgame_sv_mp; pfirst_item: ppCSE_Abstract; plast_item: ppCSE_Abstract); stdcall;
 begin
   while pfirst_item<>plast_item do begin
     if pfirst_item<>nil then begin
-      game_sv_mp__RejectGameItem.Call([game, pfirst_item^]);
+      game_RejectGameItem(game, pfirst_item^);
     end;
     pfirst_item:=pointer(uintptr(pfirst_item)+sizeof(pfirst_item));
   end;
 end;
 
-function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_mp; corpse: pCSE_Abstract): boolean; stdcall;
+function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_GameState; corpse: pCSE_Abstract): boolean; stdcall;
 var
   pid:pword;
   item:pCSE_Abstract;
@@ -317,7 +309,7 @@ begin
   pid:=corpse.children.start;
   result:=true;
   while pid<>corpse.children.last do begin
-    item:=xrServer__ID_to_entity.Call([game.base_game_sv_GameState.m_server, pid^]).VPointer;
+    item:=EntityFromEid(game, pid^);
     if (item <> nil) and (item.m_tClassID = CLSID_OBJECT_PLAYERS_BAG) then begin
       // Рюкзак не выбросился, пока удалять нельзя
       result:=false;
@@ -336,7 +328,7 @@ begin
     tmp_packet:=p^;
     PWord(@tmp_packet.B.data[0])^:=M_SV_DIGEST;
     tmp_packet.r_pos:=0;
-    virtual_IPureServer__OnMessage.Call([srv, @tmp_packet, sender.id]);
+    IPureServer__OnMessage(srv, @tmp_packet, sender.id);
   end;
 end;
 
@@ -347,6 +339,26 @@ begin
     FillMemory(Address, sizeof(ip_address), 0);
     FillMemory(pPort, sizeof(cardinal), 0);
     result:=false;
+  end;
+end;
+
+procedure NET_Packet__w_checkOverflow(p:pNET_Packet; count:cardinal); stdcall;
+begin
+  if sizeof(p.B.data) - p.B.count < count then begin
+    R_ASSERT(false, 'Net packet overflow: stored '+inttostr(p.B.count)+' bytes, trying to write '+inttostr(count)+' bytes; packet type '+inttostr(pWord(@p.B.data[0])^), 'NET_Packet::w');
+  end;
+end;
+
+procedure SplitEventPackPackets(packet:pNET_Packet); stdcall;
+begin
+  if packet.B.count > sizeof(packet.B.data) - 100 then begin
+    FZLogMgr.Get().Write('Flushing part of the events pack to prevent buffer overrun', FZ_LOG_DBG);
+    //Отправим пакет
+    SendBroadcastPacket(@GetLevel.Server.base_IPureServer, packet);
+
+    //Начнем запись в пакет с самого начала
+    ClearPacket(packet);
+    WriteToPacket(packet, @M_EVENT_PACK, sizeof(M_EVENT_PACK));
   end;
 end;
 

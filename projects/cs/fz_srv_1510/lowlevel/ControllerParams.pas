@@ -34,14 +34,11 @@ FZControllerMgr = class
     class function IsSACE3APIPresent():boolean; stdcall;
 end;
 
-
-
-
 implementation
 uses LogMgr, SysUtils, Windows, basedefs, srcBase;
 var
-  instance:FZControllerMgr;
-  sace3_checker:FZGetUACPlayerInfo_fun;
+  instance:FZControllerMgr = nil;
+  sace3_checker:FZGetUACPlayerInfo_fun= nil;
 
 { FZControllerMgr }
 
@@ -244,7 +241,4 @@ begin
 
 end;
 
-begin
-  instance:=nil;
-  sace3_checker:=nil;
 end.

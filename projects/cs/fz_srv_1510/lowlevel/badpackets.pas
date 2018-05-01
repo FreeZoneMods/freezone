@@ -37,7 +37,7 @@ begin
   //ну и хватит ) Хотя можно и дальше было бы извращаться, но клиенту хватит и этого
   //захочешь больше - смотри game_PlayerState::net_Import
 
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 procedure SendBrokenSVConfigGamePacket(srv:pIPureServer; cl_id:cardinal); stdcall;
@@ -51,7 +51,7 @@ begin
   s:='unk';
   WriteToPacket(@p, PChar(s), length(s)+1); //хидер
 
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 procedure SendBrokenMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word); stdcall;
@@ -76,7 +76,7 @@ begin
   WriteToPacket(@p, @c, sizeof(c));
   WriteToPacket(@p, @c, sizeof(c));          
 
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 
@@ -92,7 +92,7 @@ begin
   //max 64 bytes. Make longer! Get overflow...
   s:='12345678901234567890123456789012345678901234567890123456789012345678901234567890';
   WriteToPacket(@p, PChar(s), length(s)+1);
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 procedure SendBrokenSpawnPacket(srv:pIPureServer; cl_id:cardinal); stdcall;
@@ -106,7 +106,7 @@ begin
   WriteToPacket(@p, @M_SPAWN, sizeof(M_SPAWN)); //хидер
   s:='sace3_anticheat';  //this section is not exist ;)
   WriteToPacket(@p, PChar(s), length(s)+1);
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 procedure SendFileReceiveStart(srv:pIPureServer; cl_id:cardinal); stdcall;
@@ -130,7 +130,7 @@ begin
   end;}
   WriteToPacket(@p, PChar(s), length(s)+1);
 
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 procedure SendFileReceivePacket(srv:pIPureServer; cl_id:cardinal); stdcall;
@@ -154,7 +154,7 @@ begin
 
   WriteToPacket(@p, @b, sizeof(b));//data
 
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 end;
 
 

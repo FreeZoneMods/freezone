@@ -2,12 +2,12 @@ unit Schedule;
 {$mode delphi}
 interface
 
-type IScheduled = packed record
+type ISheduled = packed record
   vftable:pointer;
   shedule:word; //bitset really
   _unused:word;
 end;
-type pIScheduled = ^IScheduled;
+type pISheduled = ^ISheduled;
 
 implementation
 

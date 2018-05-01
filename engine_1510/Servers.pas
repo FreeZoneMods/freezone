@@ -1,7 +1,7 @@
 unit Servers;
 {$MODE Delphi}
 interface
-uses xrstrings, PureServer, SrcCalls, Clients, vector, Synchro, Games;
+uses xrstrings, PureServer, SrcCalls, Clients, vector, Synchro, Games, Packets, CSE;
 function Init():boolean; stdcall;
 procedure ForEachClientDo(action:PlayerAction; predicate:PlayerSearchPredicate = nil; parameter:pointer=nil; parameter2:pointer=nil); stdcall;
 function CurPlayersCount:cardinal; stdcall;
@@ -12,6 +12,8 @@ function GetServerClient():pxrClientData; stdcall;
 procedure LockServerPlayers(); stdcall;
 procedure UnlockServerPlayers(); stdcall;
 
+function ID_to_client(clid:cardinal): pxrClientData;
+function PS_to_client(ps:pgame_PlayerState): pxrClientData;
 
 type
 xrServer = packed record
@@ -68,16 +70,19 @@ end;
 #define DPNSEND_COALESCE 0x0100
 }
 
-var
-  IPureServer__SendTo:srcECXCallFunction;
-  IPureServer__SendTo_LL:srcECXCallFunction;
-  virtual_IPureServer__DisconnectClient:srcVirtualECXCallFunction;
-  virtual_IPureServer__OnMessage:srcVirtualECXCallFunction;
-  virtual_IPureServer__Flush_Clients_Buffers:srcVirtualECXCallFunction;
-  CID_Generator__tfGetID:srcESICallFunctionWEAXArg;
-  xrServer__ID_to_entity:srcECXCallFunction;
-
 procedure xrServer__SendConnectResult(this:pxrServer; CL:pIClient; res:byte; res1:byte; ResultStr:PChar); stdcall;
+
+procedure SendPacketToClient(this:pIPureServer; clid:cardinal; p:pNET_Packet; flags:cardinal = 8; timeout:cardinal = 0); stdcall;
+procedure SendPacketToClient_LL(this:pIPureServer; clid:cardinal; data:pointer; size:cardinal; flags:cardinal = 8; timeout:cardinal = 0); stdcall;
+procedure SendBroadcastPacket(this:pIPureServer; p:pNET_Packet; flags:cardinal = 8) stdcall;
+procedure ReserveGameID(srv:pxrServer; gameid:cardinal); stdcall;
+
+//use EntityFromEid instead (Games module)
+//function EntityByGameID(srv:pxrServer; gameid:cardinal):pCSE_Abstract; stdcall;
+
+procedure IPureServer__OnMessage(srv:pIPureServer; p:pNET_Packet; clid:cardinal); stdcall;
+procedure IPureServer__DisconnectClient(srv:pIPureServer; player:pIClient; reason:string); stdcall;
+function GetClientAddress(srv:pIPureServer; clid:cardinal; addr:pip_address; port:pcardinal):boolean; stdcall;
 
 function CheckForClientExist(srv:pxrServer; cl:pIClient):boolean; stdcall; //doesn't enter critical section! You MUST enter it manually before calls!
 
@@ -85,12 +90,64 @@ const
   xrServer__ErrNoErr:cardinal=2;
 
 implementation
-uses basedefs, Packets, Level, dynamic_caster;
+uses basedefs, Level, dynamic_caster, xr_debug, windows;
+
+var
+  IPureServer__SendTo:srcECXCallFunction;
+  IPureServer__SendTo_LL:srcECXCallFunction;
+  IPureServer__SendBroadcast:srcECXCallFunction;
+  IPureServer__GetClientAddress:srcECXCallFunction;
+  virtual_IPureServer__DisconnectClient:srcVirtualECXCallFunction;
+  virtual_IPureServer__OnMessage:srcVirtualECXCallFunction;
+  virtual_IPureServer__Flush_Clients_Buffers:srcVirtualECXCallFunction;
+  CID_Generator__tfGetID:srcESICallFunctionWEAXArg;
+  xrServer__ID_to_entity:srcECXCallFunction;
+
+procedure SendPacketToClient(this:pIPureServer; clid:cardinal; p:pNET_Packet; flags:cardinal = 8; timeout:cardinal = 0); stdcall;
+begin
+ IPureServer__SendTo.Call([this, clid, p, flags, timeout]);
+end;
+
+procedure SendPacketToClient_LL(this:pIPureServer; clid:cardinal; data:pointer; size:cardinal; flags:cardinal = 8; timeout:cardinal = 0); stdcall;
+begin
+ IPureServer__SendTo_LL.Call([this, clid, data, size, flags, timeout]);
+end;
+
+procedure ReserveGameID(srv:pxrServer; gameid:cardinal); stdcall;
+begin
+  CID_Generator__tfGetID.Call([@srv.m_tID_Generator, gameid]);
+end;
+
+function EntityByGameID(srv:pxrServer; gameid:cardinal):pCSE_Abstract; stdcall;
+begin
+  result:=xrServer__ID_to_entity.Call([srv, gameid]).VPointer;
+end;
+
+procedure IPureServer__OnMessage(srv:pIPureServer; p:pNET_Packet; clid:cardinal); stdcall;
+begin
+  virtual_IPureServer__OnMessage.Call([srv, p, clid]);
+end;
+
+procedure IPureServer__DisconnectClient(srv:pIPureServer; player:pIClient; reason:string); stdcall;
+begin
+  virtual_IPureServer__DisconnectClient.Call([srv, player, PAnsiChar(reason)]);
+end;
+
+function GetClientAddress(srv: pIPureServer; clid: cardinal; addr: pip_address; port: pcardinal): boolean; stdcall;
+begin
+  result:=IPureServer__GetClientAddress.Call([srv, clid, addr, port]).VBoolean;
+end;
+
+procedure SendBroadcastPacket(this: pIPureServer; p: pNET_Packet; flags: cardinal)stdcall;
+begin
+  IPureServer__SendBroadcast.Call([this, -1, p, flags]);
+end;
 
 procedure xrServer__SendConnectResult(this:pxrServer; CL:pIClient; res:byte; res1:byte; ResultStr:PChar); stdcall;
 var
   p:NET_Packet;
   tmpb:byte;
+  pSrvOptions:PAnsiChar;
 begin
   ClearPacket(@p);
   p.w_allow:=true;
@@ -106,7 +163,9 @@ begin
     tmpb:=0;
   end;
   WriteToPacket(@p, @tmpb, sizeof(tmpb));
-  WriteToPacket(@p, @pCLevel(g_ppGameLevel^).m_caServerOptions.p_.value, length(PChar(@pCLevel(g_ppGameLevel^).m_caServerOptions.p_.value)));
+
+  pSrvOptions:=get_string_value(@(GetLevel.m_caServerOptions));
+  WriteToPacket(@p, pSrvOptions, length(pSrvOptions));
 
   IPureServer__SendTo.Call([@this.base_IPureServer, CL.ID.id, @p, 8, 0]);
   if res=0 then begin
@@ -114,7 +173,6 @@ begin
     virtual_IPureServer__DisconnectClient.Call([@this.base_IPureServer, CL, ResultStr])
   end;
 end;
-
 
 procedure ForEachClientDo(action:PlayerAction; predicate:PlayerSearchPredicate = nil; parameter:pointer=nil; parameter2:pointer=nil); stdcall;
 var
@@ -146,7 +204,7 @@ begin
   xrCriticalSection__Enter(@pm.csPlayers);
   try
     pm.now_iterating_in_net_players:=1;
-    result:= (cardinal(pm.net_Players.last) - cardinal(pm.net_Players.start)) div sizeof(pIClient);
+    result:= items_count_in_vector(@pm.net_Players, sizeof(pIClient));
     pm.now_iterating_in_net_players:=0;
   finally
     xrCriticalSection__Leave(@pm.csPlayers);
@@ -170,12 +228,12 @@ end;
 
 function GetPureServer():pIPureServer; stdcall;
 begin
-  if (g_ppGameLevel=nil) or (g_ppGameLevel^=nil) then begin
+  if GetLevel() = nil then begin
     result:=nil;
     exit;
   end;
 
-  result:=@(pCLevel(g_ppGameLevel^).Server.base_IPureServer);
+  result:=@GetLevel.Server.base_IPureServer;
 end;
 
 procedure LockServerPlayers(); stdcall;
@@ -198,18 +256,34 @@ begin
   end;
 end;
 
+function ID_to_client(clid:cardinal): pxrClientData;
+begin
+  result:=nil;
+  ForEachClientDo(AssignFoundClientDataAction, OneIDSearcher, @clid, @result);
+end;
+
+function PS_to_client(ps:pgame_PlayerState): pxrClientData;
+begin
+  R_ASSERT(ps<>nil, 'Cannot get client by nil PlayerState');
+  result:=nil;
+  //Кастуется от IClient к xrClientData автоматом
+  ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @ps.GameID, @result);
+end;
+
 function Init():boolean; stdcall;
 const
   IPureServer__DisconnectClient_index:cardinal = $40;
   IPureServer__Flush_Clients_Buffers_index:cardinal = $1C;
   IPureServer__OnMessage_index:cardinal = $24;
 begin
- IPureServer__SendTo:=srcECXCallFunction.Create(pointer(xrNetServer+$B0E0), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger], 'SendTo', 'IPureServer'); ;
- IPureServer__SendTo_LL:=srcECXCallFunction.Create(pointer(xrNetServer+$AFF0), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger, vtInteger], 'SendTo_LL', 'IPureServer'); ; 
+ IPureServer__SendTo:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?SendTo@IPureServer@@QAEXVClientID@@AAVNET_Packet@@II@Z'), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger], 'SendTo', 'IPureServer'); ;
+ IPureServer__SendTo_LL:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?SendTo_LL@IPureServer@@UAEXVClientID@@PAXIII@Z'), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger, vtInteger], 'SendTo_LL', 'IPureServer'); ;
+ IPureServer__SendBroadcast:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?SendBroadcast@IPureServer@@UAEXVClientID@@AAVNET_Packet@@I@Z'), [vtPointer, vtInteger, vtPointer, vtInteger], 'SendBroadcast', 'IPureServer'); ;
+ IPureServer__GetClientAddress:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?GetClientAddress@IPureServer@@QAE_NVClientID@@AAUip_address@@PAK@Z'), [vtPointer, vtInteger, vtPointer, vtPointer], 'GetClientAddress', 'IPureServer'); ;
+
  virtual_IPureServer__DisconnectClient:=srcVirtualECXCallFunction.Create(IPureServer__DisconnectClient_index, [vtPointer, vtPointer, vtPChar], 'DisconnectClient','IPureServer');
  virtual_IPureServer__Flush_Clients_Buffers:=srcVirtualECXCallFunction.Create(IPureServer__Flush_Clients_Buffers_index, [vtPointer], 'Flush_Clients_Buffers','IPureServer');
  virtual_IPureServer__OnMessage:=srcVirtualECXCallFunction.Create(IPureServer__OnMessage_index, [vtPointer, vtPointer, vtInteger], 'OnMessage', 'IPureServer' );
-
  if xrGameDllType()=XRGAME_SV_1510 then begin
    CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$5F370), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
    xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2c6f20), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
@@ -218,8 +292,10 @@ begin
    xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2dbf90), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
  end;
 
-
- result:=true;
+ result:= (IPureServer__SendTo.GetMyAddress()<>nil) and
+          (IPureServer__SendTo_LL.GetMyAddress()<>nil) and
+          (IPureServer__SendBroadcast.GetMyAddress()<>nil) and
+          (IPureServer__GetClientAddress.GetMyAddress()<>nil);
 end;
 
 end.

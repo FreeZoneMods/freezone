@@ -56,10 +56,11 @@ PlayerAction = function (player:pointer{pIClient}; parameter:pointer=nil; parame
 procedure ForEachClientDo_LL(pm:pPlayersMonitor; action:PlayerAction; predicate:PlayerSearchPredicate = nil; parameter:pointer=nil; parameter2:pointer=nil); stdcall;
 
 function OneIDSearcher(player:pointer; id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
-function AssignFoundClientAction(player:pointer; {%H-}id:pointer; res:pointer):boolean; stdcall;
+function AssignFoundClientAction(player:pointer; {%H-}id:pointer; res:pointer):boolean; stdcall;     //as pIClient
+function AssignFoundClientDataAction(player:pointer; {%H-}id:pointer; res:pointer):boolean; stdcall; //as pxrClientData
 function LocalClientSearcher(player:pointer; {%H-}id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
 function OneGameIDSearcher(player:pointer; id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
-function AssignFoundClientDataAction(player:pointer; {%H-}id:pointer; res:pointer):boolean; stdcall;
+function OnePlayerStateSearcher(player:pointer; ps:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
 
 function CheckForClientOnline_LL(pm:pPlayersMonitor; cl:pointer{pIClient}):boolean; stdcall; //doesn't enter critical section! You MUST enter it manually before calls!
 
@@ -106,6 +107,19 @@ begin
   if cld=nil then exit;
 
   result:=(cld.ps.GameID = pword(id)^);
+end;
+
+function OnePlayerStateSearcher(player:pointer; ps:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
+var
+  cld:pxrClientData;
+begin
+  result:=false;
+  if (ps=nil) then exit;
+
+  cld:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
+  if cld=nil then exit;
+
+  result:= (cld.ps = ppgame_PlayerState(ps)^) ;
 end;
 
 function AssignFoundClientDataAction(player:pointer; id:pointer; res:pointer):boolean; stdcall;

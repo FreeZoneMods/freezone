@@ -21,81 +21,60 @@ const
   ServerAdminName:PChar = 'ServerAdmin';
 
 implementation
-uses LogMgr, sysutils, TranslationMgr, ChatCommands, dynamic_caster, basedefs, Players, Console, Censor, ConfigCache, Level, ControlGUI;
+uses LogMgr, sysutils, TranslationMgr, ChatCommands, dynamic_caster, basedefs, Players, Console, Censor, ConfigCache, ControlGUI, HackProcessor, xr_debug;
 
 const
   MAX_NICK_SIZE:cardinal = 50;
   MAX_MSG_SIZE:cardinal = 250;
   FREEZONE_CHAT_STRING:PChar = '%c[red]FreeZone';
+  CHAT_GROUP = '[CHAT]';
 
 
 
 function OnPlayerSpeechMessage(game:pgame_sv_mp; p:pNET_packet; sender:ClientID):boolean; stdcall;
 var
-  cl:pIClient;
   cld:pxrClientData;
   t:cardinal;
 begin
   result:=false;
-  cl:=nil;
-  ForEachClientDo(AssignFoundClientAction, OneIDSearcher, @sender.id, @cl);
-  if cl=nil then exit;
 
-  cld:=dynamic_cast(cl, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
+  cld:=ID_to_client(sender.id);
   if cld=nil then exit;
 
   t:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).OnSpeechMessage();
   if t<>0 then begin
     result:=false;
-    SendChatMessageByFreezone(@(pCLevel(g_ppGameLevel^).Server.base_IPureServer), sender.id, FZTranslationMgr.Get.TranslateSingle('fz_speech_have_been_muted_for_you')+' '+inttostr(t div 1000));
+    SendChatMessageByFreezone(GetPureServer(), sender.id, FZTranslationMgr.Get.TranslateSingle('fz_speech_have_been_muted_for_you')+' '+inttostr(t div 1000));
   end else begin
     result:=not FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).IsSpeechMuted();
     if not result then begin
-      SendChatMessageByFreezone(@(pCLevel(g_ppGameLevel^).Server.base_IPureServer), sender.id, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_speech'));    
+      SendChatMessageByFreezone(GetPureServer(), sender.id, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_speech'));
     end;  
   end;
 end;
 
 ////////////////////////////////////////////////////////////////////////////////
+function ModifyChatStringForHacker(pMsg:PAnsiChar):boolean;
+var
+  translated:string;
+begin
+  result:=false;
+  translated:=FZTranslationMgr.Get().TranslateOrEmptySingle('fz_chat_antihacker');
+  if length(translated) > 0 then begin
+    translated:=leftstr(translated, MAX_MSG_SIZE-1);
+    strcopy(pMsg, PAnsiChar(translated));
+    //выставить "цвет" сообщени€ (общий чат)
+    pWord(@pMsg[length(translated)+1])^:=0;
+    result:=true;
+  end;
+end;
+
 function CorrectChatSymbol(symb:char):char; stdcall;
 begin
   case symb of
     '%', '$', '#': result:='_';
   else
     result:=symb;
-  end;
-end;
-
-function CheckPlayerChatForMute(player:pointer; pl_id:pointer; pbool_res:pointer):boolean; stdcall;
-var
-  cld:pxrClientData;
-  t:cardinal;
-begin
-  result:=false; //продолжать не надо, клиент искомый только один и так
-  cld:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if cld=nil then exit;
-  if FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).IsMuted() then begin
-    pboolean(pbool_res)^:=true;
-  end else begin
-    t:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).OnChatMessage();
-    pboolean(pbool_res)^:=(t<>0);
-    if t<>0 then begin
-      SendChatMessageByFreezone(@(pCLevel(g_ppGameLevel^).Server.base_IPureServer), pcardinal(pl_id)^, FZTranslationMgr.Get.TranslateSingle('fz_chat_have_been_muted_for_you')+' '+inttostr(t div 1000));
-    end;
-  end;
-end;
-
-
-function OnPlayerBadWord(player:pointer; {%H-}pl_id:pointer; ptime:pointer):boolean; stdcall;
-var
-  cld:pxrClientData;
-begin
-  result:=false; //продолжать не надо, клиент искомый только один и так
-  cld:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if cld<>nil then begin
-    pcardinal(ptime)^:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).OnBadWordsInChat();
-  end else begin
-    pcardinal(ptime)^:=0;
   end;
 end;
 
@@ -120,107 +99,127 @@ end;
 
 function OnChatMessage_ValidateAndChange(srv:pxrServer; p:pNET_packet; sender:pxrClientData):boolean; stdcall;
 var
-  i:cardinal;
-  pname:PChar;
-  pmsg:PChar;
-  teamid:word;
-  teamid_sender:word;
-  is_muted:boolean;
-  t:cardinal;
+  pData:pByte;
+  dest_teamid, msg_type, from_teamid:word;
+  pNick, pMsg:PAnsiChar;
+  len_nick, len_message, time:cardinal;
   msg_struct:FZChatMsg;
-  j:cardinal;
+  gui_str:string;
+  buf:FZPlayerStateAdditionalInfo;
+const
+  MUTED:string='[MUTED] ';
+  CENSORED:string='[CENSORED] ';
 begin
+  R_ASSERT( (sender<>nil) and (p<>nil) and (srv<>nil), 'Cannot validate chat message - invalid input detected');
+
   //если отправл€ть ничего уже никому не надо - вернуть false;
-  if pword(@p.B.data[0])^<>M_CHAT_MESSAGE then begin
-    result:=false;
+  result:=false;
+  pData:=@p.B.data[0];
+
+  msg_type:=pWord(pData)^;
+  if msg_type<>M_CHAT_MESSAGE then begin
+    //если отправл€ть ничего уже никому не надо - вернуть false;
     exit;
+  end;
+  pData:=@pData[sizeof(msg_type)];
+
+  dest_teamid:=pWord(pData)^;
+  if (dest_teamid<>$FFFF) and (dest_teamid>2) then begin
+    BadEventsProcessor(FZ_SEC_EVENT_ATTACK, CHAT_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent message to team #'+inttostr(dest_teamid)+'. Dropping.' ));
+    exit;
+  end;
+  pData:=@pData[sizeof(dest_teamid)];
+
+  pNick:=PAnsiChar(pData);
+  len_nick:=0;
+  while (pNick[len_nick]<>chr(0)) and (len_nick<MAX_NICK_SIZE) do begin
+    pNick[len_nick]:=CorrectChatSymbol(pNick[len_nick]);
+    len_nick:=len_nick+1;
   end;
 
-  teamid:=pword(@p.B.data[p.r_pos])^;
-  if (teamid<>$FFFF) and (teamid>2) then begin
-    FZLogMgr.Get.Write('Player ID='+inttostr(sender.base_IClient.ID.id)+'sent message to team #'+inttostr(teamid)+'. Dropping.', FZ_LOG_ERROR);
-    result:=false;
-    exit;    
-  end;
-  i:=p.r_pos+2;
-  pname:=PChar(@p.B.data[i]);
-
-  j:=0;
-  while (p.B.count>i) and (j<=MAX_NICK_SIZE) do begin
-    if p.B.data[i+j]=0 then begin
-      break;
-    end;
-    j:=j+1;
-  end;
-  if j>MAX_NICK_SIZE then begin
-    FZLogMgr.Get.Write('Nickname in chat packet is TOO long, sender ID='+inttostr(sender.base_IClient.ID.id)+'! Dropping.', FZ_LOG_ERROR);
-    result:=false;
+  if len_nick>=MAX_NICK_SIZE then begin
+    BadEventsProcessor(FZ_SEC_EVENT_ATTACK, CHAT_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent chat message with TOO long name. Dropping!' ));
     exit;
+  end;
+  pData:=@pData[len_nick+1];
+
+  pMsg:=PAnsiChar(pData);
+  len_message:=0;
+  while (pMsg[len_message]<>chr(0)) and (len_message<MAX_MSG_SIZE) do begin
+    pMsg[len_message]:=CorrectChatSymbol(pMsg[len_message]);
+    len_message:=len_message+1;
   end;
 
-  i:=i+j+1;
-  pmsg:=PChar(@p.B.data[i]);
-  j:=0;
-  while (p.B.count>i) and (j<=MAX_MSG_SIZE) do begin
-    if p.B.data[i+j]=0 then begin
-      break;
-    end;
-    p.B.data[i+j]:=byte(CorrectChatSymbol(chr(p.B.data[i+j])));
-    j:=j+1;
-  end;
-  if j>MAX_MSG_SIZE then begin
-    FZLogMgr.Get.Write('Chat message is TOO long, sender ID='+inttostr(sender.base_IClient.ID.id)+'! Dropping.', FZ_LOG_ERROR);
-    result:=false;
+  if len_message >= MAX_MSG_SIZE then begin
+    BadEventsProcessor(FZ_SEC_EVENT_ATTACK, CHAT_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent TOO long chat message. Dropping!' ));
+    ActiveDefence(sender.ps);
+    result:=ModifyChatStringForHacker(pMsg);
     exit;
   end;
-  if j=0 then begin
-    result:=false;
+  pData:=@pData[len_message+1];
+
+  from_teamid:=pWord(pData)^;
+  if (from_teamid<>$FFFF) and (from_teamid > 2) then begin
+    BadEventsProcessor(FZ_SEC_EVENT_ATTACK, CHAT_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent message with invalid source team ID('+inttostr(from_teamid)+'). Dropping!' ));
+    ActiveDefence(sender.ps);
+    result:=ModifyChatStringForHacker(pMsg);
     exit;
   end;
-  i:=i+j+1;
 
   //манипул€ци€ цветами чата
-  if teamid = $FFFF then begin
-    teamid_sender:=0;
+  if dest_teamid = $FFFF then begin
+    from_teamid:=0;
   end else begin
-    teamid_sender := sender.ps.team;
-    //if teamid_sender>0 then teamid_sender:=teamid-1;
+    from_teamid := sender.ps.team;
   end;
+  pWord(pData)^:=from_teamid;
 
-  pword(@p.B.data[i])^:=teamid_sender;
-
-  if (pmsg[0] ='\') or (pmsg[0] ='/') then begin
-    result:=OnChatCommand(srv, pmsg, p, sender)
+  if (pMsg[0] ='\') or (pMsg[0] ='/') then begin
+    result:=OnChatCommand(srv, pMsg, p, sender)
   end else begin
-    result:=true;
-    ControlGUI.AddChatMessageToList(pname, pmsg);
+    gui_str:=pMsg;
+    LockServerPlayers();
+    try
+      buf:=FZPlayerStateAdditionalInfo(sender.ps.FZBuffer);
+      if (buf=nil) then exit;
 
-    //отключение (mute) чата игрока
-    is_muted:=false;
-    ForEachClientDo(CheckPlayerChatForMute, OneIDSearcher, @sender.base_IClient.ID.id, @is_muted);
-    if is_muted then begin
-      FZLogMgr.Get.Write('Muted player '+pname+' tries to say "'+pmsg+'"', FZ_LOG_INFO);
-      SendChatMessageByFreeZone(@srv.base_IPureServer, sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_your_chat_muted'));
-      result:=false;
-      exit;
-    end;
+      //отключение (mute) чата игрока
+      if buf.IsMuted() then begin
+        gui_str:=MUTED+gui_str;
+        FZLogMgr.Get.Write('Muted player '+pNick+' tries to say "'+pMsg+'"', FZ_LOG_INFO);
+        SendChatMessageByFreeZone(@srv.base_IPureServer, sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_your_chat_muted'));
+        exit;
+      end;
 
-    //цензор
-    if FZConfigCache.Get.GetDataCopy.censor_chat and FZCensor.Get.CheckAndCensorString(pmsg, true, 'Censored message:') then begin
-       t:=0;
-       ForEachClientDo(OnPlayerBadWord, OneIDSearcher, @sender.base_IClient.ID.id, @t);
-       if t>0 then begin
-         t:=t div 1000;
-         SendChatMessageByFreeZone(@srv.base_IPureServer, sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_muted_for_badwords')+inttostr(t));
-       end;
-    end;
+      time:=buf.OnChatMessage();
+      if time<>0 then begin
+        gui_str:=MUTED+gui_str;
+        FZLogMgr.Get.Write('Muted player '+pNick+' tries to say "'+pMsg+'"', FZ_LOG_INFO);
+        SendChatMessageByFreezone(GetPureServer(), sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_chat_have_been_muted_for_you')+' '+inttostr(time div 1000));
+        exit;
+      end;
 
-    //отправл€ть радминам весь чат другой команды
-    if (FZConfigCache.Get.GetDataCopy.radmins_see_other_team_chat) and (teamid<>$FFFF) then begin
-      msg_struct.msg:=pmsg;
-      msg_struct.sender:=pname;
-      msg_struct.teamid:=sender.ps.team;
-      ForEachClientDo(SendMessageToRAdmins, nil, @msg_struct, srv);
+      //цензор
+      if FZConfigCache.Get.GetDataCopy.censor_chat and FZCensor.Get.CheckAndCensorString(pMsg, true, 'Censored message:') then begin
+        gui_str:=CENSORED+gui_str;
+        time:=buf.OnBadWordsInChat();
+        if time>0 then begin
+          SendChatMessageByFreeZone(@srv.base_IPureServer, sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_muted_for_badwords')+inttostr(time div 1000));
+        end;
+        //не возвращаем false, чтобы отобразились звездочки
+      end;
+      result:=true;
+
+      //отправл€ть радминам весь чат другой команды
+      if (FZConfigCache.Get.GetDataCopy.radmins_see_other_team_chat) and (from_teamid<>$FFFF) then begin
+        msg_struct.msg:=pMsg;
+        msg_struct.sender:=pNick;
+        msg_struct.teamid:=sender.ps.team;
+        ForEachClientDo(SendMessageToRAdmins, nil, @msg_struct, srv);
+      end;
+    finally
+      UnlockServerPlayers();
+      ControlGUI.AddChatMessageToList(pNick, PAnsiChar(gui_str));
     end;
   end;
 end;
@@ -307,11 +306,11 @@ begin
   if length(name)>integer(MAX_NICK_SIZE) then setlength(msg, MAX_NICK_SIZE);
 
   WriteToPacket(@p, @channel_id, sizeof(channel_id));
-  WriteToPacket(@p, PChar(name), length(name)+1);
-  WriteToPacket(@p, PChar(msg), length(msg)+1);
+  WriteToPacket(@p, PAnsiChar(name), length(name)+1);
+  WriteToPacket(@p, PAnsiChar(msg), length(msg)+1);
   WriteToPacket(@p, @team_id, sizeof(team_id));
 
-  IPureServer__SendTo.Call([srv, cl_id, @p, 8, 0]);
+  SendPacketToClient(srv, cl_id, @p);
 
 end;
 
