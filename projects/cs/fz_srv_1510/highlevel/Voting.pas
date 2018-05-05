@@ -80,9 +80,9 @@ function CanSafeStartVoting(game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID)
 var
   pVoteStr:PAnsiChar;
   i:integer;
-  args:array[0..5] of string;
+  args:array of string;
   args_cnt:integer;
-  tmpstr, logstr:string;
+  tmpstr, logstr, tmpstr2:string;
 const
   BannedSymbols:string = '%';
   MAX_VOTE_STRING_SIZE: integer = 200;
@@ -111,22 +111,26 @@ begin
 
   if i<MAX_VOTE_STRING_SIZE then begin
     //Заполним строки аргументов
-    i:=0;
+    args_cnt:=0;
+    setlength(args, args_cnt);
     tmpstr:=trim(pVoteStr);
     logstr:='';
-    while (i<length(args)-1) and FZCommonHelper.GetNextParam(tmpstr, args[i], ' ') do begin
-       logstr:=logstr+', arg'+inttostr(i)+': '+args[i];
-       tmpstr:=trim(tmpstr);
-      i:=i+1;
+    while FZCommonHelper.GetNextParam(tmpstr, tmpstr2, ' ') do begin
+      args_cnt:=args_cnt+1;
+      setlength(args, args_cnt);
+      tmpstr:=trim(tmpstr);
+      args[args_cnt-1]:=tmpstr2;
+      logstr:=logstr+', arg'+inttostr(args_cnt-1)+': '+args[args_cnt-1];
     end;
 
-    if i<length(args)-1 then begin
+    if length(tmpstr)>0 then begin
       //Последний аргумент не распарсился из-за отсутствия пробела на конце, сохраняем отдельно
-      args[i]:=trim(tmpstr);
-      logstr:=logstr+', arg'+inttostr(i)+': '+args[i];
-      i:=i+1;
+      args_cnt:=args_cnt+1;
+      setlength(args, args_cnt);
+      args[args_cnt-1]:=tmpstr;
+      logstr:=logstr+', arg'+inttostr(args_cnt-1)+': '+args[args_cnt-1];
     end;
-    args_cnt:=i;
+
     FZLogMgr.Get.Write('VoteStart'+logstr, FZ_LOG_DBG);
 
     //Проверим на корректность
@@ -165,6 +169,8 @@ begin
   end else begin
     BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender_id.id, ' is denied to start voting (parameters not parsed)'));
   end;
+
+  setlength(args, 0);
 end;
 
 function IsVoteEarlySuccess(game:pgame_sv_mp; agreed, against_explicit, total_clients:cardinal):boolean; stdcall;
