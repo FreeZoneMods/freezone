@@ -180,6 +180,9 @@ begin
   core_params:=VersionAbstraction().GetCoreParams();
   if params_approved or (Pos(DEBUG_MODE_KEY, core_params)>0) then begin
     settings:=tmp_settings;
+    settings.exe_name:=StringReplace(settings.exe_name, '\', '_', [rfReplaceAll]);
+    settings.exe_name:=StringReplace(settings.exe_name, '/', '_', [rfReplaceAll]);
+    settings.exe_name:=StringReplace(settings.exe_name, '..', '__', [rfReplaceAll]);
     result:=true;
   end;
 
@@ -332,6 +335,8 @@ begin
     assignfile(f, filename);
     rewrite(f);
     opened:=true;
+
+    writeln(f,'$mnt_point$=false|false|$fs_root$|gamedata\');
 
     writeln(f,'$app_data_root$=false |false |$fs_root$|'+userdata_dir_name);
     writeln(f,'$parent_app_data_root$=false |false|'+VersionAbstraction().UpdatePath('$app_data_root$', ''));
@@ -523,6 +528,9 @@ begin
   while VersionAbstraction().CheckForLevelExist() do begin
     Sleep(10);
   end;
+
+  //Пауза для нормального обновления мастер-листа
+  Sleep(500);
 
   FZLogMgr.Get.Write('Starting visual download', FZ_LOG_INFO);
   if not VersionAbstraction().StartVisualDownload() then begin

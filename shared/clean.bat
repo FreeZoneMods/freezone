@@ -10,4 +10,6 @@ cd 3rdparty
 @start clean.bat
 cd ..
 
+rmdir /S /Q backup
+
 exit

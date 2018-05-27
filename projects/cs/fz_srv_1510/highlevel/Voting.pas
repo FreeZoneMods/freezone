@@ -134,31 +134,30 @@ begin
     FZLogMgr.Get.Write('VoteStart'+logstr, FZ_LOG_DBG);
 
     //ѕроверим на корректность
-    if (args[0]='kick') then begin
+    if args_cnt < 1 then begin
+      result := false;
+    end else if (args[0]='kick') then begin
       //ќдин (или более) строковый аргумент, не транслируетс€
-      result := (length(args[1]) > 0);
+      result := (args_cnt > 1);
     end else if (args[0]='ban') then begin
       //ќдин (или более) строковый аргумент (не транслируетс€) и одно число
-      result:=(length(args[1])>0) and (args_cnt > 2) and (strtointdef(args[args_cnt-1], -1)>=0);
+      result:= (args_cnt > 2) and (strtointdef(args[args_cnt-1], -1)>=0);
     end else if (args[0]='fraglimit') or (args[0]='timelimit') then begin
       //ќдин числовой аргумент
-      result := strtointdef(args[1], -1) >= 0;
+      result := (args_cnt = 2) and (strtointdef(args[1], -1) >= 0);
     end else if (args[0]='changeweather') then begin
       //ƒва строковых аргумента, первый “–јЌ—Ћ»–”≈“—я!
-      result:= ((args[1]='clear')  and (args[2]='9:00'))  or
-               ((args[1]='cloudy') and (args[2]='13:00')) or
-               (((args[1]='nigth') or (args[1]='night'))  and (args[2]='01:00')) or
-               ((args[1]='rain')   and (args[2]='16:00'));
+      result:= (args_cnt = 3) and IsWeatherPresent(args[1], args[2]);
     end else if (args[0]='changemap') then begin
       //два строковых аргумента, первый “–јЌ—Ћ»–”≈“—я!
       //ѕровер€ем, есть ли така€ карта на сервере
-      result:=(length(args[1])>0) and (length(args[2])>0) and IsMapPresent(args[1], args[2], game.base_game_sv_GameState.base_game_GameState.m_type);
+      result:=(args_cnt=3) and IsMapPresent(args[1], args[2], game.base_game_sv_GameState.base_game_GameState.m_type);
     end else if (args[0]='changegametype') then begin
       //ќдин строковый аргумент, не транслируетс€
-      result:= (args[1]='dm') or (args[1]='deathmatch') or (args[1]='tdm') or (args[1]='teamdeathmatch') or (args[1]='ah') or (args[1]='artefacthunt') or (args[1]='cta') or (args[1]='capturetheartefact');
+      result:= (args_cnt = 2) and ( (args[1]='dm') or (args[1]='deathmatch') or (args[1]='tdm') or (args[1]='teamdeathmatch') or (args[1]='ah') or (args[1]='artefacthunt') or (args[1]='cta') or (args[1]='capturetheartefact'));
     end else if (args[0]='restart') or (args[0]='restart_fast') then begin
       //нет аргументов
-      result:=true;
+      result:= (args_cnt = 1);
     end else if (length(args[0])>0) and (args[0][1]='$') then begin
       result:=true;
     end

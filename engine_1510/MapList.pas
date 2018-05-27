@@ -10,6 +10,7 @@ SGameWeathers = record
   m_weather_name:shared_str;
   m_start_time:shared_str;
 end;
+pSGameWeathers = ^SGameWeathers;
 
 SGameTypeMaps_SMapItm = record
 	map_name:shared_str;
@@ -35,9 +36,10 @@ function Init():boolean; stdcall;
 function GetMapList():pCMapListHelper; stdcall;
 procedure LoadMapList(); stdcall;
 function IsMapPresent(mapname:string; mapver:string; gametype_id:cardinal):boolean; stdcall;
+function IsWeatherPresent(weathername:string; weathertime:string):boolean; stdcall;
 
 implementation
-uses basedefs, srcCalls;
+uses basedefs, srcCalls, strutils, sysutils;
 var
   g_pMapListHelper:pCMapListHelper;
   CMapListHelper__Load:srcBaseFunction;
@@ -50,6 +52,34 @@ end;
 procedure LoadMapList(); stdcall;
 begin
   CMapListHelper__Load.Call([]);
+end;
+
+function IsWeatherPresent(weathername:string; weathertime:string):boolean; stdcall;
+var
+  i:integer;
+  helper:pCMapListHelper;
+  gWeathers:pSGameWeathers;
+begin
+  result:=false;
+
+  helper:=GetMapList();
+  if helper.m_weathers.start = nil then begin
+    LoadMapList();
+  end;
+
+  gWeathers:=helper.m_weathers.start;
+  if gWeathers = nil then exit;
+
+  weathername:=lowercase(trim(weathername));
+  weathertime:=lowercase(trim(weathertime));
+
+  for i:=0 to items_count_in_vector(@helper.m_weathers, sizeof(SGameWeathers))-1 do begin
+    gWeathers:=get_item_from_vector(@helper.m_weathers, i, sizeof(SGameWeathers));
+    if (gWeathers<>nil) and (lowercase(trim(get_string_value(@gWeathers.m_start_time))) = weathertime) and (lowercase(trim(get_string_value(@gWeathers.m_weather_name))) = weathername) then begin
+      result:=true;
+      break;
+    end;
+  end;
 end;
 
 function IsMapPresent(mapname:string; mapver:string; gametype_id:cardinal):boolean; stdcall;
