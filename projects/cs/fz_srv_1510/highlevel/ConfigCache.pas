@@ -53,6 +53,7 @@ FZCacheData = record
   mod_dsign:string;
   mod_compression_type:cardinal;
   mod_is_reconnect_needed:boolean;
+  mod_prefer_parent_appdata_for_maps:boolean;
 
   allow_russian_nicknames:boolean;
   hit_statistics_mode:cardinal;
@@ -61,6 +62,7 @@ FZCacheData = record
 
   log_severity:cardinal;
   external_log:boolean;
+  log_events:boolean;
   antihacker:boolean;
 
   radmins_see_sec_events:boolean;
@@ -69,6 +71,9 @@ FZCacheData = record
 
   ip_checker_time_delta:cardinal;
   ip_checker_max_connections_per_delta_count:cardinal;
+
+  preserve_map:boolean;
+  mapchange_voting_lock_time:cardinal;
 end;
 pFZCacheData = ^FZCacheData;
 
@@ -215,6 +220,7 @@ begin
   if not FZConfigMgr.Get.GetData('mod_dsign', self._data.mod_dsign) then self._data.mod_dsign:='';
 
   self._data.mod_is_reconnect_needed:=FZConfigMgr.Get.GetBool('mod_is_reconnect_needed', false);
+  self._data.mod_prefer_parent_appdata_for_maps:=FZConfigMgr.Get.GetBool('mod_prefer_parent_appdata_for_maps', false);
 
   self._data.allow_russian_nicknames:=FZConfigMgr.Get.GetBool('allow_russian_nicknames', false);
   self._data.hit_statistics_mode:=FZConfigMgr.Get.GetInt('hit_statistics_mode', 0);
@@ -223,6 +229,7 @@ begin
 
   self._data.log_severity:=FZConfigMgr.Get.GetInt('log_severity',FZ_LOG_DEFAULT_SEVERITY);
   self._data.external_log:=FZConfigMgr.Get.GetBool('external_log', false);
+  self._data.log_events:=FZConfigMgr.Get.GetBool('log_events', false);
   self._data.antihacker:=FZConfigMgr.Get.GetBool('antihacker', false);
 
   self._data.radmins_see_sec_events:=FZConfigMgr.Get.GetBool('radmins_see_sec_events', true);
@@ -232,6 +239,9 @@ begin
 
   self._data.ip_checker_time_delta:=FZConfigMgr.Get.GetInt('ip_checker_time_delta', 60000);
   self._data.ip_checker_max_connections_per_delta_count:=FZConfigMgr.Get.GetInt('ip_checker_max_connections_per_delta_count', 3);
+
+  self._data.preserve_map:=FZConfigMgr.Get.GetBool('preserve_map', false);
+  self._data.mapchange_voting_lock_time:=FZConfigMgr.Get.GetInt('mapchange_voting_lock_time', 0);
 end;
 
 function Init():boolean; stdcall;

@@ -13,7 +13,6 @@ function OnChatCommand(srv:pxrServer; msg:PChar; {%H-}p:pNET_packet; sender:pxrC
 procedure SendChatMessage(srv:pIPureServer; cl_id:cardinal; name:string; msg:string; team_id:word=0; channel_id:word=$FFFF); stdcall;
 procedure SendChatMessageByFreeZone(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
 procedure SendChatMessageByFreeZoneWSplitting(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
-procedure SendSaceChatMessage(srv:pIPureServer; cl_id:cardinal); stdcall;
 
 function Init():boolean; stdcall;
 
@@ -26,7 +25,6 @@ uses LogMgr, sysutils, TranslationMgr, ChatCommands, dynamic_caster, basedefs, P
 const
   MAX_NICK_SIZE:cardinal = 50;
   MAX_MSG_SIZE:cardinal = 250;
-  FREEZONE_CHAT_STRING:PChar = '%c[red]FreeZone';
   CHAT_GROUP = '[CHAT]';
 
 
@@ -226,21 +224,23 @@ end;
 
 function OnChatCommand(srv:pxrServer; msg:PChar; p:pNET_packet; sender:pxrClientData):boolean; stdcall;
 begin
-  //SendChatMessageByFreeZone(@srv.base_IPureServer, sender.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('not_implemented'));
   FZChatCommandList.Get.Execute(msg, sender, srv);
   result:=false;
 end;
 
 procedure SendChatMessageByFreeZone(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
+const
+  FREEZONE_CHAT_PARAM:string = 'fz_chat_message_header';
+  FREEZONE_DEF_CHAT_HDR:PChar = '%c[red]FreeZone';
+var
+  header:string;
 begin
-  SendChatMessage(srv, cl_id, FREEZONE_CHAT_STRING, msg);
+  header:=FZTranslationMgr.Get().TranslateSingle(FREEZONE_CHAT_PARAM);
+  if header = FREEZONE_CHAT_PARAM then begin
+    header := FREEZONE_DEF_CHAT_HDR;
+  end;
+  SendChatMessage(srv, cl_id, PAnsiChar(header), msg);
 end;
-
-procedure SendSaceChatMessage(srv:pIPureServer; cl_id:cardinal); stdcall;
-begin
-  SendChatMessage(srv, cl_id, '%c[0,0,0,0]', '%c[SACE]');
-end;
-
 
 procedure SendChatMessageByFreeZoneWSplitting(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
 var
@@ -314,60 +314,8 @@ begin
 
 end;
 
-
-////////////////////////////////////////////
-procedure MuteCmdInfo(args:PChar); stdcall;
-begin
-  strcopy(args, 'Disables chat for player');
-end;
-procedure MuteCmdExecute(args:PChar); stdcall;
-const
-  INV_F:string='Invalid call. Format: fz_muteplayer <player_id|last_printed> <mute time in seconds|-1 to unmute>';
-var
-  pos_del:integer;
-  t:PChar;
-  time:integer;
-  id:ClientID;
-  res:boolean;
-begin
-  pos_del:=pos(' ', args);
-  if pos_del=0 then begin
-    FZLogMgr.Get.Write(INV_F, FZ_LOG_IMPORTANT_INFO);
-    exit;
-  end;
-  t:=@args[pos_del];
-  args[pos_del-1]:=chr(0);
-
-  pos_del:=pos('raid', t);
-  if pos_del<>0 then begin
-    t[pos_del-1]:=chr(0);
-  end;
-
-  time:=strtointdef(trim(t), 0)*1000;
-  if time=0 then begin
-    FZLogMgr.Get.Write(INV_F, FZ_LOG_IMPORTANT_INFO);
-    exit;  
-  end;
-  if strcomp(args, 'last_printed')=0 then begin
-    id.id:=last_printed_id^;
-  end else begin
-    id.id:=strtoint64def(trim(args),0);
-  end;
-  if time>0 then begin
-    res:=MutePlayer(id, time);
-  end else begin
-    res:=UnMutePlayer(id);
-  end;
-
-  if not res then begin
-    FZLogMgr.Get.Write('No such player id: '+inttostr(id.id), FZ_LOG_IMPORTANT_INFO);
-  end;
-end;
-////////////////////////////////////////////
-
 function Init():boolean; stdcall;
 begin
-  AddConsoleCommand('fz_muteplayer', MuteCmdExecute, MuteCmdInfo);
   result:=true;
 end;
 

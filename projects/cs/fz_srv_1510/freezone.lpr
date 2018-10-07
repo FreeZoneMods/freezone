@@ -3,7 +3,7 @@ library freezone;
 uses
   windows, Forms, Interfaces, lazcontrols,
   srcBase, srcInjections, appinit, basedefs, ConfigMgr, Console, LogMgr,
-  PlayersConnectionLog;
+  PlayersConnectionLog, ge_filter, PlayersConsole, AdminCommands;
 
 
 {$R *.res}
@@ -44,6 +44,8 @@ end;
 exports
   Init;
 
+var
+  CApplication_destructor:pointer;
 begin
   randomize();
 
@@ -57,7 +59,10 @@ begin
 
   Init();
 
-  srcCleanupInjection.Create(pointer(xrEngine+$5f690), @Cleanup, 5);
+  CApplication_destructor:=GetProcAddress(xrEngine, '??1CApplication@@QAE@XZ');
+  if CApplication_destructor<>nil then begin
+    srcCleanupInjection.Create(CApplication_destructor, @Cleanup, 5);
+  end;
   srcKit.Get.InjectAll;
 
   RequireDerivedFormResource:=True;

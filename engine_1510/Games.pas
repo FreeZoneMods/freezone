@@ -138,8 +138,8 @@ type game_sv_mp = packed record
   _unused2:word;
   TeamList:xr_deque;
   m_strWeaponsData:pCItemMgr;
-  m_bVotingActive:boolean;
-  m_bVotingReal:boolean;
+  m_bVotingActive:byte; {boolean}
+  m_bVotingReal:byte; {boolean}
   fz_vote_started_by_admin:byte;
   _unused3:byte;
   m_uVoteStartTime:cardinal;
@@ -147,6 +147,8 @@ type game_sv_mp = packed record
   m_voting_string:shared_str;
   m_started_player:shared_str;
   m_u8SpectatorModes:byte;
+  _unused4:byte;
+  _unused5:word;
   m_cdkey_ban_list:cdkey_ban_list;
   round_statistics_dump_fn:string_path;
   m_async_stats:async_statistics_collector;
@@ -162,12 +164,12 @@ type game_sv_Deathmatch = packed record
   m_vFreeRPoints:array [0..3] of xr_vector {u32};
   m_dwLastRPoints:array[0..3] of cardinal;
 
-  m_delayedRoundEnd:boolean;
+  m_delayedRoundEnd:byte;
   _reserved1:byte;
   _reserved2:word;
   m_roundEndDelay:cardinal;
 
-  m_delayedTeamEliminated:boolean;
+  m_delayedTeamEliminated:byte;
   _reserved3:byte;
   _reserved4:word;
   m_TeamEliminatedDelay:cardinal;
@@ -181,7 +183,7 @@ type game_sv_Deathmatch = packed record
   m_dwLastAnomalySetID:cardinal;
   m_dwLastAnomalyStartTime:cardinal;
   m_AnomalyIDSetsList:xr_vector;
-  m_bSpectatorMode:boolean;
+  m_bSpectatorMode:byte;
   _unused1:byte;
   _unused2:word;
   m_dwSM_SwitchDelta:cardinal;
@@ -217,14 +219,15 @@ const
   eRoundEnd_ArtefactLimit:cardinal=3;
   eRoundEnd_Force:cardinal=$FFFFFFFF;
 
-
   function IsServerControlsHits():boolean;
   procedure game_PlayerAddMoney(pgame:pgame_sv_mp; ps:pgame_PlayerState; amount:int32); stdcall;
   procedure game_RejectGameItem(pgame:pgame_sv_mp; entity:pCSE_Abstract); stdcall;
   procedure game_KillPlayer(pgame:pgame_sv_mp; id_who:cardinal; GameID:cardinal); stdcall;
+  procedure game_OnPlayerSelectTeam(pgame:pgame_sv_mp; client_id:cardinal; team:int16); stdcall;
   function GetPlayerStateByGameID(game:pgame_sv_GameState; gameid:cardinal):pgame_PlayerState; stdcall;
   function GetClientByGameID(gameid:cardinal):pxrClientData; stdcall;
   function GetClientDataByPlayerState(ps:pgame_PlayerState):pxrClientData;
+  function IsServerObjectControlledByClient(obj:pCSE_Abstract; client:pxrClientData):boolean;
   function GetCurrentGame():pgame_sv_mp;
   procedure DestroyAllPlayerItems(game:pgame_sv_mp; client_id:cardinal); stdcall;
   function EntityFromEid(game:pgame_sv_GameState; gameid:cardinal):pCSE_Abstract; stdcall;
@@ -237,6 +240,7 @@ var
   game_sv_mp__KillPlayer:srcECXCallFunction;
   game_sv_mp__RejectGameItem:srcECXCallFunction;
   virtual_game_sv_mp__Player_AddMoney:srcVirtualECXCallFunction;
+  virtual_game_sv_mp__OnPlayerSelectTeam:srcVirtualECXCallFunction;
   virtual_game_sv_mp__DestroyAllPlayerItems:srcVirtualECXCallFunction;
   game_sv_GameState__get_entity_from_eid:srcEDXCallFunctionWEAXArg;
   virtual_game_sv_GameState__get_eid:srcVirtualECXCallFunction;
@@ -246,10 +250,21 @@ const
   game_sv_mp__Player_AddMoney_index:cardinal=$1DC;
   game_sv_GameState__get_eid_index:cardinal=$98;
   game_sv_mp__DestroyAllPlayerItems_index:cardinal=$154;
+  game_sv_mp__OnPlayerSelectTeam_index:cardinal=$1a0;
 
 procedure game_PlayerAddMoney(pgame:pgame_sv_mp; ps:pgame_PlayerState; amount:int32); stdcall;
 begin
   virtual_game_sv_mp__Player_AddMoney.Call([pgame, ps, amount]);
+end;
+
+procedure game_OnPlayerSelectTeam(pgame:pgame_sv_mp; client_id:cardinal; team:int16); stdcall;
+var
+  p:NET_Packet;
+begin
+  ClearPacket(@p);
+  WriteToPacket(@p, @team, sizeof(team));
+
+  virtual_game_sv_mp__OnPlayerSelectTeam.Call([pgame, @p, client_id]);
 end;
 
 function IsServerControlsHits():boolean;
@@ -293,6 +308,20 @@ begin
   ForEachClientDo(AssignFoundClientDataAction, OneGameIDSearcher, @gameid, @result);
 end;
 
+function IsServerObjectControlledByClient(obj:pCSE_Abstract; client:pxrClientData):boolean;
+begin
+  result:=false;
+  if (obj=nil) or (client=nil) then exit;
+
+  //Получим владельца высшего уровня в иерархии
+  while obj.ID_Parent<>$FFFF do begin
+    obj:=EntityFromEid(@GetCurrentGame.base_game_sv_GameState, obj.ID_Parent);
+    R_ASSERT(obj<>nil, 'Can''t get parent object by ID='+inttostr(obj.ID_Parent), 'CheckServerObjectParent');
+  end;
+
+  result:=pxrClientData(obj.owner).base_IClient.ID.id = client.base_IClient.ID.id;
+end;
+
 function GetClientDataByPlayerState(ps:pgame_PlayerState):pxrClientData;
 begin
  result:=nil;
@@ -322,6 +351,7 @@ begin
   end;
   virtual_game_sv_mp__Player_AddMoney:=srcVirtualECXCallFunction.Create(game_sv_mp__Player_AddMoney_index, [vtPointer, vtPointer, vtInteger], 'Player_AddMoney','game_sv_mp');
   virtual_game_sv_mp__DestroyAllPlayerItems:=srcVirtualECXCallFunction.Create(game_sv_mp__DestroyAllPlayerItems_index, [vtPointer, vtInteger], 'DestroyAllPlayerItems', 'game_sv_mp');
+  virtual_game_sv_mp__OnPlayerSelectTeam:=srcVirtualECXCallFunction.Create(game_sv_mp__OnPlayerSelectTeam_index, [vtPointer, vtPointer, vtInteger], 'OnPlayerGameMenu','game_sv_mp');
 
   virtual_game_sv_GameState__get_eid:=srcVirtualECXCallFunction.Create(game_sv_GameState__get_eid_index, [vtPointer, vtInteger], 'get_eid', 'game_sv_GameState');
   result:=true;

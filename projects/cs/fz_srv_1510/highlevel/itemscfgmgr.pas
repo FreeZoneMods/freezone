@@ -32,8 +32,9 @@ type
     function IsItemBannedToBuy(section:string):boolean;
   end;
 
+function Init:boolean; stdcall;
+function Free:boolean; stdcall;
 
-  function Init:boolean; stdcall;
 implementation
 uses sysutils, xr_debug;
 var
@@ -128,6 +129,13 @@ function Init:boolean; stdcall;
 begin
   R_ASSERT(_instance=nil, 'ItemsCfgMgr module is already inited');
   _instance:=FZItemCfgMgr.Create();
+  result:=true;
+end;
+
+function Free:boolean; stdcall;
+begin
+  _instance.Free();
+  _instance:=nil;
   result:=true;
 end;
 

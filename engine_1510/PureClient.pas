@@ -1,7 +1,7 @@
 unit PureClient;
 {$mode delphi}
 interface
-uses Packets, NET_Common, Time, Synchro, vector, Clients;
+uses Packets, NET_Common, xr_time, Synchro, vector, Clients;
 type
 IPureClient = packed record
   base_MultipacketReciever:MultipacketReciever;

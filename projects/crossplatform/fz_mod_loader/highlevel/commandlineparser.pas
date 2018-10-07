@@ -15,6 +15,8 @@ function IsGameSpyDlForced(cmdline: PAnsiChar):boolean;
 function IsFullInstallMode(cmdline: PAnsiChar):boolean;
 function IsSharedPatches(cmdline: PAnsiChar):boolean;
 function GetLogSeverity(cmdline: PAnsiChar):FZLogMessageSeverity;
+function IsCmdLineNameNameNeeded(cmdline:PAnsiChar):boolean;
+function ForceShowMessage(cmdline:PAnsiChar):boolean;
 
 implementation
 uses sysutils,JwaWinDNS;
@@ -188,6 +190,20 @@ begin
 
     result:=FZLogMessageSeverity(tmpres);
   end;
+end;
+
+function IsCmdLineNameNameNeeded(cmdline: PAnsiChar): boolean;
+const
+  INCLUDENAME: string = ' -includename ';
+begin
+  result:=Pos(INCLUDENAME, ' '+cmdline+' ') > 0;
+end;
+
+function ForceShowMessage(cmdline: PAnsiChar): boolean;
+const
+  MESSAGEKEY: string = ' -preservemessage ';
+begin
+  result:=Pos(MESSAGEKEY, ' '+cmdline+' ') > 0;
 end;
 
 function IsFullInstallMode(cmdline: PAnsiChar): boolean;

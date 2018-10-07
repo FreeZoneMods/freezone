@@ -25,6 +25,7 @@ type
     class function StringToFloatDef(str:string; def:single):single;
     class function FloatToString(value: single; precision:integer = 4; digits:integer = 2): string;
     class function ReadFileAsString(fname:string; var str:string):boolean;
+    class function MovingPointerReader(var src: pointer; var srcsize: cardinal; dst: pointer; sizetoread: cardinal):boolean;
 end;
 
 const
@@ -210,7 +211,7 @@ begin
   end;
 end;
 
-class function FZCommonHelper.GetGameTickCount: cardinal;
+class function FZCommonHelper.GetGameTickCount(): cardinal;
 begin
   result:=GetTickCount;
   if result=0 then result:=1;
@@ -316,6 +317,18 @@ begin
   except
     result:=false;
   end;
+end;
+
+class function FZCommonHelper.MovingPointerReader(var src: pointer; var srcsize: cardinal; dst: pointer; sizetoread: cardinal): boolean;
+begin
+  result:=false;
+  if (src=nil) or (dst=nil) then exit;
+  if srcsize < sizetoread then exit;
+
+  CopyMemory(dst, src, sizetoread);
+  srcsize:=srcsize - sizetoread;
+  src:=@pByte(src)[sizetoread];
+  result:=true;
 end;
 
 end.

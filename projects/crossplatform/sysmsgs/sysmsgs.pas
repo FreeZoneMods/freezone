@@ -61,6 +61,7 @@ end;
 FZMapLoadingFlags = cardinal;
 const
   FZ_MAPLOAD_MANDATORY_RECONNECT: FZMapLoadingFlags = 1; //Обязательный реконнект после успешной подгрузки скачанной карты
+  FZ_MAPLOAD_PREFER_PARENT_APPDATA_STORE: FZMapLoadingFlags = 2; //Стараться скачивать карты в родительскую аппдату; полезно в случае, если у нас стоит мод, использующий оригинальные карты.
 
 //Параметры загрузки клиентом db-архива с картой
 type

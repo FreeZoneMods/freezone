@@ -8,7 +8,7 @@ function GenerateKey(data:pbyte; data_size:cardinal; use_separators:boolean=true
 function GenerateRandomKey(use_separators:boolean=true):string;
 
 implementation
-uses Windows, xr_Debug;
+uses Windows;
 
 function CreateCheck(key:pbyte; keylen:integer; cskey:word):word; stdcall;
 var
@@ -17,8 +17,9 @@ var
 begin
   check:=0;
   for i:=0 to keylen-1 do begin
-    check := check*$9CCF9319+key^;
-    key:=pbyte(cardinal(key)+sizeof(byte));
+    check:=cardinal(Int64(check)*$9CCF9319);
+    check:=cardinal(check+key^);
+    key:=pbyte(uintptr(key)+sizeof(byte));
   end;
   result:=(check mod 65521) xor cskey;
 end;
@@ -140,7 +141,7 @@ var
 const
   CLEAR_SKY_KEY:word = 2264;
 begin
-  R_ASSERT(data_size>=10, 'Key generation failed - data must be at least 10 bytes long');
+  assert(data_size>=10, 'Key generation failed - data must be at least 10 bytes long');
 
   check:=CreateCheck(data, data_size-sizeof(word),CLEAR_SKY_KEY);
   PWord(cardinal(data) + data_size{%H-}-sizeof(word))^:=check;

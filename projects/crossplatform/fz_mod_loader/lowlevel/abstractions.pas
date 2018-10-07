@@ -26,6 +26,12 @@ type
     function ThreadSpawn(proc:uintptr; args:uintptr; name:PAnsiChar = nil; stack:cardinal = 0):boolean; virtual; abstract;
     procedure AbortConnection(); virtual; abstract;
     procedure Log(txt:PAnsiChar); virtual; abstract;
+    function GetPlayerName():string; virtual; abstract;
+    function IsServerListUpdateActive():boolean; virtual; abstract;
+    function IsMessageActive():boolean; virtual; abstract;
+    procedure TriggerMessage(); virtual; abstract;
+    procedure PrepareForMessageShowing(); virtual; abstract;
+    procedure ResetMasterServerError(); virtual; abstract;
   end;
 
   { FZTestGameVersion }
@@ -34,6 +40,8 @@ type
   public
     function ThreadSpawn(proc:uintptr; args:uintptr; {%H-}name:PAnsiChar = nil; {%H-}stack:cardinal = 0):boolean; override;
     procedure Log(txt:PAnsiChar); override;
+    function GetPlayerName():string; override;
+    function IsServerListUpdateActive():boolean; override;
   end;
 
   { FZBaseGameVersion }
@@ -68,6 +76,7 @@ type
     CLocatorApi__update_path:pointer;
     CLocatorApi__path_exists:pointer;
     Log_fun:procedure(text:PAnsiChar); cdecl;
+    CConsole__GetString:pointer;
 
     _log_file_name:string;
 
@@ -90,6 +99,7 @@ type
     function PathExists(root:string):boolean; override;
     function CheckForLevelExist():boolean; override;
     procedure Log(txt:PAnsiChar); override;
+    function GetPlayerName():string; override;
   end;
 
   { FZUnknownGameVersion }
@@ -104,6 +114,11 @@ type
     procedure SetVisualProgress({%H-}progress:single); override;
     function ThreadSpawn(proc:uintptr; args:uintptr; {%H-}name:PAnsiChar = nil; {%H-}stack:cardinal = 0):boolean; override;
     procedure AbortConnection(); override;
+    function IsServerListUpdateActive():boolean; override;
+    function IsMessageActive():boolean; override;
+    procedure TriggerMessage(); override;
+    procedure PrepareForMessageShowing(); override;
+    procedure ResetMasterServerError(); override;
   end;
 
   { FZCommonGameVersion }
@@ -136,8 +151,17 @@ type
     function get_CMainMenu__m_sPDProgress__IsInProgress_offset():uintptr; virtual; abstract;
     function get_CMainMenu__m_sPDProgress__Progress_offset():uintptr; virtual; abstract;
     function get_CMainMenu__m_pGameSpyFull_offset():uintptr; virtual; abstract;
+    function get_CMainMenu__m_NeedErrDialog_offset():uintptr; virtual; abstract;
+    function get_CMainMenu__ConnectToMasterServer_dlg_id():cardinal; virtual; abstract;
+    function get_CMainMenu__Message_dlg_id():cardinal; virtual; abstract;
     function get_CGameSpy_Full__m_pGS_HTTP_offset():uintptr; virtual; abstract;
+    function get_CGameSpy_Full__m_pGS_SB_offset():uintptr; virtual; abstract;
     function get_CGameSpy_HTTP__m_LastRequest_offset():uintptr; virtual; abstract;
+    function get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset():uintptr; virtual; abstract;
+    function get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset():uintptr; virtual; abstract;
+
+    function get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset():uintptr; virtual; abstract;
+    function get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset():uintptr; virtual; abstract;
 
     function get_CRenderDevice__mt_bMustExit_offset():uintptr; virtual; abstract;
     function get_CRenderDevice__mt_csEnter_offset():uintptr; virtual; abstract;
@@ -156,6 +180,9 @@ type
 
     function virtual_IMainMenu__Activate_index():cardinal; virtual; abstract;
     function virtual_CUIDialogWnd__Dispatch_index():cardinal; virtual; abstract;
+
+    procedure SetActiveErrorDlg(dlg:cardinal);
+    function GetNeedErrorDlg():cardinal;
   public
     constructor Create();
     procedure ShowMpMainMenu(); override;
@@ -166,6 +193,11 @@ type
     procedure SetVisualProgress(progress:single); override;
     function ThreadSpawn(proc:uintptr; args:uintptr; name:PAnsiChar = nil; stack:cardinal = 0):boolean; override;
     procedure AbortConnection(); override;
+    function IsServerListUpdateActive():boolean; override;
+    function IsMessageActive():boolean; override;
+    procedure TriggerMessage(); override;
+    procedure PrepareForMessageShowing(); override;
+    procedure ResetMasterServerError(); override;
   end;
 
   { FZGameVersion1510 }
@@ -181,8 +213,17 @@ type
     function get_CMainMenu__m_sPDProgress__IsInProgress_offset():uintptr; override;
     function get_CMainMenu__m_sPDProgress__Progress_offset():uintptr; override;
     function get_CMainMenu__m_pGameSpyFull_offset():uintptr; override;
+    function get_CMainMenu__m_NeedErrDialog_offset():uintptr; override;
+    function get_CMainMenu__ConnectToMasterServer_dlg_id():cardinal; override;
+    function get_CMainMenu__Message_dlg_id():cardinal; override;
     function get_CGameSpy_Full__m_pGS_HTTP_offset():uintptr; override;
     function get_CGameSpy_HTTP__m_LastRequest_offset():uintptr; override;
+    function get_CGameSpy_Full__m_pGS_SB_offset():uintptr; override;
+    function get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset():uintptr; override;
+    function get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset():uintptr; override;
+
+    function get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset():uintptr; override;
+    function get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset():uintptr; override;
 
     function get_CRenderDevice__mt_bMustExit_offset():uintptr; override;
     function get_CRenderDevice__mt_csEnter_offset():uintptr; override;
@@ -201,6 +242,8 @@ type
 
     function virtual_IMainMenu__Activate_index():cardinal; override;
     function virtual_CUIDialogWnd__Dispatch_index():cardinal; override;
+  public
+    constructor Create();
   end;
 
   { FZGameVersion10006 }
@@ -216,8 +259,17 @@ type
     function get_CMainMenu__m_sPDProgress__IsInProgress_offset():uintptr; override;
     function get_CMainMenu__m_sPDProgress__Progress_offset():uintptr; override;
     function get_CMainMenu__m_pGameSpyFull_offset():uintptr; override;
+    function get_CMainMenu__m_NeedErrDialog_offset():uintptr; override;
+    function get_CMainMenu__ConnectToMasterServer_dlg_id():cardinal; override;
+    function get_CMainMenu__Message_dlg_id():cardinal; override;
     function get_CGameSpy_Full__m_pGS_HTTP_offset():uintptr; override;
     function get_CGameSpy_HTTP__m_LastRequest_offset():uintptr; override;
+    function get_CGameSpy_Full__m_pGS_SB_offset():uintptr; override;
+    function get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset():uintptr; override;
+    function get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset():uintptr; override;
+
+    function get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset():uintptr; override;
+    function get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset():uintptr; override;
 
     function get_CRenderDevice__mt_bMustExit_offset():uintptr; override;
     function get_CRenderDevice__mt_csEnter_offset():uintptr; override;
@@ -236,6 +288,9 @@ type
 
     function virtual_IMainMenu__Activate_index():cardinal; override;
     function virtual_CUIDialogWnd__Dispatch_index():cardinal; override;
+
+  public
+    constructor Create();
   end;
 
   { FZGameVersion10006_v2 }
@@ -259,8 +314,17 @@ type
     function get_CMainMenu__m_sPDProgress__IsInProgress_offset():uintptr; override;
     function get_CMainMenu__m_sPDProgress__Progress_offset():uintptr; override;
     function get_CMainMenu__m_pGameSpyFull_offset():uintptr; override;
+    function get_CMainMenu__m_NeedErrDialog_offset():uintptr; override;
+    function get_CMainMenu__ConnectToMasterServer_dlg_id():cardinal; override;
+    function get_CMainMenu__Message_dlg_id():cardinal; override;
     function get_CGameSpy_Full__m_pGS_HTTP_offset():uintptr; override;
     function get_CGameSpy_HTTP__m_LastRequest_offset():uintptr; override;
+    function get_CGameSpy_Full__m_pGS_SB_offset():uintptr; override;
+    function get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset():uintptr; override;
+    function get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset():uintptr; override;
+
+    function get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset():uintptr; override;
+    function get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset():uintptr; override;
 
     function get_CRenderDevice__mt_bMustExit_offset():uintptr; override;
     function get_CRenderDevice__mt_csEnter_offset():uintptr; override;
@@ -281,6 +345,8 @@ type
     function virtual_CUIDialogWnd__Dispatch_index():cardinal; override;
   public
     procedure ShowMpMainMenu(); override;
+    procedure PrepareForMessageShowing(); override;
+    constructor Create();
   end;
 
   { FZGameVersionCreator }
@@ -297,7 +363,7 @@ procedure Free(); stdcall;
 function VersionAbstraction():FZAbstractGameVersion;
 
 implementation
-uses windows, LogMgr;
+uses windows, LogMgr, sysutils;
 
 function AtomicExchange(addr:pcardinal; val:cardinal):cardinal;
 var
@@ -309,9 +375,22 @@ begin
   result:=cardinal(tmp);
 end;
 
+procedure uniassert(cond:boolean; descr:string);
+begin
+  if not cond then begin
+    MessageBox(0, PAnsiChar(descr), 'Assertion failed!', MB_OK or MB_ICONERROR);
+    TerminateProcess(GetCurrentProcess(), 1);
+  end;
+end;
+
 { FZBaseGameVersion }
 
-constructor FZBaseGameVersion.Create;
+function CConsole__GetString_fake(cmd:PAnsiChar):PAnsiChar; stdcall;
+begin
+  result:='Unknown';
+end;
+
+constructor FZBaseGameVersion.Create();
 var
   f:textfile;
 begin
@@ -329,33 +408,38 @@ begin
   _xrCore_module_name:='xrCore';
   _xrCore_module_address:=GetModuleHandle(PAnsiChar(_xrCore_module_name));
 
-  assert(_exe_module_address<>0,    'xrEngine is 0');
-  assert(_xrGame_module_address<>0, 'xrGame is 0');
-  assert(_xrCore_module_address<>0, 'xrCore is 0');
+  uniassert(_exe_module_address<>0,    'xrEngine is 0');
+  uniassert(_xrGame_module_address<>0, 'xrGame is 0');
+  uniassert(_xrCore_module_address<>0, 'xrCore is 0');
 
   _g_ppGameLevel:=GetProcAddress(_exe_module_address, '?g_pGameLevel@@3PAVIGame_Level@@A');
-  assert(_g_ppGameLevel<>nil, 'g_ppGameLevel is 0');
+  uniassert(_g_ppGameLevel<>nil, 'g_ppGameLevel is 0');
 
   _g_ppConsole:=GetProcAddress(_exe_module_address, '?Console@@3PAVCConsole@@A');
-  assert(_g_ppConsole<>nil, 'console is 0');
+  uniassert(_g_ppConsole<>nil, 'console is 0');
 
   _core:=GetProcAddress(_xrCore_module_address, '?Core@@3VxrCore@@A');
-  assert(_core<>nil, 'core is 0');
+  uniassert(_core<>nil, 'core is 0');
 
   _xr_FS:=GetProcAddress(_xrCore_module_address, '?xr_FS@@3PAVCLocatorAPI@@A');
-  assert(_xr_FS<>nil, 'fs is 0');
+  uniassert(_xr_FS<>nil, 'fs is 0');
 
   CConsole__Execute:= GetProcAddress(_exe_module_address, '?Execute@CConsole@@QAEXPBD@Z');
-  assert(CConsole__Execute<>nil, 'CConsole::Execute is 0');
+  uniassert(CConsole__Execute<>nil, 'CConsole::Execute is 0');
 
   CLocatorApi__update_path:= GetProcAddress(_xrCore_module_address, '?update_path@CLocatorAPI@@QAEPBDAAY0CAI@DPBD1@Z');
-  assert(CLocatorApi__update_path<>nil, 'CLocatorApi::update_path is 0');
+  uniassert(CLocatorApi__update_path<>nil, 'CLocatorApi::update_path is 0');
 
   CLocatorApi__path_exists:= GetProcAddress(_xrCore_module_address, '?path_exist@CLocatorAPI@@QAE_NPBD@Z');
-  assert(CLocatorApi__path_exists<>nil, 'CLocatorApi::path_exists is 0');
+  uniassert(CLocatorApi__path_exists<>nil, 'CLocatorApi::path_exists is 0');
 
+  //Осторожно! Собака кусается! (тут функция, проверяем значение указателя на нее)
   Log_fun:= GetProcAddress(_xrCore_module_address, '?Msg@@YAXPBDZZ');
-  assert(@Log_fun<>nil, 'Log_fun is 0');
+  uniassert(@Log_fun<>nil, 'Log_fun is 0');
+
+  //По умолчанию, будем использовать эту заглушку, если в потомках не найдется чего-то поприличнее
+  CConsole__GetString:=@CConsole__GetString_fake;
+
 
   {$IFNDEF RELEASE}
   _log_file_name:='fz_loader_log.txt';
@@ -426,22 +510,22 @@ asm
   popad
 end;
 
-destructor FZBaseGameVersion.Destroy;
+destructor FZBaseGameVersion.Destroy();
 begin
   inherited Destroy;
 end;
 
-function FZBaseGameVersion.GetLevel: uintptr;
+function FZBaseGameVersion.GetLevel(): uintptr;
 begin
   result:=_g_ppGameLevel^;
 end;
 
-function FZBaseGameVersion.GetCoreParams: PAnsiChar;
+function FZBaseGameVersion.GetCoreParams(): PAnsiChar;
 begin
   result:=_core.Params;
 end;
 
-function FZBaseGameVersion.GetCoreApplicationPath: PAnsiChar;
+function FZBaseGameVersion.GetCoreApplicationPath(): PAnsiChar;
 begin
   result:=_core.ApplicationPath;
 end;
@@ -451,12 +535,12 @@ begin
   DoEcxCall_1arg(uintptr(CConsole__Execute), _g_ppConsole^, uintptr(cmd));
 end;
 
-function FZBaseGameVersion.GetEngineExeFileName: PAnsiChar;
+function FZBaseGameVersion.GetEngineExeFileName(): PAnsiChar;
 begin
   result:=PAnsiChar(_exe_module_name);
 end;
 
-function FZBaseGameVersion.GetEngineExeModuleAddress: uintptr;
+function FZBaseGameVersion.GetEngineExeModuleAddress(): uintptr;
 begin
   result:=_exe_module_address;
 end;
@@ -476,7 +560,7 @@ begin
   result:= byte(DoEcxCall_1arg(uintptr(CLocatorApi__path_exists), _xr_FS^, uintptr(PAnsiChar(root)))) <> 0;
 end;
 
-function FZBaseGameVersion.CheckForLevelExist: boolean;
+function FZBaseGameVersion.CheckForLevelExist(): boolean;
 begin
   result:=(GetLevel()<>0);
 end;
@@ -499,9 +583,19 @@ begin
   Log_fun(txt);
 end;
 
+function FZBaseGameVersion.GetPlayerName(): string;
+var
+  res:PAnsiChar;
+const
+  cmd:string='mm_net_player_name';
+begin
+  res:=PAnsiChar(DoEcxCall_1arg(uintptr(CConsole__GetString), _g_ppConsole^, uintptr(PAnsiChar(cmd))));
+  result:=res;
+end;
+
 { FZUnknownGameVersion }
 
-procedure FZUnknownGameVersion.ShowMpMainMenu;
+procedure FZUnknownGameVersion.ShowMpMainMenu();
 begin
 end;
 
@@ -510,17 +604,17 @@ begin
   FZLogMgr.Get().Write('Changing status to: '+ str, FZ_LOG_INFO);
 end;
 
-function FZUnknownGameVersion.CheckForUserCancelDownload: boolean;
+function FZUnknownGameVersion.CheckForUserCancelDownload(): boolean;
 begin
   result:=false;
 end;
 
-function FZUnknownGameVersion.StartVisualDownload: boolean;
+function FZUnknownGameVersion.StartVisualDownload(): boolean;
 begin
   result:=true;
 end;
 
-function FZUnknownGameVersion.StopVisualDownload: boolean;
+function FZUnknownGameVersion.StopVisualDownload(): boolean;
 begin
   result:=true;
 end;
@@ -538,40 +632,63 @@ begin
   CreateThread(nil, 0, pointer(proc), pointer(args), 0, thId);
 end;
 
-procedure FZUnknownGameVersion.AbortConnection;
+procedure FZUnknownGameVersion.AbortConnection();
+begin
+end;
+
+function FZUnknownGameVersion.IsServerListUpdateActive(): boolean;
+begin
+  result:=false;
+end;
+
+function FZUnknownGameVersion.IsMessageActive(): boolean;
+begin
+  result:=false;
+end;
+
+procedure FZUnknownGameVersion.TriggerMessage();
+begin
+end;
+
+procedure FZUnknownGameVersion.PrepareForMessageShowing();
+begin
+end;
+
+procedure FZUnknownGameVersion.ResetMasterServerError();
 begin
 end;
 
 { FZCommonGameVersion }
-constructor FZCommonGameVersion.Create;
+constructor FZCommonGameVersion.Create();
 begin
   inherited;
   _g_ppStringContainer:=GetProcAddress(_xrcore_module_address, '?g_pStringContainer@@3PAVstr_container@@A');
-  assert(_g_ppStringContainer<>nil, 'StringContainer is 0');
+  uniassert(_g_ppStringContainer<>nil, 'StringContainer is 0');
 
   _g_ppGamePersistent:=GetProcAddress(_exe_module_address, '?g_pGamePersistent@@3PAVIGame_Persistent@@A');
-  assert(_g_ppGamePersistent<>nil, 'GamePersistent is 0');
+  uniassert(_g_ppGamePersistent<>nil, 'GamePersistent is 0');
 
   _pDevice:=uintptr(GetProcAddress(_exe_module_address, '?Device@@3VCRenderDevice@@A'));
-  assert(_pDevice<>0, 'Device is 0');
+  uniassert(_pDevice<>0, 'Device is 0');
 
   _g_pbRendering:=GetProcAddress(_exe_module_address, '?g_bRendering@@3HA');
-  assert(_g_pbRendering<>nil, 'bRendering is 0');
+  uniassert(_g_pbRendering<>nil, 'bRendering is 0');
 
   xrCriticalSection__Enter:=GetProcAddress(_xrcore_module_address, '?Enter@xrCriticalSection@@QAEXXZ');
-  assert(xrCriticalSection__Enter<>nil, 'xrCriticalSection::Enter is 0');
+  uniassert(xrCriticalSection__Enter<>nil, 'xrCriticalSection::Enter is 0');
 
   xrCriticalSection__Leave:=GetProcAddress(_xrcore_module_address, '?Leave@xrCriticalSection@@QAEXXZ');
-  assert(xrCriticalSection__Leave<>nil, 'xrCriticalSection::Leave is 0');
+  uniassert(xrCriticalSection__Leave<>nil, 'xrCriticalSection::Leave is 0');
 
   str_container__dock:=GetProcAddress(_xrcore_module_address, '?dock@str_container@@QAEPAUstr_value@@PBD@Z');
-  assert(str_container__dock<>nil, 'str_container::dock is 0');
+  uniassert(str_container__dock<>nil, 'str_container::dock is 0');
 
+  //Осторожно! Собака кусается! (тут функция, проверяем значение указателя на нее)
   thread_spawn:=GetProcAddress(_xrCore_module_address, '?thread_spawn@@YAXP6AXPAX@ZPBDI0@Z');
-  assert(@thread_spawn<>nil, 'thread_spawn is 0');
+  uniassert(@thread_spawn<>nil, 'thread_spawn is 0');
 end;
 
-procedure FZCommonGameVersion.SafeExec_start;
+procedure FZCommonGameVersion.SafeExec_start();
 var
   old_active_status:cardinal;
 
@@ -610,7 +727,7 @@ begin
   AtomicExchange(b_is_Active, old_active_status);
 end;
 
-procedure FZCommonGameVersion.SafeExec_end;
+procedure FZCommonGameVersion.SafeExec_end();
 begin
   //НЕ ТРОГАТЬ! ОПАСНО ДЛЯ ЖИЗНИ!
   //Самое время перезапустить второй поток
@@ -627,7 +744,7 @@ procedure FZCommonGameVersion.assign_string(pshared_str: uintptr; text: PAnsiCha
 var
   pnewvalue, poldvalue:uintptr;
 begin
-  assert(pshared_str <> 0, 'pshared_str is nil, cannot assign');
+  uniassert(pshared_str <> 0, 'pshared_str is nil, cannot assign');
 
   pnewvalue:=DoEcxCall_1arg( uintptr(str_container__dock), _g_ppStringContainer^, uintptr(text) );
 
@@ -646,12 +763,12 @@ begin
   puintptr(pshared_str+get_shared_str__p_offset())^:=pnewvalue;
 end;
 
-function FZCommonGameVersion.GetMainMenu: uintptr;
+function FZCommonGameVersion.GetMainMenu(): uintptr;
 var
   gamePersistent: uintptr;
 begin
   gamePersistent:=_g_ppGamePersistent^;
-  assert(gamePersistent<>0, 'gamePersistent not exist');
+  uniassert(gamePersistent<>0, 'gamePersistent not exist');
 
   result:=puintptr(gamePersistent+get_IGamePersistent__m_pMainMenu_offset())^;
 end;
@@ -666,7 +783,61 @@ begin
   DoEcxCall_1arg(FunFromVTable(imm, virtual_IMainMenu__Activate_index()), imm, arg);
 end;
 
-procedure FZCommonGameVersion.ShowMpMainMenu;
+function FZCommonGameVersion.IsMessageActive(): boolean;
+var
+  mm:uintptr;
+  windows_start:uintptr;
+  msgwnd:uintptr;
+begin
+  result:=false;
+  mm:=GetMainMenu();
+  if mm = 0 then exit;
+
+  windows_start:=puintptr(mm+get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset())^;
+  if windows_start = 0 then exit;
+
+  msgwnd:=puintptr(windows_start+sizeof(uintptr)*get_CMainMenu__Message_dlg_id())^;
+  if msgwnd = 0 then exit;
+
+  //Сначала смотрим, не показывается ли окно
+  result:=(pByte(msgwnd+get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset())^ <> 0);
+  if result then exit;
+
+  //Быть может, мы его собираемся показать? (наоборот проверять нельзя! Выставление значения во время активности окна его скрывает!)
+  result:=pByte(mm+get_CMainMenu__m_NeedErrDialog_offset())^ = get_CMainMenu__Message_dlg_id();
+end;
+
+procedure FZCommonGameVersion.TriggerMessage();
+begin
+  SetActiveErrorDlg(get_CMainMenu__Message_dlg_id());
+end;
+
+procedure FZCommonGameVersion.PrepareForMessageShowing();
+begin
+  //Окно сообщение в ТЧ/ЧН может "зависнуть" в неопределенном состоянии
+  //Будем триггерить его до тех пор, пока не "отлипнет"
+  while IsMessageActive() do begin
+    TriggerMessage();
+  end;
+end;
+
+procedure FZCommonGameVersion.ResetMasterServerError();
+var
+  mm,gsfull,sb:uintptr;
+begin
+  mm:=GetMainMenu();
+  if mm = 0 then exit;
+
+  gsfull:=puintptr(mm+get_CMainMenu__m_pGameSpyFull_offset())^;
+  if gsfull=0 then exit;
+
+  sb:=puintptr(gsfull+get_CGameSpy_Full__m_pGS_SB_offset())^;
+  if sb=0 then exit;
+
+  pByte(sb+get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset())^:=1;
+end;
+
+procedure FZCommonGameVersion.ShowMpMainMenu();
 const
   MP_MENU_CMD:cardinal = 2;
   MP_MENU_PARAM:cardinal = 1;
@@ -703,12 +874,12 @@ begin
   SafeExec_end();
 end;
 
-function FZCommonGameVersion.CheckForUserCancelDownload: boolean;
+function FZCommonGameVersion.CheckForUserCancelDownload(): boolean;
 begin
   result := (pbyte(GetMainMenu() + get_CMainMenu__m_sPDProgress__IsInProgress_offset())^ = 0);
 end;
 
-function FZCommonGameVersion.StartVisualDownload: boolean;
+function FZCommonGameVersion.StartVisualDownload(): boolean;
 var
   mm:uintptr;
   tmp:cardinal;
@@ -722,7 +893,7 @@ begin
   //Назначим строку-пояснение над индикатором загрузки (там что-то должно быть перед
   //назначением IsInProgress, иначе вероятность вылета при попытке отрисовки)
   if ( puintptr(mm+get_CMainMenu__m_sPDProgress__FileName_offset()+get_shared_str__p_offset())^ = 0 ) then begin
-    VersionAbstraction().AssignStatus('Preparing synchronization...');
+    AssignStatus('Preparing synchronization...');
   end;
 
   cyclesCount:=1000; //будем ждать 10 секунд, пока нам разрешат загружаться
@@ -743,9 +914,9 @@ begin
 
   //На случай нажатия кнопки отмена - укажем, что активного запроса о загрузке не было
   gsFull:=puintptr(mm+get_CMainMenu__m_pGameSpyFull_offset())^;
-  assert(gsFull<>0, 'm_pGameSpyFull is 0');
+  uniassert(gsFull<>0, 'm_pGameSpyFull is 0');
   gsHttp:=puintptr(gsFull+get_CGameSpy_Full__m_pGS_HTTP_offset())^;
-  assert(gsFull<>0, 'm_pGS_HTTP is 0');
+  uniassert(gsFull<>0, 'm_pGS_HTTP is 0');
   pcardinal(gsHttp+get_CGameSpy_HTTP__m_LastRequest_offset())^:=cardinal(-1);
 
   //Включим главное меню на вкладке мультиплеера(ползунок загрузки есть только там)
@@ -753,7 +924,7 @@ begin
   result:=true;
 end;
 
-function FZCommonGameVersion.StopVisualDownload: boolean;
+function FZCommonGameVersion.StopVisualDownload(): boolean;
 begin
   SetVisualProgress(0);
   AtomicExchange(pcardinal(GetMainMenu() + get_CMainMenu__m_sPDProgress__IsInProgress_offset()), 0);
@@ -771,7 +942,7 @@ begin
   result:=true;
 end;
 
-procedure FZCommonGameVersion.AbortConnection;
+procedure FZCommonGameVersion.AbortConnection();
 var
   lvl:uintptr;
 const
@@ -785,236 +956,394 @@ begin
   end;
 end;
 
+function FZCommonGameVersion.IsServerListUpdateActive(): boolean;
+var
+  mm, windows_start, msgwnd:uintptr;
+  gsfull:uintptr;
+  sb:uintptr;
+  status:byte;
+begin
+  result:=false;
+
+  mm:=GetMainMenu();
+  if mm = 0 then exit;
+
+  gsfull:=puintptr(mm+get_CMainMenu__m_pGameSpyFull_offset())^;
+  if gsfull=0 then exit;
+
+  sb:=puintptr(gsfull+get_CGameSpy_Full__m_pGS_SB_offset())^;
+  if sb=0 then exit;
+
+  status:=pByte(sb+get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset())^;
+
+  result:= status<>0;
+  if result then exit;
+
+  //Смотрим, не активно ли все еще окно
+  windows_start:=puintptr(mm+get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset())^;
+  if windows_start = 0 then exit;
+
+  msgwnd:=puintptr(windows_start+sizeof(uintptr)*get_CMainMenu__ConnectToMasterServer_dlg_id())^;
+  if msgwnd = 0 then exit;
+
+  //Сначала смотрим, не показывается ли окно
+  result:=(pByte(msgwnd+get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset())^ <> 0);
+  if result then exit;
+
+end;
+
+function FZCommonGameVersion.GetNeedErrorDlg(): cardinal;
+var
+  mm:uintptr;
+begin
+  result:=0;
+  mm:=GetMainMenu();
+  if mm = 0 then exit;
+
+  result:=pByte(mm+get_CMainMenu__m_NeedErrDialog_offset())^;
+end;
+
+procedure FZCommonGameVersion.SetActiveErrorDlg(dlg: cardinal);
+var
+  mm:uintptr;
+begin
+  mm:=GetMainMenu();
+  if mm = 0 then exit;
+  pByte(mm+get_CMainMenu__m_NeedErrDialog_offset())^:=byte(dlg);
+end;
+
 { FZGameVersion1510 }
 
-function FZGameVersion1510.get_CMainMenu_castto_IMainMenu_offset: uintptr;
+constructor FZGameVersion1510.Create();
+var
+  addr:pointer;
+begin
+  inherited;
+  addr:=GetProcAddress(_exe_module_address, '?GetString@CConsole@@QAEPBDPBD@Z');
+  if addr<>nil then begin
+    CConsole__GetString:=addr;
+  end;
+end;
+
+function FZGameVersion1510.get_CMainMenu_castto_IMainMenu_offset(): uintptr;
 begin
   result:=0;
 end;
 
-function FZGameVersion1510.get_IGamePersistent__m_pMainMenu_offset: uintptr;
+function FZGameVersion1510.get_IGamePersistent__m_pMainMenu_offset(): uintptr;
 begin
   result:=$46C;
 end;
 
-function FZGameVersion1510.get_CMainMenu__m_startDialog_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_startDialog_offset(): uintptr;
 begin
   result:=$54;
 end;
 
-function FZGameVersion1510.get_CMainMenu__m_sPDProgress__FileName_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_sPDProgress__FileName_offset(): uintptr;
 begin
   result:=$284;
 end;
 
-function FZGameVersion1510.get_CMainMenu__m_sPDProgress__Status_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_sPDProgress__Status_offset(): uintptr;
 begin
   result:=$280;
 end;
 
-function FZGameVersion1510.get_CMainMenu__m_sPDProgress__IsInProgress_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_sPDProgress__IsInProgress_offset(): uintptr;
 begin
   result:=$278;
 end;
 
-function FZGameVersion1510.get_CMainMenu__m_sPDProgress__Progress_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_sPDProgress__Progress_offset(): uintptr;
 begin
   result:=$27C;
 end;
 
-function FZGameVersion1510.get_CMainMenu__m_pGameSpyFull_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_pGameSpyFull_offset(): uintptr;
 begin
   result:=$274;
 end;
 
-function FZGameVersion1510.get_CGameSpy_Full__m_pGS_HTTP_offset: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_NeedErrDialog_offset(): uintptr;
+begin
+  result:=$288;
+end;
+
+function FZGameVersion1510.get_CMainMenu__ConnectToMasterServer_dlg_id(): cardinal;
+begin
+  result:=14;
+end;
+
+function FZGameVersion1510.get_CMainMenu__Message_dlg_id(): cardinal;
 begin
   result:=$10;
 end;
 
-function FZGameVersion1510.get_CGameSpy_HTTP__m_LastRequest_offset: uintptr;
+function FZGameVersion1510.get_CGameSpy_Full__m_pGS_HTTP_offset(): uintptr;
+begin
+  result:=$10;
+end;
+
+function FZGameVersion1510.get_CGameSpy_HTTP__m_LastRequest_offset(): uintptr;
 begin
   result:=$4;
 end;
 
-function FZGameVersion1510.get_CRenderDevice__mt_bMustExit_offset: uintptr;
+function FZGameVersion1510.get_CGameSpy_Full__m_pGS_SB_offset(): uintptr;
 begin
-  result:=$304;
+  result:=$14;
 end;
 
-function FZGameVersion1510.get_CRenderDevice__mt_csEnter_offset: uintptr;
+function FZGameVersion1510.get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset(): uintptr;
 begin
-  result:=$2FC;
+  result:=$11;
 end;
 
-function FZGameVersion1510.get_CRenderDevice__b_is_Active_offset: uintptr;
-begin
-  result:=$114;
-end;
-
-function FZGameVersion1510.get_CLevel__m_bConnectResult_offset: uintptr;
-begin
-  result:=$496A9;
-end;
-
-function FZGameVersion1510.get_CLevel__m_bConnectResultReceived_offset: uintptr;
-begin
-  result:=$496A8;
-end;
-
-function FZGameVersion1510.get_CLevel__m_connect_server_err_offset: uintptr;
-begin
-  result:=$49698;
-end;
-
-function FZGameVersion1510.get_shared_str__p_offset: uintptr;
-begin
-  result:=0;
-end;
-
-function FZGameVersion1510.get_str_value__dwReference_offset: uintptr;
-begin
-  result:=0;
-end;
-
-function FZGameVersion1510.get_str_value__value_offset: uintptr;
+function FZGameVersion1510.get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset(): uintptr;
 begin
   result:=$10;
 end;
 
-function FZGameVersion1510.get_SecondaryThreadProcAddress: uintptr;
+function FZGameVersion1510.get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset(): uintptr;
+begin
+  result:=$2A4
+end;
+
+function FZGameVersion1510.get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset(): uintptr;
+begin
+  result:=4;
+end;
+
+function FZGameVersion1510.get_CRenderDevice__mt_bMustExit_offset(): uintptr;
+begin
+  result:=$304;
+end;
+
+function FZGameVersion1510.get_CRenderDevice__mt_csEnter_offset(): uintptr;
+begin
+  result:=$2FC;
+end;
+
+function FZGameVersion1510.get_CRenderDevice__b_is_Active_offset(): uintptr;
+begin
+  result:=$114;
+end;
+
+function FZGameVersion1510.get_CLevel__m_bConnectResult_offset(): uintptr;
+begin
+  result:=$496A9;
+end;
+
+function FZGameVersion1510.get_CLevel__m_bConnectResultReceived_offset(): uintptr;
+begin
+  result:=$496A8;
+end;
+
+function FZGameVersion1510.get_CLevel__m_connect_server_err_offset(): uintptr;
+begin
+  result:=$49698;
+end;
+
+function FZGameVersion1510.get_shared_str__p_offset(): uintptr;
+begin
+  result:=0;
+end;
+
+function FZGameVersion1510.get_str_value__dwReference_offset(): uintptr;
+begin
+  result:=0;
+end;
+
+function FZGameVersion1510.get_str_value__value_offset(): uintptr;
+begin
+  result:=$10;
+end;
+
+function FZGameVersion1510.get_SecondaryThreadProcAddress(): uintptr;
 begin
   result:=_exe_module_address+$556F0;
 end;
 
-function FZGameVersion1510.get_SecondaryThreadProcName: PAnsiChar;
+function FZGameVersion1510.get_SecondaryThreadProcName(): PAnsiChar;
 begin
   result:=PAnsiChar(_exe_module_address+$7ACB4);
 end;
 
-function FZGameVersion1510.virtual_IMainMenu__Activate_index: cardinal;
+function FZGameVersion1510.virtual_IMainMenu__Activate_index(): cardinal;
 begin
   result:=$1;
 end;
 
-function FZGameVersion1510.virtual_CUIDialogWnd__Dispatch_index: cardinal;
+function FZGameVersion1510.virtual_CUIDialogWnd__Dispatch_index(): cardinal;
 begin
   result:=$29;
 end;
 
 { FZGameVersion10006 }
 
-function FZGameVersion10006.get_CMainMenu_castto_IMainMenu_offset: uintptr;
+constructor FZGameVersion10006.Create();
+var
+  addr:pointer;
+begin
+  inherited;
+  addr:=GetProcAddress(_exe_module_address, '?GetString@CConsole@@QAEPADPBD@Z');
+  if addr<>nil then begin
+    CConsole__GetString:=addr;
+  end;
+end;
+
+function FZGameVersion10006.get_CMainMenu_castto_IMainMenu_offset(): uintptr;
 begin
   result:=0;
 end;
 
-function FZGameVersion10006.get_IGamePersistent__m_pMainMenu_offset: uintptr;
+function FZGameVersion10006.get_IGamePersistent__m_pMainMenu_offset(): uintptr;
 begin
   result:=$468;
 end;
 
-function FZGameVersion10006.get_CMainMenu__m_startDialog_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_startDialog_offset(): uintptr;
 begin
   result:=$50;
 end;
 
-function FZGameVersion10006.get_CMainMenu__m_sPDProgress__FileName_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_sPDProgress__FileName_offset(): uintptr;
 begin
   result:=$284;
 end;
 
-function FZGameVersion10006.get_CMainMenu__m_sPDProgress__Status_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_sPDProgress__Status_offset(): uintptr;
 begin
   result:=$280;
 end;
 
-function FZGameVersion10006.get_CMainMenu__m_sPDProgress__IsInProgress_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_sPDProgress__IsInProgress_offset(): uintptr;
 begin
   result:=$278;
 end;
 
-function FZGameVersion10006.get_CMainMenu__m_sPDProgress__Progress_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_sPDProgress__Progress_offset(): uintptr;
 begin
   result:=$27C;
 end;
 
-function FZGameVersion10006.get_CMainMenu__m_pGameSpyFull_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_pGameSpyFull_offset(): uintptr;
 begin
   result:=$274;
 end;
 
-function FZGameVersion10006.get_CGameSpy_Full__m_pGS_HTTP_offset: uintptr;
+function FZGameVersion10006.get_CMainMenu__m_NeedErrDialog_offset(): uintptr;
+begin
+  result:=$288
+end;
+
+function FZGameVersion10006.get_CMainMenu__ConnectToMasterServer_dlg_id(): cardinal;
+begin
+  result:=14;
+end;
+
+function FZGameVersion10006.get_CMainMenu__Message_dlg_id(): cardinal;
 begin
   result:=$10;
 end;
 
-function FZGameVersion10006.get_CGameSpy_HTTP__m_LastRequest_offset: uintptr;
+function FZGameVersion10006.get_CGameSpy_Full__m_pGS_HTTP_offset(): uintptr;
+begin
+  result:=$10;
+end;
+
+function FZGameVersion10006.get_CGameSpy_HTTP__m_LastRequest_offset(): uintptr;
 begin
   result:=$04;
 end;
 
-function FZGameVersion10006.get_CRenderDevice__mt_bMustExit_offset: uintptr;
+function FZGameVersion10006.get_CGameSpy_Full__m_pGS_SB_offset(): uintptr;
+begin
+  result:=$14;
+end;
+
+function FZGameVersion10006.get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset(): uintptr;
+begin
+  result:=$11;
+end;
+
+function FZGameVersion10006.get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset(): uintptr;
+begin
+  result:=$10;
+end;
+
+function FZGameVersion10006.get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset(): uintptr;
+begin
+  result:=$29c;
+end;
+
+function FZGameVersion10006.get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset(): uintptr;
+begin
+  result:=4;
+end;
+
+function FZGameVersion10006.get_CRenderDevice__mt_bMustExit_offset(): uintptr;
 begin
   result:=$34c;
 end;
 
-function FZGameVersion10006.get_CRenderDevice__mt_csEnter_offset: uintptr;
+function FZGameVersion10006.get_CRenderDevice__mt_csEnter_offset(): uintptr;
 begin
   result:=$344;
 end;
 
-function FZGameVersion10006.get_CRenderDevice__b_is_Active_offset: uintptr;
+function FZGameVersion10006.get_CRenderDevice__b_is_Active_offset(): uintptr;
 begin
   result:=$114;
 end;
 
-function FZGameVersion10006.get_CLevel__m_bConnectResult_offset: uintptr;
+function FZGameVersion10006.get_CLevel__m_bConnectResult_offset(): uintptr;
 begin
   result:=$45a1;
 end;
 
-function FZGameVersion10006.get_CLevel__m_bConnectResultReceived_offset: uintptr;
+function FZGameVersion10006.get_CLevel__m_bConnectResultReceived_offset(): uintptr;
 begin
   result:=$45a0;
 end;
 
-function FZGameVersion10006.get_CLevel__m_connect_server_err_offset: uintptr;
+function FZGameVersion10006.get_CLevel__m_connect_server_err_offset(): uintptr;
 begin
   result:=$4594;
 end;
 
-function FZGameVersion10006.get_shared_str__p_offset: uintptr;
+function FZGameVersion10006.get_shared_str__p_offset(): uintptr;
 begin
   result:=0;
 end;
 
-function FZGameVersion10006.get_str_value__dwReference_offset: uintptr;
+function FZGameVersion10006.get_str_value__dwReference_offset(): uintptr;
 begin
   result:=0;
 end;
 
-function FZGameVersion10006.get_str_value__value_offset: uintptr;
+function FZGameVersion10006.get_str_value__value_offset(): uintptr;
 begin
   result:=$c;
 end;
 
-function FZGameVersion10006.get_SecondaryThreadProcAddress: uintptr;
+function FZGameVersion10006.get_SecondaryThreadProcAddress(): uintptr;
 begin
   result:=_exe_module_address+$83450;
 end;
 
-function FZGameVersion10006.get_SecondaryThreadProcName: PAnsiChar;
+function FZGameVersion10006.get_SecondaryThreadProcName(): PAnsiChar;
 begin
   result:=PAnsiChar(_exe_module_address+$D4D48);
 end;
 
-function FZGameVersion10006.virtual_IMainMenu__Activate_index: cardinal;
+function FZGameVersion10006.virtual_IMainMenu__Activate_index(): cardinal;
 begin
   result:=1;
 end;
 
-function FZGameVersion10006.virtual_CUIDialogWnd__Dispatch_index: cardinal;
+function FZGameVersion10006.virtual_CUIDialogWnd__Dispatch_index(): cardinal;
 begin
   result:=$2C;
 end;
@@ -1033,7 +1362,18 @@ end;
 
 { FZGameVersion1602 }
 
-procedure FZGameVersion1602.ShowMpMainMenu;
+constructor FZGameVersion1602.Create();
+var
+  addr:pointer;
+begin
+  inherited;
+  addr:=GetProcAddress(_exe_module_address, '?GetString@CConsole@@QBEPBDPBD@Z');
+  if addr<>nil then begin
+    CConsole__GetString:=addr;
+  end;
+end;
+
+procedure FZGameVersion1602.ShowMpMainMenu();
 const
   CMainMenu_login_manager_offset:cardinal=$274;
   login_manager_m_current_profile_offset:cardinal=$11C;
@@ -1051,117 +1391,178 @@ begin
   inherited ShowMpMainMenu;
 end;
 
-function FZGameVersion1602.get_CMainMenu_castto_IMainMenu_offset: uintptr;
+procedure FZGameVersion1602.PrepareForMessageShowing();
+var
+  mm:uintptr;
+  windows_start:uintptr;
+  msgwnd:uintptr;
+begin
+  //в ЗП многократно триггерить бесполезно - оно работает только на отображение окна
+  //Оно и к лучшему - не надо ничего ждать перед отображением
+  //Но надо выставить статус m_bShowed окна в false (оно может быть залипшим!)
+  mm:=GetMainMenu();
+  if mm = 0 then exit;
+
+  windows_start:=puintptr(mm+get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset())^;
+  if windows_start = 0 then exit;
+
+  msgwnd:=puintptr(windows_start+sizeof(uintptr)*get_CMainMenu__Message_dlg_id())^;
+  if msgwnd = 0 then exit;
+
+  pByte(msgwnd+get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset())^:=0;
+end;
+
+function FZGameVersion1602.get_CMainMenu_castto_IMainMenu_offset(): uintptr;
 begin
   result:= 0;
 end;
 
-function FZGameVersion1602.get_IGamePersistent__m_pMainMenu_offset: uintptr;
+function FZGameVersion1602.get_IGamePersistent__m_pMainMenu_offset(): uintptr;
 begin
   result:=$46C;
 end;
 
-function FZGameVersion1602.get_CMainMenu__m_startDialog_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_startDialog_offset(): uintptr;
 begin
   result:=$4C;
 end;
 
-function FZGameVersion1602.get_CMainMenu__m_sPDProgress__FileName_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_sPDProgress__FileName_offset(): uintptr;
 begin
   result:=$294;
 end;
 
-function FZGameVersion1602.get_CMainMenu__m_sPDProgress__Status_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_sPDProgress__Status_offset(): uintptr;
 begin
   result:=$290;
 end;
 
-function FZGameVersion1602.get_CMainMenu__m_sPDProgress__IsInProgress_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_sPDProgress__IsInProgress_offset(): uintptr;
 begin
   result:=$288;
 end;
 
-function FZGameVersion1602.get_CMainMenu__m_sPDProgress__Progress_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_sPDProgress__Progress_offset(): uintptr;
 begin
   result:=$28C;
 end;
 
-function FZGameVersion1602.get_CMainMenu__m_pGameSpyFull_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_pGameSpyFull_offset(): uintptr;
 begin
   result:=$26C;
 end;
 
-function FZGameVersion1602.get_CGameSpy_Full__m_pGS_HTTP_offset: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_NeedErrDialog_offset(): uintptr;
+begin
+  result:=$298;
+end;
+
+function FZGameVersion1602.get_CMainMenu__ConnectToMasterServer_dlg_id(): cardinal;
+begin
+  result:=14;
+end;
+
+function FZGameVersion1602.get_CMainMenu__Message_dlg_id(): cardinal;
 begin
   result:=$10;
 end;
 
-function FZGameVersion1602.get_CGameSpy_HTTP__m_LastRequest_offset: uintptr;
+function FZGameVersion1602.get_CGameSpy_Full__m_pGS_HTTP_offset(): uintptr;
+begin
+  result:=$10;
+end;
+
+function FZGameVersion1602.get_CGameSpy_HTTP__m_LastRequest_offset(): uintptr;
 begin
   result:=$04;
 end;
 
-function FZGameVersion1602.get_CRenderDevice__mt_bMustExit_offset: uintptr;
-begin
-  result:=$3E4;
-end;
-
-function FZGameVersion1602.get_CRenderDevice__mt_csEnter_offset: uintptr;
-begin
-  result:=$3DC;
-end;
-
-function FZGameVersion1602.get_CRenderDevice__b_is_Active_offset: uintptr;
+function FZGameVersion1602.get_CGameSpy_Full__m_pGS_SB_offset(): uintptr;
 begin
   result:=$14;
 end;
 
-function FZGameVersion1602.get_CLevel__m_bConnectResult_offset: uintptr;
+function FZGameVersion1602.get_CGameSpy_Browser__m_bTryingToConnectToMasterServer_offset(): uintptr;
 begin
-  result:=$486D1;
+  result:=$11;
 end;
 
-function FZGameVersion1602.get_CLevel__m_bConnectResultReceived_offset: uintptr;
-begin
-  result:=$486D0;
-end;
-
-function FZGameVersion1602.get_CLevel__m_connect_server_err_offset: uintptr;
-begin
-  result:=$486C0;
-end;
-
-function FZGameVersion1602.get_shared_str__p_offset: uintptr;
-begin
-  result:=$0;
-end;
-
-function FZGameVersion1602.get_str_value__dwReference_offset: uintptr;
-begin
-  result:=$0;
-end;
-
-function FZGameVersion1602.get_str_value__value_offset: uintptr;
+function FZGameVersion1602.get_CGameSpy_Browser__m_bAbleToConnectToMasterServer_offset(): uintptr;
 begin
   result:=$10;
 end;
 
-function FZGameVersion1602.get_SecondaryThreadProcAddress: uintptr;
+function FZGameVersion1602.get_CMainMenu__m_pMB_ErrDlgs_first_element_ptr_offset(): uintptr;
+begin
+  result:=$2B4;
+end;
+
+function FZGameVersion1602.get_CUIMessageBoxEx_to_CUISimpleWindow_m_bShowMe_offset(): uintptr;
+begin
+  result:=4;
+end;
+
+function FZGameVersion1602.get_CRenderDevice__mt_bMustExit_offset(): uintptr;
+begin
+  result:=$3E4;
+end;
+
+function FZGameVersion1602.get_CRenderDevice__mt_csEnter_offset(): uintptr;
+begin
+  result:=$3DC;
+end;
+
+function FZGameVersion1602.get_CRenderDevice__b_is_Active_offset(): uintptr;
+begin
+  result:=$14;
+end;
+
+function FZGameVersion1602.get_CLevel__m_bConnectResult_offset(): uintptr;
+begin
+  result:=$486D1;
+end;
+
+function FZGameVersion1602.get_CLevel__m_bConnectResultReceived_offset(): uintptr;
+begin
+  result:=$486D0;
+end;
+
+function FZGameVersion1602.get_CLevel__m_connect_server_err_offset(): uintptr;
+begin
+  result:=$486C0;
+end;
+
+function FZGameVersion1602.get_shared_str__p_offset(): uintptr;
+begin
+  result:=$0;
+end;
+
+function FZGameVersion1602.get_str_value__dwReference_offset(): uintptr;
+begin
+  result:=$0;
+end;
+
+function FZGameVersion1602.get_str_value__value_offset(): uintptr;
+begin
+  result:=$10;
+end;
+
+function FZGameVersion1602.get_SecondaryThreadProcAddress(): uintptr;
 begin
   result:=_exe_module_address+$53290;
 end;
 
-function FZGameVersion1602.get_SecondaryThreadProcName: PAnsiChar;
+function FZGameVersion1602.get_SecondaryThreadProcName(): PAnsiChar;
 begin
   result:= PAnsiChar(_exe_module_address + $75F34);
 end;
 
-function FZGameVersion1602.virtual_IMainMenu__Activate_index: cardinal;
+function FZGameVersion1602.virtual_IMainMenu__Activate_index(): cardinal;
 begin
   result:=1;
 end;
 
-function FZGameVersion1602.virtual_CUIDialogWnd__Dispatch_index: cardinal;
+function FZGameVersion1602.virtual_CUIDialogWnd__Dispatch_index(): cardinal;
 begin
   result:=$1F;
 end;
@@ -1177,12 +1578,22 @@ begin
   CreateThread(nil, 0, pointer(proc), pointer(args), 0, thId);
 end;
 
-procedure FZTestGameVersion.Log(txt:PChar);
+procedure FZTestGameVersion.Log(txt: PAnsiChar);
 var
   s:string;
 begin
   s:='[TestGame] '+txt;
   writeln(s);
+end;
+
+function FZTestGameVersion.GetPlayerName(): string;
+begin
+  result:='TestPlayer';
+end;
+
+function FZTestGameVersion.IsServerListUpdateActive(): boolean;
+begin
+  result:=false;
 end;
 
 ////////////////////////////////////////////////////////////////////////////////////

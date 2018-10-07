@@ -2,7 +2,6 @@ unit CSE;
 {$mode delphi}
 interface
 uses xrstrings, vector, BaseClasses, MatVectors, srcCalls, xr_configs;
-function Init():boolean; stdcall;
 
 type
 
@@ -103,6 +102,9 @@ const
   CSE_Abstract__visual_index:cardinal=$28;
 
 
+function Init():boolean; stdcall;
+function GametypeNameById(id:cardinal):string;
+
 var
   CSE_Visual__set_visual:srcESICallFunctionWEAXArg;
   CSE_Abstract__visual:srcVirtualBaseFunction;
@@ -120,6 +122,27 @@ begin
  CSE_Abstract__visual:=srcVirtualBaseFunction.Create(CSE_Abstract__visual_index, [vtPointer], 'visual', 'CSE_Abstract');
 
  result:=true;
+end;
+
+function GametypeNameById(id: cardinal): string;
+begin
+  if id = EGameIDs__eGameIDSingle then begin
+    result:='single';
+  end else if id = EGameIDs__eGameIDDeathmatch then begin
+    result:='deathmatch';
+  end else if id = EGameIDs__eGameIDTeamDeathmatch then begin
+    result:='teamdeathmatch';
+  end else if id = EGameIDs__eGameIDArtefactHunt then begin
+    result:= 'artefacthunt';
+  end else if id = EGameIDs__eGameIDCaptureTheArtefact then begin
+    result:= 'capturetheartefact';
+  end else if id = EGameIDs__eGameIDDominationZone then begin
+    result:= 'dominationzone';
+  end else if id = EGameIDs__eGameIDTeamDominationZone then begin
+    result:= 'teamdominationzone';
+  end else begin
+    result := '';
+  end;
 end;
 
 end.

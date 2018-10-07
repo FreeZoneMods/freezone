@@ -1,9 +1,7 @@
 unit Packets;
 {$mode delphi}
 interface
-uses srcCalls, Synchro, Vector, xr_configs;
-function Init():boolean; stdcall;
-
+uses srcCalls, Synchro, Vector, xr_configs, MatVectors;
 
 type
 //Direct Play structs
@@ -130,6 +128,8 @@ function WriteToPacket(p:pNET_Packet; buf:pointer; size:cardinal):boolean; stdca
 procedure InvalidatePacket(p:pNET_Packet); stdcall;
 
 procedure MakeDestroyGameItemPacket(p:pNET_Packet; gameid:word; time:cardinal);
+procedure MakeRadminCmdPacket(p:pNET_Packet; s:string);
+procedure MakeMovePlayerPacket(p: pNET_Packet; gameid:word; pos:pFVector3; dir:pFVector3);
 
 var
   pCompressor:pNET_Compressor;
@@ -164,11 +164,65 @@ const
   M_FZ_DIGEST:word=$1300;
 
 
+  GAME_EVENT_PLAYER_READY:word = 0;
+  GAME_EVENT_PLAYER_GAME_MENU:word = 6;
+  GAME_EVENT_PLAYER_CONNECTED:word = 8;
+  GAME_EVENT_PLAYER_DISCONNECTED:word = 9;
+  GAME_EVENT_PLAYER_KILLED:word = 11;
+  GAME_EVENT_PLAYER_HITTED:word = 12;
   GAME_EVENT_MAKE_DATA:cardinal=42;
 
-
-  GE_DESTROY:cardinal = 8;
-  GE_HIT_STATISTIC:cardinal = 47;
+  GE_RESPAWN: cardinal = 0;
+  GE_OWNERSHIP_TAKE: cardinal = 1;
+  GE_OWNERSHIP_TAKE_MP_FORCED: cardinal = 2;
+  GE_OWNERSHIP_REJECT: cardinal = 3;
+  GE_TRANSFER_AMMO: cardinal = 4;
+  GE_HIT: cardinal = 5;
+  GE_DIE: cardinal = 6;
+  GE_ASSIGN_KILLER: cardinal = 7;
+  GE_DESTROY: cardinal = 8;
+  GE_DESTROY_REJECT: cardinal = 9;
+  GE_TELEPORT_OBJECT: cardinal = 10;
+  GE_ADD_RESTRICTION: cardinal = 11;
+  GE_REMOVE_RESTRICTION: cardinal = 12;
+  GE_REMOVE_ALL_RESTRICTIONS: cardinal = 13;
+  GE_BUY: cardinal = 14;
+  GE_INFO_TRANSFER: cardinal = 15;
+  GE_TRADE_SELL: cardinal = 16;
+  GE_TRADE_BUY: cardinal = 17;
+  GE_WPN_AMMO_ADD: cardinal = 18;
+  GE_WPN_STATE_CHANGE: cardinal = 19;
+  GE_ADDON_ATTACH: cardinal = 20;
+  GE_ADDON_DETACH: cardinal = 21;
+  GE_ADDON_CHANGE: cardinal = 22;
+  GE_INSTALL_UPGRADE: cardinal = 23;
+  GE_GRENADE_EXPLODE: cardinal = 24;
+  GE_INV_ACTION: cardinal = 25;
+  GE_ZONE_STATE_CHANGE: cardinal = 26;
+  GE_MOVE_ACTOR: cardinal = 27;
+  GE_ACTOR_JUMPING: cardinal = 28;
+  GE_ACTOR_MAX_POWER: cardinal = 29;
+  GE_ACTOR_MAX_HEALTH: cardinal = 30;
+  GE_CHANGE_POS: cardinal = 31;
+  GE_GAME_EVENT: cardinal = 32;
+  GE_CHANGE_VISUAL: cardinal = 33;
+  GE_MONEY: cardinal = 34;
+  GEG_PLAYER_ACTIVATE_SLOT: cardinal = 35;
+  GEG_PLAYER_ITEM2SLOT: cardinal = 36;
+  GEG_PLAYER_ITEM2BELT: cardinal = 37;
+  GEG_PLAYER_ITEM2RUCK: cardinal = 38;
+  GEG_PLAYER_ITEM_EAT: cardinal = 39;
+  GEG_PLAYER_ITEM_SELL: cardinal = 40;
+  GEG_PLAYER_ACTIVATEARTEFACT: cardinal = 41;
+  GEG_PLAYER_WEAPON_HIDE_STATE: cardinal = 42;
+  GEG_PLAYER_DISABLE_SPRINT: cardinal = 43;
+  GEG_PLAYER_ATTACH_HOLDER: cardinal = 44;
+  GEG_PLAYER_DETACH_HOLDER: cardinal = 45;
+  GEG_PLAYER_PLAY_HEADSHOT_PARTICLE: cardinal = 46;
+  GE_HIT_STATISTIC: cardinal = 47;
+  GE_KILL_SOMEONE: cardinal = 48;
+  GE_FREEZE_OBJECT: cardinal = 49;
+  GE_LAUNCH_ROCKET: cardinal = 50;
 
 
   PACKET_MAX_SIZE:cardinal = 16384;
@@ -185,6 +239,10 @@ const
   DPNSEND_GUARANTEED:cardinal=$8;
   DPNSEND_PRIORITY_HIGH:cardinal=$80;
   DPNSEND_IMMEDIATELLY:cardinal=$100;
+
+function Init():boolean; stdcall;
+
+function UnreadBytesCountInPacket(p:pNET_Packet):cardinal;
 
 implementation
 uses sysutils, srcBase, basedefs, windows;
@@ -253,6 +311,15 @@ begin
   result:=true;
 end;
 
+function UnreadBytesCountInPacket(p:pNET_Packet):cardinal;
+begin
+  result:=0;
+  if p=nil then exit;
+
+  result:=p.B.count - p.r_pos;
+end;
+
+//******************************Special packets constructors**********************
 procedure MakeDestroyGameItemPacket(p:pNET_Packet; gameid:word; time:cardinal);
 begin
   ClearPacket(p);
@@ -260,6 +327,27 @@ begin
   WriteToPacket(p, @time, sizeof(cardinal));
   WriteToPacket(p, @GE_DESTROY, sizeof(word));
   WriteToPacket(p, @gameid, sizeof(word));
+end;
+
+procedure MakeRadminCmdPacket(p:pNET_Packet; s:string);
+begin
+  ClearPacket(p);
+  WriteToPacket(p, @M_REMOTE_CONTROL_CMD, sizeof(word));
+  WriteToPacket(p, PAnsiChar(s), length(s)+1);
+end;
+
+procedure MakeMovePlayerPacket(p: pNET_Packet; gameid:word; pos:pFVector3; dir:pFVector3);
+var
+  b:byte;
+begin
+  ClearPacket(p);
+  WriteToPacket(p, @M_MOVE_PLAYERS, sizeof(M_MOVE_PLAYERS)); //хидер
+  b:=1;
+  WriteToPacket(p, @b, sizeof(b)); //число игроков в пакете
+
+  WriteToPacket(p, @gameid, sizeof(gameid));
+  WriteToPacket(p, pos, sizeof(FVector3));
+  WriteToPacket(p, dir, sizeof(FVector3));
 end;
 
 end.

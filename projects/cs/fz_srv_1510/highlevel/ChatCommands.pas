@@ -203,7 +203,7 @@ begin
   cl:=pIClient(player);
   if cl=nil then exit;
 
-  if (cl.flags and ICLIENT_FLAG_LOCAL)=0 then begin
+  if not IsLocalServerClient(cl) then begin
     if GetSACEStatus(cl.ID.id)=SACE_OK then begin
       str:=pstring(p1);
       str^:=str^ + get_string_value(@cl.name)+' ';

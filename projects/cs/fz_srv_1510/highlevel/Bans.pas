@@ -12,47 +12,13 @@ function IPureServer__net_Handler_OnBannedByGameIpFound(ip:ip_address):boolean; 
 function cdkey_ban_list__ban_player_checkemptykey(cl:pxrClientData):boolean; stdcall;
 
 implementation
-uses basedefs, global_functions, LogMgr, sysutils, misc_stuff, ConfigCache, Servers, dynamic_caster, Keys,TranslationMgr, Level, sysmsgs, Players, PlayersConnectionLog, HackProcessor;
+uses basedefs, global_functions, LogMgr, sysutils, misc_stuff, ConfigCache, Servers, dynamic_caster, Keys,TranslationMgr, Level, Players, PlayersConnectionLog, HackProcessor;
 
 procedure xrServer__ProcessClientDigest_ProtectFromKeyChange(xrCL:pxrClientData; secondary:pshared_str; p:pNET_Packet); stdcall;
 var
   gs_hash:PAnsiChar;
-  hash2:shared_str;
-  hwid:string;
-  old_hwid:string;
 begin
-  init_string(@hash2);
-  //Считаем (основной) хеш от верхнего регистра
-  NET_Packet__r_stringZ.Call([p, @hash2]);
-
-  //Теперь посмотрим - один из хешей может в реальности быть hwid
-  //hwid всегда заносим в secondary
-  if ValidateHwId(get_string_value(@hash2), nil)<>FZ_HWID_NOT_HWID then begin
-    hwid := get_string_value(@hash2);
-    assign_string(secondary, PAnsiChar(hwid));
-  end else if ValidateHwId(get_string_value(@xrCL.m_cdkey_digest), nil)<>FZ_HWID_NOT_HWID then begin
-    hwid := get_string_value(@xrCL.m_cdkey_digest);
-    assign_string(@xrCL.m_cdkey_digest, get_string_value(@hash2));
-    assign_string(secondary, PAnsiChar(hwid));
-  end else begin
-    //Ни один из хешей не hwid. Что ж...
-    hwid:='';
-    //хеш от верхнего регистра - как основной
-    assign_string(secondary, get_string_value(@xrCL.m_cdkey_digest));
-    //хеш от нижнего регистра - как дополнительный
-    assign_string(@xrCL.m_cdkey_digest, get_string_value(@hash2));
-  end;
-
-  old_hwid:=GetHwId(xrCL);
-  if (length(old_hwid)>0) and (old_hwid<>hwid) then begin
-    //Зашел другой клиент с тем же ip, сбросим флаг реконнекта для обнуления статы
-    FZLogMgr.Get.Write(GenerateMessageForClientId(xrCL.base_IClient.ID.id, 'has different HWID, reset reconnect flag'), FZ_LOG_INFO);
-    xrCL.base_IClient.flags:= xrCL.base_IClient.flags and (not ICLIENT_FLAG_RECONNECT);
-  end;
-
-  SetHwId(xrCL, hwid);
-
-  //Если есть геймспаевский хеш - основной заменяем им
+  //[bug] Клиент тут нам может скормить любой хеш... То есть совсем любой. Решение - если есть геймспаевский хеш, основной заменяем им
   gs_hash:=xrGS_gcd_getkeyhash.Call([xrCL.base_IClient.ID.id]).VPChar;
   if (gs_hash<>nil) and (gs_hash[0]<>CHR(0)) then begin
     assign_string(@xrCL.m_cdkey_digest, gs_hash);
@@ -72,7 +38,7 @@ begin
   checkfor:=pxrClientData(xrcldata);
   if (cl=nil) or (checkfor=nil) or (cl=checkfor) then exit;
 
-  //if (pIClient(player).flags and ICLIENT_FLAG_LOCAL)>0 then exit; //или оставить серверного??
+  //if IsLocalServerClient(player) then exit; //или оставить серверного??
 
   if strcomp(get_string_value(@checkfor.m_cdkey_digest), get_string_value(@cl.m_cdkey_digest))=0 then begin
     //Совпадение? Не думаю... ;)
@@ -87,38 +53,11 @@ begin
 end;
 
 function xrServer__ProcessClientDigest_CheckAdditionalRejectingConditions(xrCL:pxrClientData):boolean; stdcall;
-var
-  hwidresult:FZHwIdValidationResult;
-  hwid, hash, reason:string;
 begin
   result:=true;
   //теперь проверим, нет ли такого игрока уже на сервере
   if FZConfigCache.Get.GetDataCopy.no_same_cdkeys then begin
     ForEachClientDo(CheckForSameKey, nil, @result, xrCL);
-  end;
-
-  if xrCL.base_IClient.flags and ICLIENT_FLAG_LOCAL = 0 then begin
-    hwid:=GetHwId(xrCL);
-    hash:=get_string_value(@xrCL.m_cdkey_digest);
-    hwidresult:=ValidateHwId(PAnsiChar(hwid), PAnsiChar(hash));
-
-    if hwidresult = FZ_HWID_INVALID then begin
-      reason:=FZTranslationMgr.Get.TranslateSingle('fz_invalid_hwid');
-      xrServer__SendConnectResult(GetLevel.Server, @xrCL.base_IClient, 0, 3,  PChar(reason));
-      FZLogMgr.Get.Write(GenerateMessageForClientId(xrCL.base_IClient.ID.id,'has invalid HWID'), FZ_LOG_IMPORTANT_INFO );
-    end else if hwidresult = FZ_HWID_UNKNOWN_VERSION then begin
-      if FZConfigCache.Get.GetDataCopy.strict_hwid then begin
-        reason:=FZTranslationMgr.Get.TranslateSingle('fz_hwid_version_not_supported');
-        FZLogMgr.Get.Write(GenerateMessageForClientId(xrCL.base_IClient.ID.id, 'has unknown HWID type'), FZ_LOG_IMPORTANT_INFO );
-        xrServer__SendConnectResult(GetLevel.Server, @xrCL.base_IClient, 0, 3,  PChar(reason));
-      end;
-    end else if hwidresult <> FZ_HWID_VALID then begin
-      if FZConfigCache.Get.GetDataCopy.strict_hwid then begin
-        FZLogMgr.Get.Write(GenerateMessageForClientId(xrCL.base_IClient.ID.id, 'has no HWID'), FZ_LOG_IMPORTANT_INFO );
-        reason:=FZTranslationMgr.Get.TranslateSingle('fz_hwid_required');
-        xrServer__SendConnectResult(GetLevel.Server, @xrCL.base_IClient, 0, 3,  PChar(reason));
-      end;
-    end;
   end;
 end;
 

@@ -58,6 +58,7 @@ const
   engine_dir_name:string='bin\';
   patches_dir_name:string='patches\';
   mp_dir_name:string='mp\';
+  additional_keys_line_file:string='mod_key_line.txt';
 
   mod_dir_prefix:PChar='.svn\';
   allowed_symbols_in_mod_name:string='1234567890abcdefghijklmnopqrstuvwxyz_';
@@ -111,7 +112,6 @@ begin
   PushToArray(master_links, 'https://raw.githubusercontent.com/FreeZoneMods/modmasterlinks/master/links.ini');
   PushToArray(master_links, 'http://www.gwrmod.tk/files/mods_links.ini');
   PushToArray(master_links, 'http://www.stalker-life.ru/mods_links/links.ini');
-  PushToArray(master_links, 'http://stalker.gamepolis.ru/mods_clear_sky/links.ini');
   PushToArray(master_links, 'http://stalker.stagila.ru:8080/stcs_emergency/mods_links.ini');
 
   list_downloaded:=false;
@@ -522,20 +522,55 @@ var
   sz:cardinal;
 
   mod_settings:FZModSettings;
+  playername:string;
+
+  message_initially_shown:boolean;
+
+  add_params_file:textfile;
+  add_params:string;
 begin
   result:=false;
+
+  message_initially_shown:=false;
+
+  if ForceShowMessage(_mod_params) then begin
+    message_initially_shown:=VersionAbstraction().IsMessageActive();
+    FZLogMgr.Get.Write('Initial message status is ' + booltostr(message_initially_shown, true), FZ_LOG_INFO);
+  end;
+
   //Пока идет коннект(существует уровень) - не начинаем работу
   while VersionAbstraction().CheckForLevelExist() do begin
     Sleep(10);
   end;
 
   //Пауза для нормального обновления мастер-листа
-  Sleep(500);
+  Sleep(50); //Слип тут чтобы поток обновления гарантированно запустился - мало ли
+  while VersionAbstraction().IsServerListUpdateActive() do begin
+    Sleep(1);
+  end;
 
   FZLogMgr.Get.Write('Starting visual download', FZ_LOG_INFO);
   if not VersionAbstraction().StartVisualDownload() then begin
     FZLogMgr.Get.Write('Cannot start visual download', FZ_LOG_ERROR);
     exit;
+  end;
+
+  VersionAbstraction().AssignStatus('Preparing synchronization...');
+  VersionAbstraction().ResetMasterServerError();
+
+  if ForceShowMessage(_mod_params) and message_initially_shown then begin
+    //Ждем, пока исчезнет сообщение о коннекте к мастер-серверу
+    while VersionAbstraction().IsServerListUpdateActive() do begin
+      Sleep(1);
+    end;
+
+    //Дождемся подходящего для показа момента
+    FZLogMgr.Get.Write('Prepare for message displaying', FZ_LOG_INFO);
+    VersionAbstraction().PrepareForMessageShowing();
+
+    //Включим его обратно
+    FZLogMgr.Get.Write('Activating message', FZ_LOG_INFO);
+    VersionAbstraction().TriggerMessage();
   end;
 
   //Получим путь к корневой (установочной) диектории мода
@@ -606,6 +641,8 @@ begin
   VersionAbstraction().AssignStatus('Preprocessing files...');
 
   PreprocessFiles(files, mod_settings.root_dir);
+  FZLogMgr.Get.Write('=======Sorting files=======', FZ_LOG_INFO);
+  files.SortBySize();
   files.Dump(FZ_LOG_INFO);
 
   VersionAbstraction().AssignStatus('Downloading content...');
@@ -658,12 +695,33 @@ begin
   end;
 
   //Подготовимся к перезапуску
-  FZLogMgr.Get.Write('Prepare to restart client '+cmdapp+' '+cmdline, FZ_LOG_INFO);
+  FZLogMgr.Get.Write('Prepare to restart client', FZ_LOG_INFO);
   port:=GetServerPort(_mod_params);
   if (port<0) or (port>65535) then begin
     FZLogMgr.Get.Write('Cannot determine port', FZ_LOG_ERROR);
     exit;
   end;
+
+  playername:='';
+  if IsCmdLineNameNameNeeded(_mod_params) then begin
+    playername:=VersionAbstraction().GetPlayerName();
+    FZLogMgr.Get.Write('Using player name '+playername, FZ_LOG_INFO);
+    playername:='/name='+playername;
+  end;
+
+  assignfile(add_params_file, additional_keys_line_file);
+  try
+    reset(add_params_file);
+    try
+      readln(add_params_file, add_params);
+    finally
+      closefile(add_params_file);
+    end;
+  except
+    add_params:='';
+  end;
+
+  FZLogMgr.Get.Write('User-defined restart params: '+add_params, FZ_LOG_INFO);
 
   if length(mod_settings.binlist_url) > 0 then begin
     // Нестандартный двиг мода
@@ -678,7 +736,7 @@ begin
 
     //-fzmod - показывает имя мода; -fz_nomod - тключает загрузку модов (чтобы не впасть в рекурсию/старая версия)
     //так как проверка на имя мода идет первой, то все должно работать
-    cmdline:= cmdline + ' -fz_nomod -fzmod '+mod_settings.modname+' -start client('+ip+'/port='+inttostr(port)+')';
+    cmdline:= cmdline+' '+add_params+' -fz_nomod -fzmod '+mod_settings.modname+' -start client('+ip+'/port='+inttostr(port)+playername+')';
     workingdir:=mod_settings.root_dir;
   end else begin
     // Используем текущий двиг
@@ -692,7 +750,7 @@ begin
     until GetModuleFileName(VersionAbstraction().GetEngineExeModuleAddress(), fullPathToCurEngine, sz) < sz-1;
     cmdapp:=fullPathToCurEngine;
     workingdir:=mod_settings.root_dir;
-    cmdline:= VersionAbstraction().GetEngineExeFileName()+' -fz_nomod -fzmod '+mod_settings.modname+' -wosace -start client('+ip+'/port='+inttostr(port)+')';
+    cmdline:= VersionAbstraction().GetEngineExeFileName()+' '+add_params+' -fz_nomod -fzmod '+mod_settings.modname+' -wosace -start client('+ip+'/port='+inttostr(port)+playername+')';
     FreeMem(fullPathToCurEngine, sz);
   end;
 
@@ -701,6 +759,9 @@ begin
     FZLogMgr.Get().Write('Cancelled by user', FZ_LOG_ERROR);
     exit;
   end;
+
+  FZLogMgr.Get.Write('cmdapp: '+cmdapp, FZ_LOG_INFO);
+  FZLogMgr.Get.Write('cmdline: '+cmdline, FZ_LOG_INFO);
 
   FillMemory(@si, sizeof(si),0);
   FillMemory(@pi, sizeof(pi),0);
@@ -711,8 +772,6 @@ begin
 
   //Запустим клиента
   if (not CreateProcess(PAnsiChar(cmdapp), PAnsiChar(cmdline), nil, nil, false, CREATE_SUSPENDED, nil, PAnsiChar(workingdir),si, pi)) then begin
-    FZLogMgr.Get.Write('cmdapp: '+cmdapp, FZ_LOG_ERROR);
-    FZLogMgr.Get.Write('cmdline: '+cmdline, FZ_LOG_ERROR);
     FZLogMgr.Get.Write('Cannot run application', FZ_LOG_ERROR);
   end else begin
     ResumeThread(pi.hThread);
@@ -807,6 +866,9 @@ begin
   if not result then begin
     FZLogMgr.Get.Write('Loading failed!', FZ_LOG_ERROR);
     VersionAbstraction().SetVisualProgress(0);
+    if VersionAbstraction().IsMessageActive() then begin
+      VersionAbstraction().TriggerMessage();
+    end;
     VersionAbstraction().AssignStatus('Downloading failed. Try again.');
 
     i:=0;
@@ -995,6 +1057,8 @@ end;
 //-logsev <number> - уровень серьезности логируемых сообщений, по умолчанию FZ_LOG_ERROR
 //-configsdir <string> - директория конфигов
 //-exename <string> - имя исполняемого файла мода
+//-includename - включить в строку запуска мода параметр /name= с именем игрока
+//-preservemessage - показывать окно с сообщением о загрузке мода
 
 function ModLoad(mod_name:PAnsiChar; mod_params:PAnsiChar):FZDllModFunResult; stdcall;
 var
@@ -1034,7 +1098,7 @@ end;
 {$IFNDEF RELEASE}
 procedure ModLoadTest(); stdcall;
 begin
-  ModLoad('soc20006h', ' -srvname localhost -srvport 5449 '{ ' -srvname localhost -srvport 5449 '});
+  ModLoad('sace3', ' -srvname localhost -srvport 5449 -includename'{ ' -srvname localhost -srvport 5449 '});
 end;
 {$ENDIF}
 

@@ -3,7 +3,7 @@ unit Device;
 {$mode delphi}
 
 interface
-uses Windows, Time, Vector, Synchro, MatVectors;
+uses Windows, xr_time, Vector, Synchro, MatVectors;
 
 type
 CRegistrator = packed record

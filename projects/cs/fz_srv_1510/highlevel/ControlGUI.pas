@@ -30,6 +30,7 @@ const
   STR_TEST_CENSOR:PChar = 'Check censor';
   STR_KILL_PLAYER:PChar = 'Kill player';
   STR_ADD_MONEY:PChar = 'Add money';
+  STR_SET_TEAM:PChar = 'Change team';
   STR_RANK_UP:PChar = 'Rank Up';
   STR_RANK_DOWN:PChar = 'Rank Down';
 
@@ -65,6 +66,7 @@ const
   INFO_TEAMKILLS:PChar =        'Teamkills: ';
   INFO_DEATHES:PChar =          'Deathes: ';
   INFO_HWID:PChar =             'HWID: ';
+  INFO_ORIG_CDKEY:PChar =       'CDKEY: ';
   INFO_SACE:PChar =             'SACE: ';
 
 
@@ -93,6 +95,7 @@ type
     rank:integer;
     team:integer;
     hwid:string;
+    orig_cdkey:string;
 
     item_color:TColor;
 
@@ -114,6 +117,7 @@ type
     btn_clear_chat: TButton;
     lbl_hwid: TLabel;
     lbl_sace: TLabel;
+    lbl_orig_cdkey: TLabel;
     ListPlayers: TListBox;
     ActList: TActionList;
     ActRefresh: TAction;
@@ -121,6 +125,7 @@ type
     ActRankUp: TAction;
     ActRankDown: TAction;
     ActMoneyAdd: TAction;
+    ActSetTeam: TAction;
     ActExperienceAdd: TAction;
     ActKick: TAction;
     ActBan: TAction;
@@ -187,6 +192,7 @@ type
     procedure ActRankDownExecute(Sender: TObject);
     procedure ActRankUpExecute(Sender: TObject);
     procedure ActRefreshExecute(Sender: TObject);
+    procedure ActSetTeamExecute(Sender: TObject);
     procedure ActStopServerExecute(Sender: TObject);
     procedure btn_clear_chatClick(Sender: TObject);
     procedure chatlogContextPopup(Sender: TObject; {%H-}MousePos: TPoint;
@@ -257,7 +263,7 @@ procedure Clean();
 var
   FZControlGUI: TFZControlGUI;
 implementation
-uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog;
+uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog, MapGametypes, AdminCommands;
 
 {$R *.lfm}
 
@@ -321,6 +327,7 @@ begin
   FZCensor.Get.ReloadDefaultFile;
   FZSubnetBanList.Get.ReloadDefaultFile();
   FZItemCfgMgr.Get.Reload;
+  FZMapGametypesMgr.Get.Reload;
   FZPlayersConnectionMgr.Get.Reset;
   FZLogMgr.Get.Write('Configs reloaded.', FZ_LOG_USEROUT);
 end;
@@ -345,7 +352,7 @@ var
 begin
   result:=true;
   cl_d:=dynamic_cast(pl, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if (cl_d = nil) or ((cl_d.base_IClient.flags and ICLIENT_FLAG_LOCAL) >0)  then exit;
+  if (cl_d = nil) or IsLocalServerClient(@cl_d.base_IClient) then exit;
   pd:=TFZPlayerData.Create(cl_d);
   FZControlGUI.ListPlayers.AddItem(WinCPToUTF8(pd.name), pd as TObject);
 end;
@@ -353,54 +360,7 @@ end;
 
 {TFZControlGUI}
 
-procedure TFZControlGUI.ActRefreshExecute(Sender: TObject);
-var
-  last_id:cardinal;
-  i:integer;
-begin
-  if (ListPlayers.Count>0) and  (self.ListPlayers.ItemIndex>=0) then begin
-    last_id:= (self.ListPlayers.Items.Objects[self.ListPlayers.ItemIndex] as TFZPlayerData).id.id;
-  end else begin
-    last_id:=$FFFFFFFF;
-  end;
-
-  _ClearListPlayers();
-  ForEachClientDo(ProcessAddPlayerToListQuery);
-
-  self.ListPlayers.ItemIndex:=ListPlayers.Count-1;
-
-  //восстановим выделение, если оно было и игрок тут
-  if last_id<>$FFFFFFFF then begin
-    for i:=0 to ListPlayers.Count-1 do begin
-      if (self.ListPlayers.Items.Objects[i] as TFZPlayerData).id.id=last_id then begin
-        self.ListPlayers.ItemIndex:=i;
-        break;
-      end;
-    end;
-  end;
-  RefreshSelectedInfo();
-end;
-
-procedure TFZControlGUI.ActBanExecute(Sender: TObject);
-begin
-
-end;
-
-procedure TFZControlGUI.ActRankDownExecute(Sender: TObject);
-begin
-  if ListPlayers.ItemIndex>=0 then begin
-    ChangePlayerRank((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, -1);
-  end;
-end;
-
-procedure TFZControlGUI.ActRankUpExecute(Sender: TObject);
-begin
-  if ListPlayers.ItemIndex>=0 then begin
-    ChangePlayerRank((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, 1);
-  end;
-end;
-
-procedure TFZControlGUI._ClearListPlayers;
+procedure TFZControlGUI._ClearListPlayers();
 var
   i:integer;
 begin
@@ -410,7 +370,7 @@ begin
   self.ListPlayers.Clear;
 end;
 
-procedure TFZControlGUI.RefreshSelectedInfo;
+procedure TFZControlGUI.RefreshSelectedInfo();
 var
   sel:TFZPlayerData;
 begin
@@ -432,7 +392,12 @@ begin
     lbl_selfkills.Caption:=INFO_SELFKILLS+inttostr(sel.selfkills);
     lbl_teamkills.Caption:=INFO_TEAMKILLS+inttostr(sel.teamkills);
     lbl_deathes.Caption:=INFO_DEATHES+inttostr(sel.deathes);
+
+    lbl_hwid.visible:= length(sel.hwid) > 0;
     lbl_hwid.Caption:=INFO_HWID+sel.hwid;
+
+    lbl_orig_cdkey.visible:= length(sel.orig_cdkey) > 0;
+    lbl_orig_cdkey.Caption:=INFO_ORIG_CDKEY+sel.orig_cdkey;
 
     lbl_sace.visible:= length(sel.sace_string) > 0;
     lbl_sace.Caption:=INFO_SACE+sel.sace_string;
@@ -453,7 +418,13 @@ begin
     lbl_selfkills.Caption:=INFO_SELFKILLS;
     lbl_teamkills.Caption:=INFO_TEAMKILLS;
     lbl_deathes.Caption:=INFO_DEATHES;
+
+    lbl_hwid.visible:=false;
     lbl_hwid.Caption:=INFO_HWID;
+
+    lbl_orig_cdkey.visible:=false;
+    lbl_orig_cdkey.Caption:=INFO_ORIG_CDKEY;
+
     lbl_sace.visible := false;
     lbl_sace.Caption:=INFO_SACE;
   end;
@@ -516,7 +487,8 @@ begin
   self.teamkills:=cl.ps.m_iTeamKills;
   self.rank:=cl.ps.rank;
   self.team:=cl.ps.team;
-  self.hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId();
+  self.hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(false);
+  self.orig_cdkey:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetOrigCdkeyHash();
 
   if self.sace_status = SACE_NOT_FOUND then begin
     self.item_color:=clRed;
@@ -537,12 +509,6 @@ end;
 destructor TFZPlayerData.Destroy;
 begin
   inherited;
-end;
-
-procedure TFZControlGUI.ActStopServerExecute(Sender: TObject);
-begin
-  if MessageBox(self.Handle, STR_REALLY_STOP_SERVER, '', MB_YESNO+MB_ICONQUESTION)=IDYES then
-    ExecuteConsoleCommand('quit');
 end;
 
 procedure TFZControlGUI.btn_clear_chatClick(Sender: TObject);
@@ -608,66 +574,6 @@ begin
   EnableScrollBar(chatlog.Handle, SB_VERT, ESB_DISABLE_BOTH);
 end;
 
-procedure TFZControlGUI.ActKillExecute(Sender: TObject);
-begin
-  if ListPlayers.ItemIndex>=0 then begin
-    KillPlayer((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id);
-  end;
-end;
-
-procedure TFZControlGUI.ActKickExecute(Sender: TObject);
-var
-  reason:string;
-begin
-  if ListPlayers.ItemIndex>=0 then begin
-    reason:=UTF8ToWinCP(edit1.Text);
-    if reason<>'' then begin
-      DisconnectPlayer((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, PAnsiChar(reason));
-    end;
-  end;
-end;
-
-procedure TFZControlGUI.ActKeyGenExecute(Sender: TObject);
-begin
-  edit1.Text:=GenerateRandomKey(true);
-end;
-
-procedure TFZControlGUI.check_autorefreshClick(Sender: TObject);
-begin
-  ActRefresh.Execute();
-end;
-
-procedure TFZControlGUI.ActMuteExecute(Sender: TObject);
-var
-  time:integer;
-const
-  MSPERMIN:cardinal=60000;
-begin
-
-  if (ListPlayers.ItemIndex>=0) and (length(edit1.text)>0) then begin
-    time:=strtointdef(edit1.text, 0);
-    if time<=0 then begin
-      UnMutePlayer((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id);
-    end else begin
-      if $FFFFFFFF/MSPERMIN<cardinal(time) then begin
-        MutePlayer((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, $FFFFFFFF);
-      end else begin
-        MutePlayer((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, cardinal(time)*MSPERMIN);
-      end;
-    end;
-  end;
-end;
-
-procedure TFZControlGUI.ActCheckCensorExecute(Sender: TObject);
-var
-  str:AnsiString;
-begin
-  str:=UTF8ToWinCP(edit1.Text);
-  if str<>'' then begin
-    edit2.Text:=booltostr(FZCensor.Get.CheckAndCensorString(PAnsiChar(str), false, ''), true);
-  end;
-end;
-
 procedure TFZControlGUI.FormCreate(Sender: TObject);
 begin
   combo_options.AddItem(STR_REFRESH, FZOptionsItem.Create(ActOptDisableAll, ActRefresh) as TObject);
@@ -680,13 +586,13 @@ begin
 
   combo_options.AddItem(STR_KILL_PLAYER, FZOptionsItem.Create(ActOptDisableAll, ActKill) as TObject);
   combo_options.AddItem(STR_ADD_MONEY, FZOptionsItem.Create(ActOptValue, ActMoneyAdd) as TObject);
+  combo_options.AddItem(STR_SET_TEAM, FZOptionsItem.Create(ActOptValue, ActSetTeam) as TObject);
 
   combo_options.AddItem(STR_RANK_UP, FZOptionsItem.Create(ActOptDisableAll, ActRankUp) as TObject);
   combo_options.AddItem(STR_RANK_DOWN, FZOptionsItem.Create(ActOptDisableAll, ActRankDown) as TObject);
-
-{$IFDEF REVO}
   combo_options.AddItem(STR_TELEPORT_PLAYER, FZOptionsItem.Create(ActOptPosDir, ActTeleport) as TObject);
 
+{$IFDEF REVO}
   combo_options.AddItem(STR_GENERATE_CDKEY, FZOptionsItem.Create(ActOptValue, ActKeyGen) as TObject);
 
   combo_options.AddItem(STR_TEST_SACE_CHAT, FZOptionsItem.Create(ActOptDisableAll, ActCheckSace_Chat) as TObject);
@@ -703,36 +609,6 @@ begin
   RefreshChat();
   RefreshSelectedInfo();
 
-end;
-
-procedure TFZControlGUI.ActOptDisableAllExecute(Sender: TObject);
-begin
-  label1.Visible:=false;
-  label2.Visible:=false;
-  edit1.Visible:=false;
-  edit2.Visible:=false;
-end;
-
-procedure TFZControlGUI.ActOptTimeReasonExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=true;
-  edit1.Visible:=true;
-  edit2.Visible:=true;
-  label1.Caption:=STR_TIME;
-  label2.Caption:=STR_REASON;
-  edit1.Text:='0';
-  edit2.Text:='';
-end;
-
-procedure TFZControlGUI.ActOptReasonExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=false;
-  edit1.Visible:=true;
-  edit2.Visible:=false;
-  label1.Caption:=STR_REASON;
-  edit1.Text:='';
 end;
 
 { FZOptionsItem }
@@ -769,75 +645,10 @@ begin
   end;
 end;
 
-procedure TFZControlGUI.ActOptTimeExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=false;
-  edit1.Visible:=true;
-  edit2.Visible:=false;
-  label1.Caption:=STR_TIME;
-  edit1.Text:='0';
-end;
-
-procedure TFZControlGUI.ActCheckSACE_ChatExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    SendSaceChatMessage(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-  end;
-end;
-
 procedure TFZControlGUI.ListPlayersClick(Sender: TObject);
 begin
   RefreshSelectedInfo();
 end;
-
-procedure TFZControlGUI.ActChangeUpdrateExecute(Sender: TObject);
-var
-  val:cardinal;
-begin
-  if (ListPlayers.ItemIndex>=0) then begin
-    val:=strtointdef(edit1.Text, 0);
-    SetUpdRate((self.ListPlayers.Items.Objects[self.ListPlayers.ItemIndex] as TFZPlayerData).id, val); 
-  end;
-end;
-
-procedure TFZControlGUI.ActOptValueExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=false;
-  edit1.Visible:=true;
-  edit2.Visible:=false;
-  label1.Caption:=STR_VALUE;
-  edit1.Text:='0';
-end;
-
-procedure TFZControlGUI.ActOptInputOutputExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=true;
-  edit1.Visible:=true;
-  edit2.Visible:=true;
-  label1.Caption:=STR_INPUT;
-  label2.Caption:=STR_OUTPUT;
-  edit1.Text:='';
-  edit2.Text:='';
-end;
-
-procedure TFZControlGUI.ActOptPosDirExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=true;
-  edit1.Visible:=true;
-  edit2.Visible:=true;
-  label1.Caption:=STR_POS;
-  label2.Caption:=STR_DIR;
-  edit1.Text:='0,0,0';
-  edit2.Text:='0,1,0';
-end;
-
 
 procedure TFZControlGUI.ActClosePanelExecute(Sender: TObject);
 begin
@@ -878,127 +689,14 @@ begin
   ActClosePanel.Execute();
 end;
 
-procedure TFZControlGUI.ActMoneyAddExecute(Sender: TObject);
-var
-  cnt:integer;
+procedure TFZControlGUI.check_autorefreshClick(Sender: TObject);
 begin
-  if ListPlayers.ItemIndex>=0 then begin
-    cnt:=strtointdef(edit1.Text, 0);
-    if cnt<>0 then begin
-      AddMoney((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id, cnt);
-    end;
-  end;
+  ActRefresh.Execute();
 end;
 
 procedure TFZControlGUI.btn_minimizeClick(Sender: TObject);
 begin
   PostMessage(Handle,WM_SYSCOMMAND, SC_MINIMIZE, 1);
-end;
-
-procedure TFZControlGUI.ActCheckSACE_ChangenameExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    SendBrokenChangeNamePacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-  end;
-end;
-
-procedure TFZControlGUI.ActBugUpdateExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    SendBrokenUpdatePacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-  end;
-end;
-
-procedure TFZControlGUI.ActBugSpawnExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    SendBrokenSpawnPacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-  end;
-end;
-
-procedure TFZControlGUI.ActBugMoveExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    SendBrokenMovePlayersPacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).game_id);
-  end;
-end;
-
-procedure TFZControlGUI.ActBugSvconfigExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    SendBrokenSVConfigGamePacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-//    SendFileReceiveStart(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-//    SendFileReceivePacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
-  end;
-end;
-
-procedure TFZControlGUI.ActTeleportExecute(Sender: TObject);
-var
-  srv:pIPureServer;
-  vp, vd:FVector3;
-  tmp, coord:string;
-begin
-  srv:=GetPureServer();
-  if (ListPlayers.ItemIndex>=0) and (srv<>nil) then begin
-    
-    tmp:=edit1.Text;
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.x:=FZCommonHelper.StringToFloatDef(coord, 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.y:=FZCommonHelper.StringToFloatDef(coord, 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.z:=FZCommonHelper.StringToFloatDef(coord, 0);
-
-    tmp:=edit2.Text;
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.x:=FZCommonHelper.StringToFloatDef(coord, 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.y:=FZCommonHelper.StringToFloatDef(coord, 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.z:=FZCommonHelper.StringToFloatDef(coord, 0);
-
-    SendMovePlayersPacket(srv, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).game_id, @vp, @vd);
-  end;
-end;
-
-procedure TFZControlGUI.ActConsoleCmdExecute(Sender: TObject);
-var
-  str:AnsiString;
-begin
-  str:=UTF8ToWinCP(Edit1.Text);
-  if length(str)>0 then begin
-    ExecuteConsoleCommand(PAnsiChar(str));
-  end;
-end;
-
-procedure TFZControlGUI.ActOptCommandExecute(Sender: TObject);
-begin
-  label1.Visible:=true;
-  label2.Visible:=false;
-  edit1.Visible:=true;
-  edit2.Visible:=false;
-  label1.Caption:=STR_COMMAND;
-  edit1.Text:='';
 end;
 
 procedure TFZControlGUI.Edit1KeyPress(Sender: TObject; var Key: Char);
@@ -1031,6 +729,344 @@ end;
 procedure TFZControlGUI.TrackChatChange(Sender: TObject);
 begin
   RefreshChat();
+end;
+
+//******************************** Actions for preparing editboxes when combobox item changing *************************************
+procedure TFZControlGUI.ActOptDisableAllExecute(Sender: TObject);
+begin
+  label1.Visible:=false;
+  label2.Visible:=false;
+  edit1.Visible:=false;
+  edit2.Visible:=false;
+end;
+
+procedure TFZControlGUI.ActOptTimeReasonExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=true;
+  edit1.Visible:=true;
+  edit2.Visible:=true;
+  label1.Caption:=STR_TIME;
+  label2.Caption:=STR_REASON;
+  edit1.Text:='0';
+  edit2.Text:='';
+end;
+
+procedure TFZControlGUI.ActOptReasonExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=false;
+  edit1.Visible:=true;
+  edit2.Visible:=false;
+  label1.Caption:=STR_REASON;
+  edit1.Text:='';
+end;
+
+procedure TFZControlGUI.ActOptTimeExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=false;
+  edit1.Visible:=true;
+  edit2.Visible:=false;
+  label1.Caption:=STR_TIME;
+  edit1.Text:='0';
+end;
+
+procedure TFZControlGUI.ActOptValueExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=false;
+  edit1.Visible:=true;
+  edit2.Visible:=false;
+  label1.Caption:=STR_VALUE;
+  edit1.Text:='0';
+end;
+
+procedure TFZControlGUI.ActOptInputOutputExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=true;
+  edit1.Visible:=true;
+  edit2.Visible:=true;
+  label1.Caption:=STR_INPUT;
+  label2.Caption:=STR_OUTPUT;
+  edit1.Text:='';
+  edit2.Text:='';
+end;
+
+procedure TFZControlGUI.ActOptPosDirExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=true;
+  edit1.Visible:=true;
+  edit2.Visible:=true;
+  label1.Caption:=STR_POS;
+  label2.Caption:=STR_DIR;
+  edit1.Text:='0,0,0';
+  edit2.Text:='0,1,0';
+end;
+
+procedure TFZControlGUI.ActOptCommandExecute(Sender: TObject);
+begin
+  label1.Visible:=true;
+  label2.Visible:=false;
+  edit1.Visible:=true;
+  edit2.Visible:=false;
+  label1.Caption:=STR_COMMAND;
+  edit1.Text:='';
+end;
+
+//////////////////////////////////// Actions from combobox ////////////////////////////////////////////////////
+
+//************************************** Common actions ******************************************************
+procedure TFZControlGUI.ActConsoleCmdExecute(Sender: TObject);
+var
+  str:AnsiString;
+begin
+  str:=UTF8ToWinCP(Edit1.Text);
+  if length(str)>0 then begin
+    AddAdminCommandToQueue(FZSimpleConsoleCmd.Create(str, FZConsoleReporter.Create(0)));
+  end;
+end;
+procedure TFZControlGUI.ActStopServerExecute(Sender: TObject);
+begin
+  if MessageBox(self.Handle, STR_REALLY_STOP_SERVER, '', MB_YESNO+MB_ICONQUESTION)=IDYES then begin
+    AddAdminCommandToQueue(FZSimpleConsoleCmd.Create('quit', FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActRefreshExecute(Sender: TObject);
+var
+  last_id:cardinal;
+  i:integer;
+begin
+  if not self.Visible then begin
+    exit;
+  end;
+
+  if (ListPlayers.Count>0) and  (self.ListPlayers.ItemIndex>=0) then begin
+    last_id:= (self.ListPlayers.Items.Objects[self.ListPlayers.ItemIndex] as TFZPlayerData).id.id;
+  end else begin
+    last_id:=$FFFFFFFF;
+  end;
+
+  _ClearListPlayers();
+  ForEachClientDo(ProcessAddPlayerToListQuery);
+
+  self.ListPlayers.ItemIndex:=ListPlayers.Count-1;
+
+  //восстановим выделение, если оно было и игрок тут
+  if last_id<>$FFFFFFFF then begin
+    for i:=0 to ListPlayers.Count-1 do begin
+      if (self.ListPlayers.Items.Objects[i] as TFZPlayerData).id.id=last_id then begin
+        self.ListPlayers.ItemIndex:=i;
+        break;
+      end;
+    end;
+  end;
+  RefreshSelectedInfo();
+end;
+
+procedure TFZControlGUI.ActCheckCensorExecute(Sender: TObject);
+var
+  str:AnsiString;
+begin
+  str:=UTF8ToWinCP(edit1.Text);
+  if str<>'' then begin
+    edit2.Text:=booltostr(FZCensor.Get.CheckAndCensorString(PAnsiChar(str), false, ''), true);
+  end;
+end;
+
+//************************************************ Actions with players ****************************************
+procedure TFZControlGUI.ActBanExecute(Sender: TObject);
+begin
+//TODO: implement
+end;
+
+procedure TFZControlGUI.ActRankDownExecute(Sender: TObject);
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    AddAdminCommandToQueue(FZAdminRankChangeCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, -1, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActRankUpExecute(Sender: TObject);
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    AddAdminCommandToQueue(FZAdminRankChangeCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, 1, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActKillExecute(Sender: TObject);
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    AddAdminCommandToQueue(FZAdminKillPlayerCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActKickExecute(Sender: TObject);
+var
+  reason:string;
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    reason:=UTF8ToWinCP(edit1.Text);
+    AddAdminCommandToQueue(FZAdminKickPlayerCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, reason, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActKeyGenExecute(Sender: TObject);
+begin
+  edit1.Text:=GenerateRandomKey(true);
+end;
+
+procedure TFZControlGUI.ActMuteExecute(Sender: TObject);
+var
+  time:integer;
+begin
+  if (ListPlayers.ItemIndex>=0) and (length(edit1.text)>0) then begin
+    time:=strtointdef(edit1.text, 0);
+    AddAdminCommandToQueue(FZAdminMutePlayerCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, time, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActMoneyAddExecute(Sender: TObject);
+var
+  cnt:integer;
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    cnt:=strtointdef(edit1.Text, 0);
+    if cnt<>0 then begin
+      AddAdminCommandToQueue(FZAdminAddMoneyCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, cnt, FZConsoleReporter.Create(0)));
+    end;
+  end;
+end;
+
+procedure TFZControlGUI.ActSetTeamExecute(Sender: TObject);
+var
+  team:integer;
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    team:=strtointdef(edit1.Text, 0);
+    if team<>0 then begin
+      AddAdminCommandToQueue(FZAdminChangeTeamCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, team, FZConsoleReporter.Create(0)));
+    end;
+  end;
+end;
+
+procedure TFZControlGUI.ActChangeUpdrateExecute(Sender: TObject);
+var
+  val:cardinal;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    val:=strtointdef(edit1.Text, 0);
+    AddAdminCommandToQueue(FZAdminSetUpdrateCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, val, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+procedure TFZControlGUI.ActTeleportExecute(Sender: TObject);
+var
+  vp, vd:FVector3;
+  tmp, coord:string;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+
+    tmp:=edit1.Text;
+    tmp:=tmp+',';
+
+    FZCommonHelper.GetNextParam(tmp, coord, ',');
+    vp.x:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
+
+    FZCommonHelper.GetNextParam(tmp, coord, ',');
+    vp.y:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
+
+    FZCommonHelper.GetNextParam(tmp, coord, ',');
+    vp.z:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
+
+    tmp:=edit2.Text;
+    tmp:=tmp+',';
+    FZCommonHelper.GetNextParam(tmp, coord, ',');
+    vd.x:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
+
+    FZCommonHelper.GetNextParam(tmp, coord, ',');
+    vd.y:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
+
+    FZCommonHelper.GetNextParam(tmp, coord, ',');
+    vd.z:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
+
+    AddAdminCommandToQueue(FZAdminTeleportPlayerCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, vp, vd, FZConsoleReporter.Create(0)));
+  end;
+end;
+
+//************************************************************ SACE checking actions **************************************
+procedure TFZControlGUI.ActCheckSACE_ChatExecute(Sender: TObject);
+var
+  cmd:FZAdminPacketSenderCommand;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    cmd:=FZAdminPacketSenderCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0));
+    CreateBrokenSaceChatMessage(cmd.GetPacket());
+    AddAdminCommandToQueue(cmd);
+  end;
+end;
+
+procedure TFZControlGUI.ActCheckSACE_ChangenameExecute(Sender: TObject);
+var
+  cmd:FZAdminPacketSenderCommand;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    cmd:=FZAdminPacketSenderCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0));
+    CreateBrokenChangeNamePacket(cmd.GetPacket());
+    AddAdminCommandToQueue(cmd);
+  end;
+end;
+
+//*************************************************************'Bugs' actions**********************************************
+procedure TFZControlGUI.ActBugUpdateExecute(Sender: TObject);
+var
+  cmd:FZAdminPacketSenderCommand;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    cmd:=FZAdminPacketSenderCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0));
+    CreateBrokenUpdatePacket(cmd.GetPacket(), (ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
+    AddAdminCommandToQueue(cmd);
+  end;
+end;
+
+procedure TFZControlGUI.ActBugSpawnExecute(Sender: TObject);
+var
+  cmd:FZAdminPacketSenderCommand;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    cmd:=FZAdminPacketSenderCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0));
+    CreateBrokenSpawnPacket(cmd.GetPacket());
+    AddAdminCommandToQueue(cmd);
+  end;
+end;
+
+procedure TFZControlGUI.ActBugSvconfigExecute(Sender: TObject);
+var
+  cmd:FZAdminPacketSenderCommand;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    cmd:=FZAdminPacketSenderCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0));
+    CreateBrokenSVConfigGamePacket(cmd.GetPacket());
+    AddAdminCommandToQueue(cmd);
+  end;
+end;
+
+procedure TFZControlGUI.ActBugMoveExecute(Sender: TObject);
+var
+  cmd:FZAdminPacketSenderCommand;
+  cl_d:pxrClientData;
+begin
+  if (ListPlayers.ItemIndex>=0) then begin
+    cl_d:=ID_to_client((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id);
+    if cl_d <> nil then begin
+      cmd:=FZAdminPacketSenderCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, FZConsoleReporter.Create(0));
+      CreateBrokenMovePlayersPacket(cmd.GetPacket(), cl_d.ps.GameID);
+      AddAdminCommandToQueue(cmd);
+    end;
+  end;
 end;
 
 end.

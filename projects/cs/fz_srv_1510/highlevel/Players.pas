@@ -43,12 +43,16 @@ protected
   _last_ping_warning_time:cardinal;
 
   _hwid:string;
+  _orig_cdkey_hash:string;
+  _hwid_received:boolean;
 
   {%H-}constructor Create(ps:pgame_PlayerState);
 public
   procedure SetUpdrate(d:cardinal);
   procedure SetHwId(hwid:string);
-  function GetHwId():string;
+  function GetHwId(allow_old:boolean):string;
+  procedure SetOrigCdkeyHash(hash:string);
+  function GetOrigCdkeyHash():string;
 
   property updrate:cardinal read _updrate write SetUpdrate;
   property last_ready:cardinal read _last_ready_time write _last_ready_time;
@@ -84,16 +88,19 @@ procedure FromPlayerStateDestructor(ps:pgame_PlayerState); stdcall;
 procedure FromPlayerStateClear({%H-}ps:pgame_PlayerState); stdcall;
 
 
-procedure DisconnectPlayer(id:ClientID; reason:string); stdcall;
-function MutePlayer(id:ClientID; time:cardinal):boolean; stdcall;
-function UnMutePlayer(id:ClientID):boolean; stdcall;
-procedure SetUpdRate(id:ClientID; updrate:cardinal); stdcall;
-procedure KillPlayer(id:ClientID); stdcall;
-procedure AddMoney(id:ClientID; amount:integer); stdcall;
-function ChangePlayerRank(id:ClientID; delta:integer):boolean; stdcall;
+procedure DisconnectPlayer(cl:pIClient; reason:string); stdcall;
+function MutePlayer(cl: pxrClientData; time:cardinal):boolean; stdcall;
+function UnMutePlayer(cl: pxrClientData):boolean; stdcall;
+procedure SetUpdRate(cl: pxrClientData; updrate:cardinal); stdcall;
+procedure KillPlayer(cl: pxrClientData); stdcall;
+procedure AddMoney(cl: pxrClientData; amount:integer); stdcall;
+function ChangePlayerRank(cl: pxrClientData; delta:integer):boolean; stdcall;
 
 procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
-function GetHwId(cl: pxrClientData): string; stdcall;
+function GetHwId(cl: pxrClientData; allow_old:boolean): string; stdcall;
+procedure SetOrigCdkeyHash(cl: pxrClientData; hash:string);
+function GetOrigCdkeyHash(cl: pxrClientData):string;
+
 
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
 procedure CheckClientConnectData(data:pSClientConnectData); stdcall;
@@ -111,7 +118,7 @@ function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdca
 procedure xrServer__OnCL_Disconnected_appendToPacket({%H-}p:pNET_Packet; pname:ppshared_str; cl:pxrClientData); stdcall;
 function game_sv_mp__OnPlayerDisconnect_is_message_needed(name:PAnsiChar):boolean; stdcall;
 
-procedure SendMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word; pos:pFVector3; dir:pFVector3); stdcall;
+procedure SendTeleportPlayerPacket(client:pxrClientData; pos:pFVector3; dir:pFVector3); stdcall;
 
 function BeforeSpawnBoughtItems_DM(ps:pgame_PlayerState; game:pgame_sv_Deathmatch):boolean; stdcall;
 function BeforeSpawnBoughtItems_CTA(ps:pgame_PlayerState; game:pgame_sv_CaptureTheArtefact):boolean; stdcall;
@@ -124,7 +131,7 @@ function GenerateMessageForClientId(id:cardinal; message: string):string;
 function IsWeaponKnife(item:pCSE_Abstract):boolean;stdcall;
 
 implementation
-uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug;
+uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug, Banned, xr_time;
 
 const
   SHOP_GROUP = '[SHOP] ';
@@ -134,9 +141,19 @@ begin
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetHwId(hwid);
 end;
 
-function GetHwId(cl: pxrClientData): string; stdcall;
+function GetHwId(cl: pxrClientData; allow_old: boolean): string; stdcall;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId();
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(allow_old);
+end;
+
+procedure SetOrigCdkeyHash(cl: pxrClientData; hash: string);
+begin
+  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetOrigCdkeyHash(hash);
+end;
+
+function GetOrigCdkeyHash(cl: pxrClientData): string;
+begin
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetOrigCdkeyHash();
 end;
 
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
@@ -194,135 +211,70 @@ begin
   end;
 end;
 
-/////////////////////////////////////////////////////
-function DoAddMoney(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; amount:pointer):boolean; stdcall;
+function ChangePlayerRank(cl: pxrClientData; delta: integer): boolean; stdcall;
 var
-  cl_d:pxrClientData;
-begin
-  result:=false;
-  cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if (cl_d<>nil) then begin
-    game_PlayerAddMoney(GetCurrentGame(), cl_d.ps, pcardinal(amount)^);
-  end;
-end;
-
-procedure AddMoney(id:ClientID; amount:integer); stdcall;
-begin
-  ForEachClientDo(DoAddMoney, OneIDSearcher, @id.id, @amount);
-end;
-
-/////////////////////////////////////////////////////
-function DoKillPlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; {%H-}junk:pointer):boolean; stdcall;
-var
-  cl_d:pxrClientData;
-begin
-  result:=false;
-  cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if (cl_d<>nil) then begin
-    game_KillPlayer(GetCurrentGame(), cl_d.base_IClient.ID.id, cl_d.ps.GameID);
-  end;
-end;
-
-procedure KillPlayer(id:ClientID); stdcall;
-begin
-  ForEachClientDo(DoKillPlayer, OneIDSearcher, @id.id);
-end;
-/////////////////////////////////////////////////////
-
-function ChangePlayerRank(id:ClientID; delta:integer):boolean; stdcall;
-var
-  cld:pxrClientData;
   newrank:integer;
 begin
   result:=false;
-  LockServerPlayers();
-  cld:=ID_to_client(id.id);
-  if (cld<>nil) and (cld.ps<>nil) then begin
-    newrank:=cld.ps.rank+delta;
-    if (newrank >= 0) and (newrank < integer(_RANK_COUNT)) then begin
-      cld.ps.rank:=byte(newrank);
-      result:=true;
+  newrank:=cl.ps.rank+delta;
+  if (newrank >= 0) and (newrank < integer(_RANK_COUNT)) then begin
+    cl.ps.rank:=byte(newrank);
+    result:=true;
+  end;
+end;
+
+procedure SetUpdRate(cl: pxrClientData; updrate: cardinal); stdcall;
+begin
+  R_ASSERT(cl <> nil, 'client is nil', 'SetUpdRate');
+  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).updrate:=updrate;
+end;
+
+function UnMutePlayer(cl: pxrClientData): boolean; stdcall;
+begin
+  R_ASSERT(cl <> nil, 'client is nil',  'UnMutePlayer');
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsMuted();
+
+  if result then begin
+    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).UnMute();
+  end;
+end;
+
+function MutePlayer(cl: pxrClientData; time: cardinal): boolean; stdcall;
+var
+  newtime:int64;
+begin
+  R_ASSERT(cl <> nil, 'client is nil',  'MutePlayer');
+
+  result:=false;
+  if time>0 then begin
+    newtime:= int64(time) * MSecsPerSec;
+    if newtime > $FFFFFFFF then begin
+      time:=$FFFFFFFF;
+    end else begin
+      time:=cardinal(newtime);
     end;
-  end;
-  UnlockServerPlayers();
-end;
-
-/////////////////////////////////////////////////////
-function DoSetUpdRate(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; val:pointer):boolean; stdcall;
-var
-  cl_d:pxrClientData;
-begin
-  result:=false;
-  cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if cl_d<>nil then begin
-    FZPlayerStateAdditionalInfo(cl_d.ps.FZBuffer).updrate:=PCardinal(val)^;
+    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).AssignMute(time);
+    result:=true;
   end;
 end;
 
-procedure SetUpdRate(id:ClientID; updrate:cardinal); stdcall;
+procedure KillPlayer(cl: pxrClientData); stdcall;
 begin
-  ForEachClientDo(DoSetUpdRate, OneIDSearcher, @id.id, @updrate);
-end;
-/////////////////////////////////////////////////////
-function DoUnMutePlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; res:pointer):boolean; stdcall;
-var
-  cl_d:pxrClientData;
-begin
-  result:=false;
-  cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if cl_d<>nil then begin
-    FZPlayerStateAdditionalInfo(cl_d.ps.FZBuffer).UnMute();
-    pcardinal(res)^:=1 ;//true;
-  end;
+  R_ASSERT(cl <> nil, 'client is nil',  'KillPlayer');
+  game_KillPlayer(GetCurrentGame(), cl.base_IClient.ID.id, cl.ps.GameID);
 end;
 
-function UnMutePlayer(id:ClientID):boolean; stdcall;
-var
-  do_mute:cardinal;
+procedure AddMoney(cl: pxrClientData; amount: integer); stdcall;
 begin
-  do_mute:=0;
-  if time>0 then begin
-    result:=false;
-    ForEachClientDo(DoUnMutePlayer, OneIDSearcher, @id.id, @do_mute);
-  end;
-  result:=(do_mute<>0);
+  R_ASSERT(cl <> nil, 'client is nil',  'AddMoney');
+  game_PlayerAddMoney(GetCurrentGame(), cl.ps, amount);
 end;
 
-/////////////////////////////////////////////////////
-function DoMutePlayer(player:pointer{pIClient}; {%H-}pcardinal_id:pointer; pcardinal_time:pointer):boolean; stdcall;
-var
-  cl_d:pxrClientData;
+procedure DisconnectPlayer(cl: pIClient; reason: string); stdcall;
 begin
-  result:=false;
-  cl_d:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
-  if cl_d<>nil then begin
-    FZPlayerStateAdditionalInfo(cl_d.ps.FZBuffer).AssignMute(pcardinal(pcardinal_time)^);
-    pcardinal(pcardinal_time)^:=0;
-  end;
+  R_ASSERT(cl <> nil, 'client is nil',  'DisconnectPlayer');
+  IPureServer__DisconnectClient(GetPureServer(), cl, PAnsiChar(reason));
 end;
-
-function MutePlayer(id:ClientID; time:cardinal):boolean; stdcall;
-begin
-  result:=false;
-  if time>0 then begin
-    ForEachClientDo(DoMutePlayer, OneIDSearcher, @id.id, @time);
-    result:=(time=0);
-  end;
-end;
-
-/////////////////////////////////////////////////////
-procedure DisconnectPlayer(id:ClientID; reason:string); stdcall;
-var
-  cld:pxrClientData;
-begin
-  LockServerPlayers();
-  cld:=ID_to_client(id.id);
-  if (cld<>nil) then begin
-    IPureServer__DisconnectClient(GetPureServer(), @cld.base_IClient, PAnsiChar(reason));
-  end;
-  UnlockServerPlayers();
-end;
-/////////////////////////////////////////////////////
 
 { FZPlayerStateAdditionalInfo }
 
@@ -373,9 +325,10 @@ begin
   end;
 end;
 
-procedure FZPlayerStateAdditionalInfo.OnDisconnected;
+procedure FZPlayerStateAdditionalInfo.OnDisconnected();
 begin
   self._connected_and_ready:=false;
+  self._hwid_received:=false;
 end;
 
 procedure FZPlayerStateAdditionalInfo.AssignVoteMute(time: cardinal);
@@ -430,6 +383,10 @@ begin
   _updrate:=0;
   _last_ready_time:=0;
   _last_ping_warning_time:=0;
+
+  _hwid:='';
+  _orig_cdkey_hash:='';
+  _hwid_received:=false;
 end;
 
 destructor FZPlayerStateAdditionalInfo.Destroy;
@@ -453,7 +410,7 @@ begin
   FZPlayerStateAdditionalInfo(ps.FZBuffer).Free;
 end;
 
-function FZPlayerStateAdditionalInfo.IsAllowedStartingVoting: boolean;
+function FZPlayerStateAdditionalInfo.IsAllowedStartingVoting(): boolean;
 begin
   EnterCriticalSection(_lock);
   try
@@ -469,7 +426,7 @@ begin
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.IsMuted: boolean;
+function FZPlayerStateAdditionalInfo.IsMuted(): boolean;
 begin
   EnterCriticalSection(_lock);
   try
@@ -487,7 +444,7 @@ begin
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.IsPlayerVoteMuted: boolean;
+function FZPlayerStateAdditionalInfo.IsPlayerVoteMuted(): boolean;
 begin
   EnterCriticalSection(_lock);
   try
@@ -505,7 +462,7 @@ begin
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.IsSpeechMuted: boolean;
+function FZPlayerStateAdditionalInfo.IsSpeechMuted(): boolean;
 begin
   if IsMuted then begin
     result:=true;
@@ -527,7 +484,7 @@ begin
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.OnBadWordsInChat: cardinal;
+function FZPlayerStateAdditionalInfo.OnBadWordsInChat(): cardinal;
 begin
   EnterCriticalSection(_lock);
   try
@@ -543,7 +500,7 @@ begin
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.OnChatMessage:cardinal;
+function FZPlayerStateAdditionalInfo.OnChatMessage(): cardinal;
 var
   _data:FZCacheData;
 begin
@@ -569,7 +526,7 @@ begin
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.OnSpeechMessage: cardinal;
+function FZPlayerStateAdditionalInfo.OnSpeechMessage(): cardinal;
 var
   _data:FZCacheData;
 begin
@@ -595,7 +552,7 @@ begin
   end;
 end;
 
-procedure FZPlayerStateAdditionalInfo.OnVote;
+procedure FZPlayerStateAdditionalInfo.OnVote();
 var
   _data:FZCacheData;
 begin
@@ -623,7 +580,7 @@ begin
   end;
 end;
 
-procedure FZPlayerStateAdditionalInfo.OnVoteStarted;
+procedure FZPlayerStateAdditionalInfo.OnVoteStarted();
 begin
   EnterCriticalSection(_lock);
   try
@@ -637,24 +594,43 @@ end;
 
 procedure FZPlayerStateAdditionalInfo.SetUpdrate(d: cardinal);
 begin
-  if (d<>0) and (d<10) then d:=10;
+  if (d=0) then d:=1;
   if d>1000 then d:=1000;
   self._updrate:=d;
 end;
 
 procedure FZPlayerStateAdditionalInfo.SetHwId(hwid: string);
 begin
-  if (length(self._hwid)=0) or (not self._connected_and_ready) then begin
+  if not _hwid_received then begin
     self._hwid:=hwid;
+    self._hwid_received:=true;
   end;
 end;
 
-function FZPlayerStateAdditionalInfo.GetHwId: string;
+function FZPlayerStateAdditionalInfo.GetHwId(allow_old: boolean): string;
 begin
-  result:=_hwid;
+  if not allow_old and not self._hwid_received then begin
+    result:='';
+  end else begin
+    result:=_hwid;
+  end;
 end;
 
-procedure FZPlayerStateAdditionalInfo.UnMute;
+procedure FZPlayerStateAdditionalInfo.SetOrigCdkeyHash(hash: string);
+begin
+  _orig_cdkey_hash:=hash;
+end;
+
+function FZPlayerStateAdditionalInfo.GetOrigCdkeyHash(): string;
+begin
+  if not self._hwid_received then begin
+    result:='';
+  end else begin
+    result:=_orig_cdkey_hash;
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.UnMute();
 begin
   EnterCriticalSection(_lock);
   try
@@ -681,11 +657,10 @@ begin
   end;
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._last_ping_warning_time:=FZCommonHelper.GetGameTickCount();
   if cl.m_ping_warn__m_maxPingWarnings>=5 then begin
-    DisconnectPlayer(cl.base_IClient.ID, FZTranslationMgr.Get.TranslateSingle('fz_ping_limit_exceeded'));
+    DisconnectPlayer(@cl.base_IClient, FZTranslationMgr.Get.TranslateSingle('fz_ping_limit_exceeded'));
   end;
   result:=false;
 end;
-
 
 procedure SendChangeLevelPacket(srv:pIPureServer; cl_id:cardinal); stdcall;
 var
@@ -700,21 +675,17 @@ begin
   SendPacketToClient(srv, cl_id, @p);
 end;
 
-procedure SendMovePlayersPacket(srv:pIPureServer; cl_id:cardinal; gameid:word; pos:pFVector3; dir:pFVector3); stdcall;
+procedure SendTeleportPlayerPacket(client:pxrClientData; pos:pFVector3; dir:pFVector3); stdcall;
 var
   p:NET_Packet;
-  b:byte;
 begin
-  ClearPacket(@p);
-  p.w_allow:=true;
-  WriteToPacket(@p, @M_MOVE_PLAYERS, sizeof(M_MOVE_PLAYERS)); //хидер
-  b:=3;
-  WriteToPacket(@p, @b, sizeof(b)); //count
-  WriteToPacket(@p, @gameid, sizeof(gameid));
-  WriteToPacket(@p, pos, sizeof(FVector3));
-  WriteToPacket(@p, dir, sizeof(FVector3));
+  R_ASSERT(client<>nil, 'client is nil', 'SendTeleportPlayerPacket');
 
-  SendPacketToClient(srv, cl_id, @p);
+  if GetPureServer() = nil then exit;
+  MakeMovePlayerPacket(@p, client.ps.GameID, pos, dir);
+  //Заставим пропускать апдейт-пакеты от игрока до подтверждения о перемещении (чтобы старые апдейты не "перебили" позицию)
+  client.net_PassUpdates:=false;
+  SendPacketToClient(GetPureServer(), client.base_IClient.ID.id, @p);
 end;
 
 function CanChangeName(client:pxrClientData):boolean; stdcall;
@@ -829,7 +800,7 @@ begin
     userdata.srv:=@srv.base_IPureServer;
     userdata.cl_id:=cl.ID;
 
-    if ((cl.flags and ICLIENT_FLAG_LOCAL)<>0) or not CheckForClientExist(srv, cl) then exit;
+    if IsLocalServerClient(cl) or not CheckForClientExist(srv, cl) then exit;
     dat:=FZConfigCache.Get.GetDataCopy();
 
     if length(dat.mod_name)>0 then begin
@@ -901,6 +872,10 @@ begin
       dlinfo.xmlname:=PAnsiChar(xml);
       dlinfo.flags := 0;
 
+      if dat.mod_prefer_parent_appdata_for_maps or FZDownloadMgr.Get().IsPreferParentAppdataDl(mapname, mapver) then begin
+        dlinfo.flags:=dlinfo.flags or FZ_MAPLOAD_PREFER_PARENT_APPDATA_STORE;
+      end;
+
       flags:=GetCommonSysmsgsFlags();
       if FZDownloadMgr.Get.IsPatchAndReconnectAfterMapload(mapname, mapver) then begin
         if flags and FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE <> FZ_SYSMSGS_PATCHES_WITH_MAPCHANGE then begin
@@ -935,9 +910,30 @@ begin
 end;
 
 procedure OnClientReady(srv:pIPureServer; cl:pxrClientData); stdcall;
+var
+  hwid:string;
+  banned_cl:pbanned_client;
 begin
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid:=true;
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._connected_and_ready:=true;
+
+  if not IsLocalServerClient(@cl.base_IClient) then begin
+    hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(false);
+    if (length(hwid) = 0) then begin
+      if FZConfigCache.Get().GetDataCopy().strict_hwid then begin
+        FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no assigned HWID, disconnecting'), FZ_LOG_INFO);
+        IPureServer__DisconnectClient(srv, @cl.base_IClient, FZTranslationMgr.Get().TranslateSingle('fz_invalid_hwid'));
+      end;
+    end else begin
+      banned_cl:=CheckDigestForBan(@GetCurrentGame.m_cdkey_ban_list, hwid);
+      if banned_cl<>nil then begin
+        FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'is FZ-banned ('+get_string_value(@banned_cl.client_hexstr_digest)+') by '+get_string_value(@banned_cl.admin_name)+', disconnecting'), FZ_LOG_INFO);
+        IPureServer__DisconnectClient(GetPureServer(), @cl.base_IClient, FZTranslationMgr.Get().TranslateSingle('fz_player_banned')+' '+get_string_value(@banned_cl.admin_name)+', '+FZTranslationMgr.Get().TranslateSingle('fz_expiration_date')+' '+TimeToString(banned_cl.ban_end_time));
+      end else begin
+        FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id,'has approved FZ digest ['+hwid+']'), FZ_LOG_INFO);
+      end;
+    end;
+  end;
 end;
 
 function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdcall;
@@ -1195,7 +1191,7 @@ begin
         //Предмет купить нельзя. Разбираемся, что нам делать теперь
         if FZConfigCache.Get().GetDataCopy().sell_items_for_shophackers then begin
           //Удаляем этот предмет из списка закупа
-          FZLogMgr.Get.Write('Removing item  with description 0x'+inttohex(idx, 0)+' ('+inttostr(i)+') from buy vector', FZ_LOG_DBG);
+          FZLogMgr.Get.Write('Removing item with description 0x'+inttohex(idx, 0)+' ('+inttostr(i)+') from buy vector', FZ_LOG_DBG);
           remove_item_from_vector(@ps.pItemList, i, sizeof(word));
         end else begin
           //Отменяем весь закуп
@@ -1297,7 +1293,7 @@ end;
 function CAmmoSectionContainer.GetRefundCost(game: pgame_sv_mp; ps: pgame_PlayerState; client_id: cardinal; itemsDesired: pxr_vector): integer;
 var
   i, j:integer;
-  idToBuy:smallint;
+  idToBuy:integer;
   pIdOfDesired:psmallint;
   box_size:integer;
   box_cost:integer;
@@ -1310,20 +1306,28 @@ begin
 
     //Если цена нашлась, то сам предмет обязательно должен уже быть в магазине!
     idToBuy:=CItemMgr__GetItemIdx(game.m_strWeaponsData, _ammos[i].name);
-    R_ASSERT(idToBuy>0, 'Cannot get item, but refund cost is not 0');
+    if (idToBuy < 0) then begin
+      FZLogMgr.Get.Write('[BUG-SUSPECT] Refund cost is '+inttostr(box_cost)+' but cannot get shop ID for '+_ammos[i].name, FZ_LOG_ERROR);
+      continue;
+    end;
 
     box_size:=game_ini_read_int_def(_ammos[i].name, 'box_size', 1);
+    if (box_size <= 0) then begin
+      FZLogMgr.Get.Write('[BUG-SUSPECT] Box size of ammo '+_ammos[i].name+' is 0', FZ_LOG_ERROR);
+      continue;
+    end;
+
     box_count:=_ammos[i].count div box_size;
 
     FZLogMgr.Get.Write(GenerateMessageForClientId(client_id, ' got refund '+inttostr(box_count)+'x'+inttostr(box_cost)+' for "'+_ammos[i].name+'", lost '+inttostr(_ammos[i].count mod box_size)+' cartridges'), FZ_LOG_DBG);
     result:=result + box_count * box_cost;
 
     //Пробегаемся по вектору желаемых покупок и отмечаем там перезакупаемые пачки
-    for j:=0 to items_count_in_vector(itemsDesired, sizeof(idToBuy))-1 do begin
+    for j:=0 to items_count_in_vector(itemsDesired, sizeof(word))-1 do begin
       //Если больше коробок нет, то и ловить тут нечего
       if box_count = 0 then break;
 
-      pIdOfDesired:=get_item_from_vector(itemsDesired, j, sizeof(idToBuy));
+      pIdOfDesired:=get_item_from_vector(itemsDesired, j, sizeof(word));
       if (pIdOfDesired^ and $00FF) = idToBuy then begin
         //Если пачка с таким ИД нашлась, бит переиспользования в ней должен еще быть неактивен, иначе что-то у нас пошло не так
         R_ASSERT( (pIdOfDesired^ shr 8) and fzBuyItemRenewing = 0, 'Reusage bit is already set for ammo box' );
@@ -1344,7 +1348,7 @@ procedure BeforeDestroyingSoldItem(itm:pCInventoryItem; game:pgame_sv_mp; warmup
 var
   sect:PAnsiChar;
   i:integer;
-  idToBuy:smallint;
+  idToBuy:integer;
   pIdOfDesired:psmallint;
   addons_mask, old_addons:smallint;
   pwpn:pCWeapon;
@@ -1366,20 +1370,20 @@ begin
   sect:=get_string_value(@itm.m_section_id);
   idToBuy:=CItemMgr__GetItemIdx(game.m_strWeaponsData, sect);
   if idToBuy<0 then begin
-    FZLogMgr.Get.Write('Item "'+sect+' is not registered in the shop, cannot return money to player; avoid false-positives!', FZ_LOG_IMPORTANT_INFO);
+    FZLogMgr.Get.Write('Item "'+sect+' is not registered in the shop, cannot return money to player', FZ_LOG_IMPORTANT_INFO);
     exit;
   end;
 
   //пробежимся по предметам, которые будут приобретаться, попробуем найти предмет с таким ID и невзведенным битом переиспользования
-  for i:=0 to items_count_in_vector(itemsDesired, sizeof(idToBuy))-1 do begin
-    pIdOfDesired:=get_item_from_vector(itemsDesired, i, sizeof(idToBuy));
+  for i:=0 to items_count_in_vector(itemsDesired, sizeof(word))-1 do begin
+    pIdOfDesired:=get_item_from_vector(itemsDesired, i, sizeof(word));
     //Если предмет с таким ИД нашелся и бит переиспользования неактивен - выставим этот бит и, если это оружие, выставим старую конфигурацию аддонов
     if ((pIdOfDesired^ and $00FF) = idToBuy) and (((pIdOfDesired^ shr 8) and fzBuyItemRenewing) = 0) then begin
       addons_mask:=fzBuyItemRenewing or ((pIdOfDesired^ and $FF00) shr 8);
       if (old_addons and eWeaponAddonScope) <> 0 then addons_mask:=addons_mask or fzBuyItemOldScopeStateBit;
       if (old_addons and eWeaponAddonGrenadeLauncher) <> 0 then addons_mask:=addons_mask or fzBuyItemOldGlStateBit;
       if (old_addons and eWeaponAddonSilencer) <> 0 then addons_mask:=addons_mask or fzBuyItemOldSilencerStateBit;
-      pIdOfDesired^:= (addons_mask shl 8) or idToBuy;
+      pIdOfDesired^:= smallint((addons_mask shl 8) or idToBuy);
 
       FZLogMgr.Get().Write('Player '+PAnsiChar(@ps.name[0])+' re-buys (upgrades) '+sect+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
       break;

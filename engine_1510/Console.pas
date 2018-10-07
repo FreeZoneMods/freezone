@@ -69,13 +69,11 @@ console_info_callback = procedure(info:PChar);stdcall;
 
 var
   c_sv_fraglimit, c_sv_timelimit:pCCC_SV_Integer;
-  c_sv_dedicated_server_update_rate:pCCC_SV_Integer;
   c_sv_vote_quota:pCCC_SV_Float;
   c_sv_vote_participants:pCCC_SV_Integer;
   c_sv_vote_enabled:pCCC_SV_Integer;
 
   g_ppConsole:ppCConsole;
-  last_printed_id:pcardinal;
 
   CConsole__AddCommand:srcECXCallFunction;
   CCC_Integer__CCC_Integer:srcECXCallFunction;
@@ -83,6 +81,8 @@ var
 //FreeZone Stuff
   procedure AddConsoleCommand(name:PChar; cb:console_execute_callback; info_cb:console_info_callback=nil; status_cb:console_status_callback=nil); stdcall;
   procedure ExecuteConsoleCommand(cmd:PAnsiChar); stdcall;
+  function GetLastPrintedID():cardinal;
+  procedure SetLastPrintedID(id:cardinal);
 
 implementation
 
@@ -90,19 +90,17 @@ uses windows;
 
 var
   CConsole__ExecuteCommand:srcECXCallFunction;
+  last_printed_id:pcardinal;
 
 procedure default_status(status:PChar); stdcall;
 begin
   status[0]:=chr(0);
 end;
 
-
 procedure default_info(info:PChar); stdcall;
 begin
   info[0]:=chr(0);
 end;
-
-
 
 procedure AddConsoleCommand(name:PChar; cb:console_execute_callback; info_cb:console_info_callback=nil; status_cb:console_status_callback=nil); stdcall;
 var
@@ -143,6 +141,16 @@ begin
   CConsole__ExecuteCommand.Call([g_ppConsole^, cmd, false]);
 end;
 
+function GetLastPrintedID(): cardinal;
+begin
+  result:=last_printed_id^;
+end;
+
+procedure SetLastPrintedID(id: cardinal);
+begin
+  last_printed_id^:=id;
+end;
+
 function Init():boolean; stdcall;
 var
   ptr:pointer;
@@ -163,7 +171,6 @@ begin
     c_sv_vote_enabled:=pointer(xrGame+$6082DC);
     last_printed_id:=pointer(xrGame+$6069c4);
   end;
-  c_sv_dedicated_server_update_rate:=pointer(xrEngine+$91144);
   g_ppConsole:= GetProcAddress(xrEngine, '?Console@@3PAVCConsole@@A');
   if g_ppConsole = nil then exit;
 

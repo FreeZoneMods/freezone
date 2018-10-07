@@ -2,7 +2,11 @@ unit srcInjections;
 {$mode delphi}
 interface
 
-type srcBaseInjection = class
+type
+
+{ srcBaseInjection }
+
+srcBaseInjection = class
 protected
   _patch_addr:pointer;                  //адрес места в двиге, из которого надо прыгнуть на врезку
   _ret_addr:pointer;                    //место, куда управление передадим после выполнения врезки
@@ -29,6 +33,9 @@ protected
 
   //требуемые нам переходы
   function _WritePayloadCall(pos: pointer; args:array of cardinal): pointer; virtual;
+  function _WriteBeforeSaveRegisters(addr:pointer):pointer; virtual;
+  function _WriteAfterCall(addr:pointer):pointer; virtual;
+  function _WriteAfterLoadRegisters(addr:pointer):pointer; virtual;
   function _WriteReturnJmp(addr:pointer):pointer;
   function _WriteSrcJmp(addr:pointer):pointer;
   function _WriteCodeJmp(addr:pointer):pointer;
@@ -37,6 +44,7 @@ protected
   function _GetPayloadCallerProjectedSize(args:array of cardinal):integer; virtual;
 
   //сколько байт займут в стеке сохраненная перед вызовом функции payload'a информация
+  //необходимо для нормального расчета смещения аргументов при вызовах с F_PUSH_ESP
   function _GetSavedInStackBytesCount():cardinal; virtual;
 
   //составные блоки врезки
@@ -52,45 +60,99 @@ public
   function GetSignature():string;
 end;
 
-type srcCleanupInjection = class (srcBaseInjection)
+srcCleanupInjection = class (srcBaseInjection)
   protected
   function _AssembleInit({%H-}args:array of cardinal):boolean; override;
   public
   constructor Create(addr:pointer; payload:pointer; count:cardinal);
   destructor Destroy; override;
-
 end;
 
-type srcInjectionWithConditionalJump = class (srcBaseInjection)
-protected
-  _jump_addr:pointer;
-  _jump_type:word;
-  function _GetPayloadCallerProjectedSize(args:array of cardinal):integer; override;
-  function _WritePayloadCall(pos:pointer; args:array of cardinal):pointer; override;
-  function _GetSavedInStackBytesCount():cardinal; override;  
-public
-  constructor Create(addr:pointer; payload:pointer {function (...):boolean; stdcall;} ; count:cardinal; args:array of cardinal; jump_addr:pointer; jump_type:word; exec_src_in_end:boolean=true; overwritten:boolean=false);
-end;
-
-type srcEAXReturnerInjection = class (srcBaseInjection)
-  //назначение: подмена вызовов функций
+{ srcResultParserInjection }
+srcResultParserInjection = class (srcBaseInjection)
+  //назначение: подмена вызовов разных функций и не только
   protected
-  _popcnt_from_stack:cardinal; //сколько байт снять со стека после выполнения инъекции
-  function _WritePayloadCall(pos:pointer; args:array of cardinal):pointer; override;
+  _popcnt_from_stack:cardinal; //сколько байт снять со стека после выполнения инъекции - надо на случай, если подменяем работу функции
+
+  function _ParseResultFromStack(addr:pointer):pointer; virtual; abstract;
+
+  function _WriteBeforeSaveRegisters(addr:pointer):pointer; override;
+  function _WriteAfterCall(addr:pointer):pointer; override;
+  function _WriteAfterLoadRegisters(addr:pointer):pointer; override;
   function _GetPayloadCallerProjectedSize(args:array of cardinal):integer; override;
-  function _GetSavedInStackBytesCount():cardinal; override;   
+  function _GetSavedInStackBytesCount():cardinal; override;
+
   public
   constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
 end;
 
-
-type srcECXReturnerInjection = class (srcBaseInjection)
-  protected
-  _popcnt_from_stack:cardinal; //сколько байт снять со стека после выполнения инъекции
-  function _WritePayloadCall(pos:pointer; args:array of cardinal):pointer; override;
+srcInjectionWithConditionalJump = class (srcResultParserInjection)
+protected
+  _jump_addr:pointer;
+  _jump_type:word;
   function _GetPayloadCallerProjectedSize(args:array of cardinal):integer; override;
-  function _GetSavedInStackBytesCount():cardinal; override;   
-  public
+  function _ParseResultFromStack(addr:pointer):pointer; override;
+public
+  constructor Create(addr:pointer; payload:pointer {function (...):boolean; stdcall;}; count:cardinal; args:array of cardinal; jump_addr:pointer; jump_type:word; exec_src_in_end:boolean=true; overwritten:boolean=false);
+end;
+
+{ srcRegisterReturnerInjection }
+srcRetRegType = (SRC_REG_EAX, SRC_REG_EBX, SRC_REG_ECX, SRC_REG_EDX, SRC_REG_EDI, SRC_REG_ESI, SRC_REG_EBP);
+srcRegisterReturnerInjection = class (srcResultParserInjection)
+protected
+  _ret_reg_type:srcRetRegType;
+  function _ParseResultFromStack(addr:pointer):pointer; override;
+  function _GetPayloadCallerProjectedSize(args:array of cardinal):integer; override;
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; register_type:srcRetRegType; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcEAXReturnerInjection }
+
+srcEAXReturnerInjection = class(srcRegisterReturnerInjection)
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcEBXReturnerInjection }
+
+srcEBXReturnerInjection = class(srcRegisterReturnerInjection)
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcECXReturnerInjection }
+
+srcECXReturnerInjection = class(srcRegisterReturnerInjection)
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcEDXReturnerInjection }
+
+srcEDXReturnerInjection = class(srcRegisterReturnerInjection)
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcESIReturnerInjection }
+
+srcESIReturnerInjection = class(srcRegisterReturnerInjection)
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcEDIReturnerInjection }
+
+srcEDIReturnerInjection = class(srcRegisterReturnerInjection)
+public
+  constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
+end;
+
+{ srcEBPReturnerInjection }
+
+srcEBPReturnerInjection = class(srcRegisterReturnerInjection)
+public
   constructor Create(addr:pointer; payload:pointer; count:cardinal; args:array of cardinal; exec_src_in_end:boolean=true; overwritten:boolean=false; popcnt:cardinal=0);
 end;
 
@@ -103,7 +165,7 @@ uses Windows, sysutils, srcBase;
 
 { srcBaseInjection }
 
-procedure srcBaseInjection.Disable;
+procedure srcBaseInjection.Disable();
 begin
   if (not self._is_ok) or (not self._is_active) then begin
     if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': already was disabled');
@@ -114,7 +176,7 @@ begin
   if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': disabled.');
 end;
 
-function srcBaseInjection.Enable:boolean;
+function srcBaseInjection.Enable(): boolean;
 begin
 
   result:=false;
@@ -147,8 +209,9 @@ begin
   result:=true;
 end;
 
-constructor srcBaseInjection.Create(addr, payload: pointer;
-  count: cardinal; args:array of cardinal; exec_src_in_end, overwritten: boolean);
+constructor srcBaseInjection.Create(addr: pointer; payload: pointer;
+  count: cardinal; args: array of cardinal; exec_src_in_end: boolean;
+  overwritten: boolean);
 begin
   //TODO:сделать автоопределение минимального числа байт, требуемых для вставления джампа по указанному адресу (исходя из декодирования инструкций)
   self._patch_addr:=addr;
@@ -175,12 +238,12 @@ begin
   srcKit.Get.RegisterInjection(self);
 end;
 
-function srcBaseInjection.IsActive: boolean;
+function srcBaseInjection.IsActive(): boolean;
 begin
   result:=self._is_active;
 end;
 
-function srcBaseInjection._SrcInit: boolean;
+function srcBaseInjection._SrcInit(): boolean;
 begin
   //сделаем буфер с вырезанным оригинальным кодом
   result:=false;
@@ -203,7 +266,7 @@ end;
 
 function srcBaseInjection._AssembleInit(args:array of cardinal):boolean;
 var
-  sz:cardinal;
+  sz, totalsz:cardinal;
   pos:pointer;
 begin
   result:=false;
@@ -211,7 +274,7 @@ begin
   //важный момент - создадим буфер с кодом врезки
 
   //посчитаем требуемый размер буфера
-  sz:=_GetPayloadCallerProjectedSize(args);   
+  sz:=_GetPayloadCallerProjectedSize(args);
 
 
   setlength(self._code, sz);
@@ -236,10 +299,19 @@ begin
     if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': final not written!', true);
     exit;
   end;
+
+  totalsz:=uintptr(pos) - uintptr(@(self._code[0]));
+  if totalsz > sz then begin
+    if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': code buffer overflow! Need '+inttostr(totalsz)+' bytes, size '+inttostr(sz)+' bytes', true);
+    halt;
+  end else begin
+    if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': code uses '+inttostr(totalsz)+' bytes from '+inttostr(sz)+' bytes', false);
+  end;
+
   result:=true;
 end;
 
-destructor srcBaseInjection.Destroy;
+destructor srcBaseInjection.Destroy();
 begin
   if srcKit.Get.IsDebug then srcKit.Get.DbgLog('injection '+GetSignature+': Destroying.');
   self.Disable;
@@ -253,14 +325,32 @@ begin
   result:=srcKit.WriteMemCall(addr, @self._code_addr, false);
 end;
 
+function srcBaseInjection._WriteBeforeSaveRegisters(addr: pointer): pointer;
+begin
+  result:=addr;
+end;
+
+function srcBaseInjection._WriteAfterCall(addr: pointer): pointer;
+begin
+  result:=addr;
+end;
+
+function srcBaseInjection._WriteAfterLoadRegisters(addr: pointer): pointer;
+begin
+  result:=addr;
+end;
+
 function srcBaseInjection._WritePayloadCall(pos: pointer; args:array of cardinal): pointer;
 begin
-  result:=srcKit.WriteSaveRegisters(pos);
+  result:=pos;
 
+  if result<>nil then result:=self._WriteBeforeSaveRegisters(result);
+  if result<>nil then result:=srcKit.WriteSaveRegisters(result);
   if result<>nil then result:=self._WriteRegisterArgs(result, args);
   if result<>nil then result:=srcKit.WriteMemCall(result, @self._payload_addr, true);
-
+  if result<>nil then result:=self._WriteAfterCall(result);
   if result<>nil then result:=srcKit.WriteLoadRegisters(result);
+  if result<>nil then result:=self._WriteAfterLoadRegisters(result);
 end;
 
 function srcBaseInjection._WriteReturnJmp(addr: pointer): pointer;
@@ -346,19 +436,33 @@ begin
   result:=pos;
 end;
 
-function srcBaseInjection.GetSignature: string;
+function srcBaseInjection.GetSignature(): string;
 begin
   result:= self.ClassName+':@'+inttohex(cardinal(self._patch_addr),8);
 end;
 
 function srcBaseInjection._GetPayloadCallerProjectedSize(args:array of cardinal): integer;
+var
+  argcnt:integer;
+const
+  PUSHAD_SIZE = 1;
+  PUSHFD_SIZE = 1;
+  CALL_SIZE = 6;
+  POPFD_SIZE = 1;
+  POPAD_SIZE = 1;
+  JUMPBACK_SIZE = 6;
+  MAX_PUSH_ARGUMENT_SIZE = 8;
 begin
-  result:=1+1+6+1+1+6+8*(high(args)-low(args)+1); //pushad+pushfd+call+popfd+popad+jmp+max_arguments_count
+  argcnt:=high(args)-low(args)+1;
+  result:=PUSHAD_SIZE+PUSHFD_SIZE+MAX_PUSH_ARGUMENT_SIZE*argcnt+CALL_SIZE+POPFD_SIZE+POPAD_SIZE+JUMPBACK_SIZE;
 end;
 
-function srcBaseInjection._GetSavedInStackBytesCount: cardinal;
+function srcBaseInjection._GetSavedInStackBytesCount(): cardinal;
+const
+  PUSHAD_STACK_COUNT = $20;
+  PUSHFD_STACK_COUNT = 4;
 begin
-  result:=$24;
+  result:=PUSHAD_STACK_COUNT+PUSHFD_STACK_COUNT;
 end;
 
 { srcCleanupInjection }
@@ -426,166 +530,186 @@ begin
   inherited;
 end;
 
-{ srcInjectionWithConditionalJumpInTheEnd }
+{ srcResultParserInjection }
 
-constructor srcInjectionWithConditionalJump.Create(addr,
-  payload: pointer; count: cardinal; args: array of cardinal;
-  jump_addr: pointer; jump_type:word; exec_src_in_end:boolean; overwritten: boolean);
+constructor srcResultParserInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
+begin
+  self._popcnt_from_stack:=popcnt;
+  inherited Create(addr, payload, count, args, exec_src_in_end, overwritten);
+end;
+
+function srcResultParserInjection._WriteBeforeSaveRegisters(addr: pointer): pointer;
+begin
+  //Сохраняем в стеке место, в которое будет записан результат вызова функции
+  (PByte(addr))^:=PUSH_EAX;
+  addr:=pointer(cardinal(addr)+1);
+
+  result:=addr;
+end;
+
+function srcResultParserInjection._WriteAfterCall(addr: pointer): pointer;
+var
+  stacksz:integer;
+begin
+  //Функция-врезка была вызвана и вернула что-то в EAX; поместим это в буфер
+  stacksz:=inherited _GetSavedInStackBytesCount();
+  //mov [esp-stacksz], eax
+  (PWord(addr))^:=$8489;
+  addr:=pointer(cardinal(addr)+2);
+  (PByte(addr))^:=$24;
+  addr:=pointer(cardinal(addr)+1);
+  (PInteger(addr))^:=stacksz;
+  addr:=pointer(cardinal(addr)+4);
+
+  result:=addr;
+end;
+
+function srcResultParserInjection._WriteAfterLoadRegisters(addr: pointer): pointer;
+begin
+  //Восстанавливаем результат со стека
+  addr:=_ParseResultFromStack(addr);
+
+  //снимаем лишнее со стека
+  if _popcnt_from_stack > 0 then begin
+    addr:=srcKit.WriteAddESPDword(addr, _popcnt_from_stack);
+  end;
+
+  result:=addr;
+end;
+
+function srcResultParserInjection._GetPayloadCallerProjectedSize(args: array of cardinal): integer;
+const
+  WRITE_BEFORE_SAVE_REG_SIZE = 1;
+  WRITE_AFTER_CALL_SIZE = 7;
+  RESTORE_FUN_REGS_SIZE = 6;
+begin
+  result:=inherited _GetPayloadCallerProjectedSize(args);
+  result:=result+WRITE_BEFORE_SAVE_REG_SIZE+WRITE_AFTER_CALL_SIZE;
+  if _popcnt_from_stack > 0 then begin
+    result:=result+RESTORE_FUN_REGS_SIZE;
+  end;
+end;
+
+function srcResultParserInjection._GetSavedInStackBytesCount(): cardinal;
+const
+  STACK_BUFFER_SIZE = 4;
+begin
+  Result:=inherited _GetSavedInStackBytesCount();
+  result:=result+STACK_BUFFER_SIZE;
+end;
+
+{ srcRegisterReturnerInjection }
+constructor srcRegisterReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; register_type: srcRetRegType; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
+begin
+  //Присваивание надо делать перед вызовом базового конструктора, т.к. в базовом произойдет активация и сборка инъекции
+  _ret_reg_type:=register_type;
+  inherited Create(addr, payload, count, args, exec_src_in_end, overwritten, popcnt);
+end;
+
+function srcRegisterReturnerInjection._ParseResultFromStack(addr: pointer): pointer;
+var
+  opcode:byte;
+begin
+  case _ret_reg_type of
+    SRC_REG_EAX: opcode:=POP_EAX;
+    SRC_REG_EBX: opcode:=POP_EBX;
+    SRC_REG_ECX: opcode:=POP_ECX;
+    SRC_REG_EDX: opcode:=POP_EDX;
+    SRC_REG_ESI: opcode:=POP_ESI;
+    SRC_REG_EDI: opcode:=POP_EDI;
+    SRC_REG_EBP: opcode:=POP_EBP;
+  else
+    srcKit.Get.DbgLog('srcRegisterReturnerInjection._ParseResultFromStack: Unknown register type '+inttostr(integer(_ret_reg_type)), true);
+    halt();
+  end;
+  (PByte(addr))^:=opcode;
+  addr:=pointer(cardinal(addr)+1);
+  result:=addr;
+end;
+
+function srcRegisterReturnerInjection._GetPayloadCallerProjectedSize(args: array of cardinal): integer;
+const
+  RESTORE_FROM_STACK_SIZE = 1;
+begin
+  result:=inherited _GetPayloadCallerProjectedSize(args);
+  result:=result+RESTORE_FROM_STACK_SIZE;
+end;
+
+{ srcInjectionWithConditionalJump }
+constructor srcInjectionWithConditionalJump.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; jump_addr: pointer; jump_type: word; exec_src_in_end: boolean; overwritten: boolean);
 begin
   self._jump_addr:=jump_addr;
   self._jump_type:=jump_type;
   inherited Create(addr,payload,count,args,exec_src_in_end,overwritten);
 end;
 
-function srcInjectionWithConditionalJump._GetPayloadCallerProjectedSize(
-  args: array of cardinal): integer;
+function srcInjectionWithConditionalJump._GetPayloadCallerProjectedSize(args: array of cardinal): integer;
+const
+  XCHG_SZ = 3;
+  TEST_SZ = 2;
+  POP_SZ = 1;
+  JUMPS_SZ = 12;
 begin
-  result:=1+6+1+2+6+6+6+8*(high(args)-low(args)+1); //pushad+call+popad+test+jne+jmp_cond+jmp+max_arguments_count
+  result:=inherited _GetPayloadCallerProjectedSize(args);
+  result:=result+XCHG_SZ+TEST_SZ+POP_SZ+JUMPS_SZ;
 end;
 
-function srcInjectionWithConditionalJump._GetSavedInStackBytesCount: cardinal;
+function srcInjectionWithConditionalJump._ParseResultFromStack(addr: pointer): pointer;
 begin
-  result:=$20;
-end;
 
-function srcInjectionWithConditionalJump._WritePayloadCall(
-  pos: pointer; args: array of cardinal): pointer;
-begin
-  result:=srcKit.WriteSaveOnlyGeneralRegisters(pos);
+  (PCardinal(addr))^:=XCHG_EAX_MEM_ESP;
+  addr:=pointer(cardinal(addr)+3);
 
-  if result<>nil then result:=self._WriteRegisterArgs(result, args);
-  if result<>nil then result:=srcKit.WriteMemCall(result, @self._payload_addr, true);
-  if result<>nil then result:=srcKit.WriteTestReg(result, TEST_AL_AL);
-  if result<>nil then result:=srcKit.WriteLoadOnlyGeneralRegisters(result);
-  if result<>nil then result:=srcKit.WriteMemConditionalJump(result,@self._jump_addr, _jump_type);
+  addr:=srcKit.WriteTestReg(addr, TEST_AL_AL);
+
+  (PByte(addr))^:=POP_EAX;
+  addr:=pointer(cardinal(addr)+1);
+
+  addr:=srcKit.WriteMemConditionalJump(addr, @self._jump_addr, _jump_type);
+
+  result:=addr;
 end;
 
 { srcEAXReturnerInjection }
-
-constructor srcEAXReturnerInjection.Create(addr, payload: pointer;
-  count: cardinal; args: array of cardinal; exec_src_in_end,
-  overwritten: boolean; popcnt: cardinal);
+constructor srcEAXReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
 begin
-  self._popcnt_from_stack:=popcnt;
-  inherited Create(addr, payload, count, args, exec_src_in_end, overwritten);
+  inherited Create(addr, payload, count, args, SRC_REG_EAX, exec_src_in_end, overwritten, popcnt);
 end;
 
-function srcEAXReturnerInjection._GetPayloadCallerProjectedSize(
-  args: array of cardinal): integer;
+{ srcEBXReturnerInjection }
+constructor srcEBXReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
 begin
-  result:=6+6+6+6+6+8*(high(args)-low(args)+1); //push_regs+call+pop_regs+jmp+add_esp+max_arguments_count
-end;
-
-function srcEAXReturnerInjection._GetSavedInStackBytesCount: cardinal;
-begin
-  result:=$18;
-end;
-
-function srcEAXReturnerInjection._WritePayloadCall(pos: pointer;
-  args: array of cardinal): pointer;
-begin
-
-  //сохраняем все регистры, кроме EAX
-  (PByte(pos))^:=PUSH_ECX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EDX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EBX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EBP;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_ESI;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EDI;
-  pos:=pointer(cardinal(pos)+1);
-
-  pos:=self._WriteRegisterArgs(pos, args);
-  if pos<>nil then pos:=srcKit.WriteMemCall(pos, @self._payload_addr, true);
-
-  //восстанавливаем сохраненные регистры
-  (PByte(pos))^:=POP_EDI;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_ESI;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EBP;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EBX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EDX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_ECX;
-  pos:=pointer(cardinal(pos)+1);
-
-  //снимаем лишнее со стека
-  pos:=srcKit.WriteAddESPDword(pos, _popcnt_from_stack);
-
-  result:=pos;
-
+  inherited Create(addr, payload, count, args, SRC_REG_EBX, exec_src_in_end, overwritten, popcnt);
 end;
 
 { srcECXReturnerInjection }
-
-function srcECXReturnerInjection._GetPayloadCallerProjectedSize(
-  args: array of cardinal): integer;
+constructor srcECXReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
 begin
-  result:=6+6+6+6+6+8*(high(args)-low(args)+1)+2; //push_regs+call+pop_regs+jmp+add_esp+max_arguments_count +swap
+  inherited Create(addr, payload, count, args, SRC_REG_ECX, exec_src_in_end, overwritten, popcnt);
 end;
 
-function srcECXReturnerInjection._GetSavedInStackBytesCount: cardinal;
+{ srcEDXReturnerInjection }
+constructor srcEDXReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
 begin
-  result:=$18;
+  inherited Create(addr, payload, count, args, SRC_REG_EDX, exec_src_in_end, overwritten, popcnt);
 end;
 
-function srcECXReturnerInjection._WritePayloadCall(pos: pointer;
-  args: array of cardinal): pointer;
+{ srcESIReturnerInjection }
+constructor srcESIReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
 begin
-  //сохраняем все регистры, кроме ECX
-  (PByte(pos))^:=PUSH_EAX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EDX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EBX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EBP;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_ESI;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=PUSH_EDI;
-  pos:=pointer(cardinal(pos)+1);
-
-  pos:=self._WriteRegisterArgs(pos, args);
-  if pos<>nil then pos:=srcKit.WriteMemCall(pos, @self._payload_addr, true);
-  (PByte(pos))^:=PUSH_EAX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_ECX;
-  pos:=pointer(cardinal(pos)+1);
-
-  //восстанавливаем сохраненные регистры
-  (PByte(pos))^:=POP_EDI;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_ESI;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EBP;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EBX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EDX;
-  pos:=pointer(cardinal(pos)+1);
-  (PByte(pos))^:=POP_EAX;
-  pos:=pointer(cardinal(pos)+1);
-
-  //снимаем лишнее со стека
-  pos:=srcKit.WriteAddESPDword(pos, _popcnt_from_stack);
-
-  result:=pos;
+  inherited Create(addr, payload, count, args, SRC_REG_ESI, exec_src_in_end, overwritten, popcnt);
 end;
 
-constructor srcECXReturnerInjection.Create(addr, payload: pointer;
-  count: cardinal; args: array of cardinal; exec_src_in_end,
-  overwritten: boolean; popcnt: cardinal);
+{ srcEDIReturnerInjection }
+constructor srcEDIReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
 begin
-  self._popcnt_from_stack:=popcnt;
-  inherited Create(addr, payload, count, args, exec_src_in_end, overwritten);
+  inherited Create(addr, payload, count, args, SRC_REG_EDI, exec_src_in_end, overwritten, popcnt);
+end;
+
+{ srcEBPReturnerInjection }
+constructor srcEBPReturnerInjection.Create(addr: pointer; payload: pointer; count: cardinal; args: array of cardinal; exec_src_in_end: boolean; overwritten: boolean; popcnt: cardinal);
+begin
+  inherited Create(addr, payload, count, args, SRC_REG_EBP, exec_src_in_end, overwritten, popcnt);
 end;
 
 end.

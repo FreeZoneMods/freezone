@@ -81,6 +81,21 @@ public
   constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
 end;
 
+{ srcEAXCallFunction }
+
+srcEAXCallFunction = class(srcECXCallFunction)
+public
+  constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+end;
+
+{ srcEDICallFunction }
+
+srcEDICallFunction = class(srcECXCallFunction)
+public
+  constructor Create(addr:pointer; args:array of const; name:string='unnamed'; visibility:string='global');
+end;
+
+{ srcVirtualECXCallFunction }
 srcVirtualECXCallFunction = class(srcECXCallFunction)
 protected
   _vftable_offset:cardinal;
@@ -123,6 +138,22 @@ constructor srcESICallFunction.Create(addr: pointer; args: array of const; name:
 begin
   inherited;
   _to_reg_move_opcode:=MOV_ESI_DWORD;
+end;
+
+{ srcEAXCallFunction }
+
+constructor srcEAXCallFunction.Create(addr: pointer; args: array of const; name: string; visibility: string);
+begin
+  inherited;
+  _to_reg_move_opcode:=MOV_EAX_DWORD;
+end;
+
+{ srcEDICallFunction }
+
+constructor srcEDICallFunction.Create(addr: pointer; args: array of const; name: string; visibility: string);
+begin
+  inherited;
+  _to_reg_move_opcode:=MOV_EDI_DWORD;
 end;
 
 { srcBaseFunction }

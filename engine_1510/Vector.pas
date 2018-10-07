@@ -67,7 +67,7 @@ var
   sz_to_copy:cardinal;
 begin
   if items_count_in_vector(v, itemsz) = 1 then begin
-    v.start:=v.last;
+    v.last:=v.start;
   end else begin
     pitem:=get_item_from_vector(v, index, itemsz);
     cnt:=items_count_in_vector(v, itemsz) - index - 1;

@@ -10,8 +10,8 @@ function Free():boolean; stdcall;
 implementation
 uses basedefs, dynamic_caster, global_functions, LogMgr, ConfigMgr, Console, Emergency, ConfigCache, TranslationMgr, DownloadMgr, SACE_Interface,
      ServerStuff, PacketFilter, UpdateRate, Bans, SubnetBanList, Censor, ChatCommands, Chat, fz_injections, ControlGUI, sysmsgs, Compressor, SACE_Hacks,
-     BaseClasses, xrstrings, Packets, Clients, Time, PureServer, Level, CSE, Vector, MatVectors, GameMessages, misc_stuff, Banned, Servers, BuyWnd,
-     Objects, Games, MapList, ItemsCfgMgr, clsids, xr_configs, Device, PureClient, PlayersConnectionLog, xr_debug;
+     BaseClasses, xrstrings, Packets, Clients, xr_time, PureServer, Level, CSE, Vector, MatVectors, GameMessages, misc_stuff, Banned, Servers, BuyWnd,
+     Objects, Games, MapList, ItemsCfgMgr, clsids, xr_configs, Device, PureClient, PlayersConnectionLog, xr_debug, Voting, mapgametypes, ge_filter, PlayersConsole, AdminCommands;
 
 function Init():boolean; stdcall;
 var
@@ -63,6 +63,7 @@ begin
   FZConfigCache.Get().OverrideConfig(cfg);
 
   if not ItemsCfgMgr.Init then exit;
+  if not mapgametypes.Init then exit;
   if not Console.Init then exit;
 
   if not Emergency.Init then exit;
@@ -79,7 +80,7 @@ begin
   if not xr_configs.Init then exit;
   if not Packets.Init then exit;
   if not Clients.Init then exit;
-  if not Time.Init then exit;
+  if not xr_time.Init then exit;
   if not PureServer.Init then exit;
   if not PureClient.Init then exit;
   if not Level.Init then exit;
@@ -116,6 +117,10 @@ begin
   if not Compressor.Init then exit;
 
   if not SACE_Hacks.Init then exit;
+  if not ge_filter.Init then exit;
+  if not Voting.Init then exit;
+  if not PlayersConsole.Init then exit;
+  if not AdminCommands.Init() then exit;
 
   result:=true;
 end;
@@ -124,13 +129,17 @@ function Free():boolean; stdcall;
 begin
   //не нарушать порядок!
   result:=true;
+  AdminCommands.Free();
   ControlGUI.Clean;
   SACE_Hacks.Free();
+  ge_filter.Free;
   ServerStuff.Clean;
   FZChatCommandList.Get.Free;
   FZSubnetBanList.Get.Free;
   FZCensor.Get.Free;
 
+  MapGametypes.Free;
+  ItemsCfgMgr.Free;
   FZTranslationMgr.Get.Free;
   FZDownloadMgr.Get.Free;
 

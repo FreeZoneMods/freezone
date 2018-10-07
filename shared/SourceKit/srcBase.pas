@@ -114,7 +114,7 @@ const
   TEST_EAX_EAX  :     word = $C085;
   TEST_AL_AL  :     word = $C084; 
 
-
+  XCHG_EAX_MEM_ESP : cardinal = $90240487;
 
 implementation
 uses windows, sysutils;

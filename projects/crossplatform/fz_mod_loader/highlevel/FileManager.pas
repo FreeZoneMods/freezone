@@ -69,6 +69,7 @@ type
     function ScanPath(dir_path:string):boolean;                                                                 //построение списка файлов в указанной директории и ее поддиректориях для последующей актуализации
     function UpdateFileInfo(filename: string; url: string; compression_type:cardinal; targetParams:FZCheckParams):boolean;      //обновить сведения о целевых параметрах файла
     function ActualizeFiles():boolean;                                                                          //актуализировать игровые данные
+    procedure SortBySize();                                                                                     //отсортировать (по размеру) для оптимизации скорости скачивания
     function AddIgnoredFile(filename:string):boolean;                                                           //добавить игнорируемый файл; вызывать после того, как все UpdateFileInfo выполнены
     procedure SetCallback(cb:FZFileActualizingCallback; userdata:pointer);                                      //добавить колбэк на обновление состояния синхронизации
 
@@ -202,7 +203,7 @@ begin
   _files.Add(result);
 end;
 
-constructor FZFiles.Create;
+constructor FZFiles.Create();
 begin
   inherited Create();
   _files:=TList.Create();
@@ -211,14 +212,14 @@ begin
   _mode:=FZ_DL_MODE_CURL;
 end;
 
-destructor FZFiles.Destroy;
+destructor FZFiles.Destroy();
 begin
   Clear();
   _files.Free();
   inherited;
 end;
 
-procedure FZFiles.Clear;
+procedure FZFiles.Clear();
 var
   ptr:pFZFileItemData;
   i:integer;
@@ -325,7 +326,33 @@ begin
   result:=true;
 end;
 
-function FZFiles.ActualizeFiles: boolean;
+procedure FZFiles.SortBySize();
+var
+  i,j,max:integer;
+  tmp:pFZFileItemData;
+begin
+  if _files.Count<2 then exit;
+  //сортируем так, чтобы самые большие файлы оказались в конце
+
+  for i:=_files.Count-1 downto 1 do begin
+    max:=i;
+  	for j:=i-1 downto 0 do begin
+      //Ищем самый большой файл
+  		if (_files.Items[j]=nil) then continue;
+  		if (_files.Items[max] = nil) or (pFZFileItemData(_files.Items[max]).target.size < (pFZFileItemData(_files.Items[j])).target.size) then begin
+        max:=j;
+      end;
+    end;
+
+    if i <> max then begin
+      tmp:=_files.Items[i];
+      _files.Items[i]:=_files.items[max];
+      _files.Items[max]:=tmp;
+    end;
+  end;
+end;
+
+function FZFiles.ActualizeFiles(): boolean;
 var
   i, last_file_index:integer;
   filedata:pFZFileItemData;
@@ -558,7 +585,7 @@ begin
   _callback:=cb;
 end;
 
-function FZFiles.EntriesCount: integer;
+function FZFiles.EntriesCount(): integer;
 begin
   result:=_files.Count;
 end;

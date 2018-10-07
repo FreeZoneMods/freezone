@@ -1,7 +1,7 @@
 unit Servers;
 {$MODE Delphi}
 interface
-uses xrstrings, PureServer, SrcCalls, Clients, vector, Synchro, Games, Packets, CSE;
+uses xrstrings, PureServer, Clients, vector, Synchro, Games, Packets, CSE;
 function Init():boolean; stdcall;
 procedure ForEachClientDo(action:PlayerAction; predicate:PlayerSearchPredicate = nil; parameter:pointer=nil; parameter2:pointer=nil); stdcall;
 function CurPlayersCount:cardinal; stdcall;
@@ -90,7 +90,7 @@ const
   xrServer__ErrNoErr:cardinal=2;
 
 implementation
-uses basedefs, Level, dynamic_caster, xr_debug, windows;
+uses basedefs, SrcCalls, Level, dynamic_caster, xr_debug, windows;
 
 var
   IPureServer__SendTo:srcECXCallFunction;

@@ -17,6 +17,8 @@ end;
 procedure xrGameSpyServer_constructor_reserve_zerogameid(srv:pxrServer); stdcall;
 function OnGameEventDelayedHitProcessing(src_id:cardinal; dest_id:cardinal; packet:pNET_Packet; senderid:cardinal):boolean; stdcall;
 function game__OnEvent_SelfKill_Check(target:pxrClientData; senderid:cardinal):boolean; stdcall;
+function OnGameEvent_CheckClientExist(p: pNET_Packet; msgid:word; clid: cardinal): boolean; stdcall;
+procedure OnGameEventNotImplenented(p: pNET_Packet; msgid: word; clid: cardinal); stdcall;
 function OnGameEventPlayerKilled(p:pNET_Packet; clid:cardinal):boolean; stdcall;
 function OnGameEventPlayerHitted(p:pNET_Packet; clid:cardinal):boolean; stdcall;
 
@@ -26,10 +28,15 @@ function game_sv__OnDetach_isitemremovingneeded(item:pCSE_Abstract):boolean; std
 function game_sv__OnDetach_isitemtransfertobagneeded(item:pCSE_Abstract):boolean; stdcall;
 procedure game_sv_Deathmatch__OnDetach_destroyitems(game:pgame_sv_mp; pfirst_item:ppCSE_Abstract; plast_item:ppCSE_Abstract); stdcall;
 
-function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_GameState; corpse:pCSE_Abstract):boolean; stdcall;
+
+procedure game_sv_mp__Update_additionals(); stdcall;
+
+function game_sv_mp__Update_could_corpse_be_removed(corpse:pCSE_Abstract):boolean; stdcall;
 
 procedure GetMapStatus(var name:string; var ver:string; var link:string); stdcall;
 procedure xrServer__Connect_updatemapname(gdd:pGameDescriptionData); stdcall;
+procedure xrServer__Connect_SaveCurrentMapInfo(gametype:PAnsiChar); stdcall;
+procedure CLevel__net_Start_overridelevelgametype(); stdcall;
 
 procedure xrServer__OnMessage_additional(srv:pIPureServer; p:pNET_Packet; sender:ClientID ); stdcall;
 
@@ -42,10 +49,12 @@ function Init():boolean; stdcall;
 procedure Clean(); stdcall;
 
 implementation
-uses LogMgr, sysutils, Hits, ConfigCache, Windows, ItemsCfgMgr, clsids, xrstrings, HackProcessor, Players, CommonHelper, Level, Objects, xr_debug;
+uses LogMgr, sysutils, Hits, ConfigCache, Windows, ItemsCfgMgr, clsids, xrstrings, HackProcessor, Players, CommonHelper, Level, Objects, xr_debug, Voting, sysmsgs, TranslationMgr, AdminCommands;
 
 const
   HITS_GROUP:string='[HIT] ';
+
+  MAP_SETTINGS_FILE:string='fz_mapname.txt';
 
 var
   _serverstate:FZServerState;
@@ -134,6 +143,35 @@ begin
   result:=true;
 end;
 
+function OnGameEvent_CheckClientExist(p: pNET_Packet; msgid:word; clid: cardinal): boolean; stdcall;
+var
+  cld:pxrClientData;
+begin
+  result:=true;
+
+  cld:=ID_to_client(clid);
+  if cld=nil then begin
+    //Игрока, отправившего сообщение, почему-то нет на сервере. Вероятно, он отсоединился, а сообщение осталось висеть в очереди.
+    //Ситуация опасна крешем - не во всех местах есть проверки
+    if (msgid <> GAME_EVENT_PLAYER_CONNECTED) and
+       (msgid <> GAME_EVENT_PLAYER_DISCONNECTED) and
+       (msgid <> GAME_EVENT_PLAYER_KILLED) and
+       (msgid <> GAME_EVENT_PLAYER_HITTED)
+    then begin
+      result:=false;
+    end;
+
+    if not result then begin
+      FZLogMgr.Get().Write('CL ID '+inttostr(clid)+' not found, message #'+inttostr(msgid)+' skipped', FZ_LOG_DBG);
+    end;
+  end;
+end;
+
+procedure OnGameEventNotImplenented(p: pNET_Packet; msgid: word; clid: cardinal); stdcall;
+begin
+  BadEventsProcessor(FZ_SEC_EVENT_ATTACK, GenerateMessageForClientId(clid, 'sent invalid game event('+inttostr(msgid)+')'));
+end;
+
 function OnGameEventPlayerHitted(p:pNET_Packet; clid:cardinal):boolean; stdcall;
 begin
   //GAME_EVENT_PLAYER_HITTED серверу может отправлять только локальный клиент!
@@ -219,6 +257,9 @@ begin
 end;
 
 procedure xrServer__Connect_updatemapname(gdd:pGameDescriptionData); stdcall;
+var
+  game:pgame_sv_mp;
+  gametype:string;
 begin
   EnterCriticalSection(_serverstate.lock);
   _serverstate.mapname:=PChar(@gdd.map_name[0]);
@@ -226,6 +267,11 @@ begin
   _serverstate.maplink:=PChar(@gdd.download_url[0]);
   LeaveCriticalSection(_serverstate.lock);
   FZLogMgr.Get.Write('Mapname updated: '+_serverstate.mapname+', '+_serverstate.mapver, FZ_LOG_IMPORTANT_INFO);
+
+  game:=GetCurrentGame();
+  gametype:=GametypeNameById(game.base_game_sv_GameState.base_game_GameState.m_type);
+
+  xrServer__Connect_SaveCurrentMapInfo(PAnsiChar(gametype));
 end;
 
 procedure GetMapStatus(var name:string; var ver:string; var link:string); stdcall;
@@ -237,10 +283,102 @@ begin
   LeaveCriticalSection(_serverstate.lock);
 end;
 
-function Check_xrClientData_owner_valid(ptr: pxrClientData): boolean;
-  stdcall;
+procedure xrServer__Connect_SaveCurrentMapInfo(gametype:PAnsiChar); stdcall;
+var
+  f:textfile;
+begin
+  if FZConfigCache.Get().GetDataCopy().preserve_map then begin
+    EnterCriticalSection(_serverstate.lock);
+    try
+      FZLogMgr.Get.Write('Saving map status: '+_serverstate.mapname+' | '+_serverstate.mapver+' | '+gametype, FZ_LOG_INFO);
+
+      assignfile(f, MAP_SETTINGS_FILE);
+      rewrite(f);
+      try
+        writeln(f, _serverstate.mapname);
+        writeln(f, _serverstate.mapver);
+        writeln(f, gametype);
+      finally
+        closefile(f)
+      end;
+    except
+      FZLogMgr.Get.Write('Cannot save map name!', FZ_LOG_ERROR);
+    end;
+    LeaveCriticalSection(_serverstate.lock);
+  end;
+end;
+
+procedure CLevel__net_Start_overridelevelgametype(); stdcall;
+var
+  lvl:pCLevel;
+  runstr, mapname, mode, mapversion, tmp:string;
+  f:textfile;
+  verpos, from:integer;
+  is_first_start:boolean;
+const
+  VER_KEY:string='ver=';
+begin
+  lvl:=GetLevel();
+  mapversion:='1.0';
+  runstr:=get_string_value(@lvl.m_caServerOptions);
+  if not FZCommonHelper.GetNextParam(runstr, mapname, '/') or not FZCommonHelper.GetNextParam(runstr, mode, '/') then begin
+    FZLogMgr.Get.Write('Cannot parse current map parameters in command string!', FZ_LOG_ERROR);
+    exit;
+  end;
+
+  verpos:=Pos(VER_KEY, runstr);
+  if verpos > 0 then begin
+    from:=verpos;
+    mapversion:='';
+    verpos:=verpos+length(VER_KEY);
+    while (verpos<=length(runstr)) and (runstr[verpos] <> '/') do begin
+      mapversion:=mapversion+runstr[verpos];
+      verpos:=verpos+1;
+    end;
+    Delete(runstr, from, length(VER_KEY)+length(mapversion)+1);
+  end;
+
+  EnterCriticalSection(_serverstate.lock);
+  is_first_start:=length(_serverstate.mapname) = 0;
+  LeaveCriticalSection(_serverstate.lock);
+
+  //Восстановление параметров надо выполнять только при запуске сервера! При смене карты производить это нельзя.
+  if FZConfigCache.Get().GetDataCopy().preserve_map and is_first_start then begin
+    FZLogMgr.Get.Write('Restoring map settings', FZ_LOG_DBG);
+    try
+      assignfile(f, MAP_SETTINGS_FILE);
+      reset(f);
+      try
+        readln(f, tmp);
+        if length(trim(tmp))>0 then mapname:=trim(tmp);
+        readln(f, tmp);
+        if length(trim(tmp))>0 then mapversion:=trim(tmp);
+        readln(f, tmp);
+        if length(trim(tmp))>0 then mode:=trim(tmp);
+      finally
+        closefile(f);
+      end;
+    except
+      FZLogMgr.Get.Write('Cannot restore map name!', FZ_LOG_ERROR);
+    end;
+  end;
+
+  if not is_first_start then begin
+    Voting.OnMapChanged();
+  end;
+
+  FZLogMgr.Get.Write('Overriding map params to: '+mapname+' | '+mapversion+' | '+mode, FZ_LOG_INFO);
+  runstr:=mapname+'/'+mode+'/ver='+mapversion+'/'+runstr;
+  assign_string(@lvl.m_caServerOptions, PAnsiChar(runstr));
+end;
+
+function Check_xrClientData_owner_valid(ptr: pxrClientData): boolean; stdcall;
 begin
   result:=(ptr<>nil) and (ptr.owner<>nil);
+
+  if not result then begin
+    FZLogMgr.Get().Write('Invalid owner detected in Check_xrClientData_owner_valid!', FZ_LOG_DBG);
+  end;
 end;
 
 function game_sv__OnDetach_isitemtransfertobagneeded(item: pCSE_Abstract): boolean; stdcall;
@@ -301,11 +439,18 @@ begin
   end;
 end;
 
-function game_sv_mp__Update_could_corpse_be_removed(game:pgame_sv_GameState; corpse: pCSE_Abstract): boolean; stdcall;
+procedure game_sv_mp__Update_additionals(); stdcall;
+begin
+  AdminCommands.ProcessAdminCommands();
+end;
+
+function game_sv_mp__Update_could_corpse_be_removed(corpse: pCSE_Abstract): boolean; stdcall;
 var
   pid:pword;
   item:pCSE_Abstract;
+  game:pgame_sv_GameState;
 begin
+  game:=@GetCurrentGame.base_game_sv_GameState;
   pid:=corpse.children.start;
   result:=true;
   while pid<>corpse.children.last do begin
@@ -319,16 +464,93 @@ begin
   end;
 end;
 
-procedure xrServer__OnMessage_additional(srv:pIPureServer; p:pNET_Packet; sender:ClientID ); stdcall;
+procedure ProcessHwidPacket(p:pNET_Packet; sender:ClientID);
 var
-  tmp_packet:NET_Packet;
+  hwid_str, hwhash_str, cdkeyhash_str:shared_str;
+  hwid, hwhash, cdkeyhash, old_hwid:string;
+  hwres:FZHwIdValidationResult;
+  xrCL:pxrClientData;
+  doKick:boolean;
+const
+  HWID_LEN:integer = 32;
+begin
+  FZLogMgr.Get.Write('FZ digest from client ID='+inttostr(sender.id), FZ_LOG_DBG);
+
+  xrCL:=ID_to_client(sender.id);
+  if xrCL = nil then begin
+    FZLogMgr.Get.Write('FZ digest from unexistent client ID='+inttostr(sender.id), FZ_LOG_ERROR);
+    exit;
+  end;
+
+  doKick:=false;
+
+  if UnreadBytesCountInPacket(p) < 2*(HWID_LEN+1) then begin
+    BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender.id, 'sent malformed FZ digest packet'));
+    doKick:=true;
+  end;
+
+  if not doKick then begin
+    p.B.data[integer(p.r_pos)+HWID_LEN]:=0;
+    p.B.data[integer(p.r_pos)+2*(HWID_LEN)+1]:=0;
+
+    init_string(@hwid_str);
+    init_string(@hwhash_str);
+    init_string(@cdkeyhash_str);
+    NET_Packet__r_stringZ.Call([p, @hwhash_str]);
+    NET_Packet__r_stringZ.Call([p, @hwid_str]);
+    hwid:=get_string_value(@hwid_str);
+    hwhash:=get_string_value(@hwhash_str);
+
+    if UnreadBytesCountInPacket(p) > 0 then begin
+      p.B.data[integer(p.r_pos)+3*(HWID_LEN)+2]:=0;
+      NET_Packet__r_stringZ.Call([p, @cdkeyhash_str]);
+      cdkeyhash:=get_string_value(@cdkeyhash_str);
+    end else begin
+      cdkeyhash:='';
+    end;
+
+    assign_string(@hwid_str, nil);
+    assign_string(@hwhash_str, nil);
+    assign_string(@cdkeyhash_str, nil);
+
+    if (length(hwid)<>HWID_LEN) or (length(hwhash)<>HWID_LEN) or ( (length(cdkeyhash)<>0) and (length(cdkeyhash)<>HWID_LEN) ) then begin
+      BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender.id, 'sent corrupted FZ digest'));
+      doKick:=true;
+    end else begin
+      FZLogMgr.Get.Write(GenerateMessageForClientId(sender.id,'sent FZ digest ['+hwhash+'|'+hwid+'|'+cdkeyhash+']'), FZ_LOG_DBG);
+    end;
+  end;
+
+  if not doKick then begin
+    hwres:=ValidateHwId(PAnsiChar(hwid), PAnsiChar(hwhash));
+    if hwres<>FZ_HWID_VALID then begin
+      if hwres = FZ_HWID_UNKNOWN_VERSION then begin
+        BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender.id, 'sent FZ digest with unknown type; a cheater or your server is out of date'));
+      end else begin
+        BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender.id, 'sent invalid FZ digest'));
+      end;
+      //Кик будет после сигнала Ready, тут в нем нет смысла - можем закрешить клиента
+    end else begin
+      old_hwid:=GetHwId(xrCL, true);
+      if (length(old_hwid)>0) and (old_hwid<>hwid) then begin
+        //Зашел другой клиент с тем же ip, сбросим флаг реконнекта для обнуления статы
+        FZLogMgr.Get.Write(GenerateMessageForClientId(xrCL.base_IClient.ID.id, 'has different HWID, reset reconnect flag'), FZ_LOG_INFO);
+        xrCL.base_IClient.flags:= xrCL.base_IClient.flags and (not ICLIENT_FLAG_RECONNECT);
+      end;
+      SetHwId(xrCL, hwid);
+      SetOrigCdkeyHash(xrCL, cdkeyhash);
+    end;
+  end;
+
+  if doKick then begin
+    IPureServer__DisconnectClient(GetPureServer(), @xrCL.base_IClient, FZTranslationMgr.Get().TranslateSingle('fz_invalid_hwid'));
+  end;
+end;
+
+procedure xrServer__OnMessage_additional(srv:pIPureServer; p:pNET_Packet; sender:ClientID ); stdcall;
 begin
   if PWord(@p.B.data[0])^=M_FZ_DIGEST then begin
-    FZLogMgr.Get.Write('FZ digest from '+inttostr(sender.id), FZ_LOG_DBG);
-    tmp_packet:=p^;
-    PWord(@tmp_packet.B.data[0])^:=M_SV_DIGEST;
-    tmp_packet.r_pos:=0;
-    IPureServer__OnMessage(srv, @tmp_packet, sender.id);
+    ProcessHwidPacket(p, sender);
   end;
 end;
 

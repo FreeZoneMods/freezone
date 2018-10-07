@@ -1,8 +1,7 @@
 unit Clients;
 {$mode delphi}
 interface
-uses Packets, Time, xrstrings, PureServer, CSE, Vector, GameMessages;
-function Init():boolean; stdcall;
+uses Packets, xr_time, xrstrings, PureServer, CSE, Vector, GameMessages;
 
 type
 ClientID = packed record
@@ -145,11 +144,20 @@ const
   ICLIENT_FLAG_LOCAL:cardinal = 1;
   ICLIENT_FLAG_RECONNECT:cardinal = 4;
 
+  GAME_PLAYER_FLAG_LOCAL:cardinal=1;
   GAME_PLAYER_FLAG_VERY_VERY_DEAD:cardinal=4;
   GAME_PLAYER_FLAG_SPECTATOR:cardinal = 8;
   GAME_PLAYER_FLAG_ONBASE:cardinal = 64;
 
+function Init():boolean; stdcall;
+function IsLocalServerClient(client: pIClient): boolean;
+
 implementation
+
+function IsLocalServerClient(client: pIClient): boolean;
+begin
+  result:=(client.flags and ICLIENT_FLAG_LOCAL) <> 0;
+end;
 
 function Init():boolean; stdcall;
 begin

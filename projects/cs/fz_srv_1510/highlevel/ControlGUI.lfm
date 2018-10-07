@@ -1,7 +1,7 @@
 object FZControlGUI: TFZControlGUI
-  Left = 408
+  Left = 730
   Height = 542
-  Top = 104
+  Top = 134
   Width = 788
   BorderStyle = bsNone
   Caption = 'FreeZone - Server Control'
@@ -18,7 +18,7 @@ object FZControlGUI: TFZControlGUI
   OnMouseUp = FormMouseUp
   OnShow = FormShow
   Position = poScreenCenter
-  LCLVersion = '1.6.4.0'
+  LCLVersion = '1.8.2.0'
   object Panel1: TPanel
     Left = 0
     Height = 542
@@ -489,6 +489,7 @@ object FZControlGUI: TFZControlGUI
       Font.Name = 'MS Sans Serif'
       ParentColor = False
       ParentFont = False
+      Visible = False
       OnDblClick = SelectOnDblClick
       OnMouseDown = FormMouseDown
       OnMouseMove = FormMouseMove
@@ -506,6 +507,23 @@ object FZControlGUI: TFZControlGUI
       ParentColor = False
       ParentFont = False
       Visible = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_orig_cdkey: TLabel
+      Left = 8
+      Height = 13
+      Top = 240
+      Width = 39
+      Caption = 'CDKEY:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      Visible = False
+      OnDblClick = SelectOnDblClick
       OnMouseDown = FormMouseDown
       OnMouseMove = FormMouseMove
       OnMouseUp = FormMouseUp
@@ -631,6 +649,10 @@ object FZControlGUI: TFZControlGUI
     object ActConsoleCmd: TAction
       Caption = 'ActConsoleCmd'
       OnExecute = ActConsoleCmdExecute
+    end
+    object ActSetTeam: TAction
+      Caption = 'ActSetTeam'
+      OnExecute = ActSetTeamExecute
     end
   end
   object RefreshTimer: TTimer

@@ -17,14 +17,15 @@ function IterateAndComparePlayersNames(it_begin:ppIClient; it_end:ppIClient; new
 function OnVoteStartIncorrectPlayerName(game:pgame_sv_mp): boolean; stdcall;
 function OnVote({%H-}game:pgame_sv_mp; sender_id:ClientID; {%H-}status:boolean):boolean; stdcall;
 
+procedure ProvideDefaultGameTypeForMapchangeVoting(); stdcall;
+procedure OnMapChanged(); stdcall;
+function Init():boolean;
 
-//TODO: антифлуд
-//TODO: интервал между назначений голосований для каждого из игроков
 implementation
-uses srcBase, LogMgr, math, sysutils, console, CommonHelper, TranslationMgr, ConfigCache, PureServer, Players, dynamic_caster, basedefs, chat, Servers, MapList, HackProcessor;
+uses srcBase, LogMgr, math, sysutils, console, CommonHelper, TranslationMgr, ConfigCache, PureServer, Players, dynamic_caster, basedefs, chat, Servers, MapList, HackProcessor, MapGametypes;
 var
   votecommands:array of _votecommands;
-
+  _last_map_change_time:cardinal;
 
 procedure AddVoteCommand(name:PAnsiChar; command:PAnsiChar; mask:cardinal); stdcall;
 var
@@ -83,12 +84,15 @@ var
   args:array of string;
   args_cnt:integer;
   tmpstr, logstr, tmpstr2:string;
+  suppress_badevent:boolean;
 const
   BannedSymbols:string = '%';
   MAX_VOTE_STRING_SIZE: integer = 200;
 
 begin
   result:=true;
+  suppress_badevent:=false;
+
   ForEachClientDo(CheckPlayerAllowedStartVoting, OneIDSearcher, @sender_id.id, @result);
   if not result then begin
     FZLogMgr.Get.Write('Player '+inttostr(sender_id.id)+' denied to start voting.', FZ_LOG_IMPORTANT_INFO);
@@ -152,6 +156,21 @@ begin
       //два строковых аргумента, первый ТРАНСЛИРУЕТСЯ!
       //Проверяем, есть ли такая карта на сервере
       result:=(args_cnt=3) and IsMapPresent(args[1], args[2], game.base_game_sv_GameState.base_game_GameState.m_type);
+      if result then begin
+        if (FZMapGametypesMgr.Get().IsMapBanned(args[1], args[2])) then begin
+          //Карта запрещена админом к игре на сервере
+          SendChatMessageByFreeZone(GetPureServer(), sender_id.id, FZTranslationMgr.Get.TranslateSingle('fz_this_map_is_banned'));
+          FZLogMgr.Get.Write(GenerateMessageForClientId(sender_id.id, ' tries to start voting "'+pVoteStr+'" (skipped - map is banned on the server)'), FZ_LOG_INFO);
+          suppress_badevent:=true;
+          result:=false;
+        end else if (_last_map_change_time<>0) and (FZCommonHelper.GetTimeDeltaSafe(_last_map_change_time) < FZConfigCache.Get().GetDataCopy().mapchange_voting_lock_time) then begin
+          //Голосование заблокировано из-за того, что карта уже недавно менялась
+          SendChatMessageByFreeZone(GetPureServer(), sender_id.id, FZTranslationMgr.Get.TranslateSingle('fz_this_voting_is_not_available'));
+          FZLogMgr.Get.Write(GenerateMessageForClientId(sender_id.id, ' tries to start voting "'+pVoteStr+'" (skipped - map has been changed recently)'), FZ_LOG_INFO);
+          suppress_badevent:=true;
+          result:=false;
+        end;
+      end;
     end else if (args[0]='changegametype') then begin
       //Один строковый аргумент, не транслируется
       result:= (args_cnt = 2) and ( (args[1]='dm') or (args[1]='deathmatch') or (args[1]='tdm') or (args[1]='teamdeathmatch') or (args[1]='ah') or (args[1]='artefacthunt') or (args[1]='cta') or (args[1]='capturetheartefact'));
@@ -159,13 +178,21 @@ begin
       //нет аргументов
       result:= (args_cnt = 1);
     end else if (length(args[0])>0) and (args[0][1]='$') then begin
-      result:=true;
+      //[bug] В game_sv_mp::OnVoteStart при активации текстового голосования в отправляемую клиенту строку копируется все, кроме первого символа $.
+      //Поэтому при старте голосования вида 'cl_votestart $changemap stalker_story_8' клиенту отправится 'changemap stalker_story_8', он попытается начать голосование на смену карты, отработает транслятор и все развалится
+      if (args[0] = '$kick') or (args[0] = '$ban') or (args[0] = '$fraglimit') or (args[0] = '$timelimit') or (args[0] = '$changeweather') or (args[0] = '$changemap') or (args[0] = '$changegametype') or (args[0] = '$restart') or (args[0] = '$restart_fast') then begin
+        result:=false;
+      end else begin
+        result:=true;
+      end;
     end
+  end else begin
+    pVoteStr[MAX_VOTE_STRING_SIZE]:=chr(0);
   end;
 
   if result then begin
     FZLogMgr.Get.Write(GenerateMessageForClientId(sender_id.id, ' is starting voting "'+pVoteStr+'"'), FZ_LOG_IMPORTANT_INFO);
-  end else begin
+  end else if not suppress_badevent  then begin
     BadEventsProcessor(FZ_SEC_EVENT_WARN, GenerateMessageForClientId(sender_id.id, ' is denied to start voting (parameters not parsed)'));
   end;
 
@@ -236,7 +263,7 @@ var
   cld:pxrClientData;
 begin
   result:=false;
-  if (pIClient(pl).flags and ICLIENT_FLAG_LOCAL) >0 then
+  if IsLocalServerClient(pl) then
     PByte(pbyte_res_ptr)^:=1
   else begin
     PByte(pbyte_res_ptr)^:=0;
@@ -253,7 +280,7 @@ var
   total_command, console_command, arg1, arg2, descr, name, par:string;
   time:cardinal;
 begin
-  if game.m_bVotingReal then begin
+  if game.m_bVotingReal<>0 then begin
     if game.m_pVoteCommand.p_ = nil then begin
       //заглушка на случай ЧП
       assign_string(@game.m_voting_string, 'Ooops! Something gone wrong...');
@@ -335,7 +362,7 @@ begin
   //если придумаем, как исправить ситуацию и начать голосование - вернуть true
   //но у нас всегда false...
   FZLogMgr.Get.Write('Voting not started - player id not found by name!', FZ_LOG_ERROR);
-  game.m_bVotingActive:=false;
+  game.m_bVotingActive:=0;
   result:=false;
 end;
 
@@ -360,6 +387,61 @@ function OnVote(game:pgame_sv_mp; sender_id:ClientID; status:boolean):boolean; s
 begin
   result:=false;
   ForEachClientDo(OnPlayerVotes, OneIDSearcher, @sender_id.id, @result);
+end;
+
+procedure ProvideDefaultGameTypeForMapchangeVoting(); stdcall;
+var
+  cmd, mapname, mapver, gametype:string;
+  i:integer;
+  game:pgame_sv_mp;
+  REPLACED_CMD:string='sv_changelevel ';
+  NEW_CMD: string = 'sv_changelevelgametype ';
+begin
+  game:=GetCurrentGame();
+  if game.m_bVotingReal=0 then exit;
+
+  cmd:=get_string_value(@game.m_pVoteCommand);
+  if leftstr(cmd, length(REPLACED_CMD)) <> REPLACED_CMD then exit;
+
+  mapname:='';
+  i:=length(REPLACED_CMD);
+  while i<=length(cmd) do begin
+    if (cmd[i] <> ' ') then begin
+      mapname:=mapname+cmd[i];
+    end else if length(mapname) > 0 then begin
+      break;
+    end;
+    i:=i+1;
+  end;
+
+  mapver:='';
+  while i<=length(cmd) do begin
+    if (cmd[i] <> ' ') then begin
+      mapver:=mapver+cmd[i];
+    end else if length(mapver) > 0 then begin
+      break;
+    end;
+    i:=i+1;
+  end;
+
+  gametype:=FZMapGametypesMgr.Get().GetDefaultGameType(mapname, mapver);
+
+  if length(gametype) > 0 then begin
+    cmd:=NEW_CMD+' '+mapname+' '+mapver+' '+gametype;
+    FZLogMgr.Get.Write('Applying gametype change: '+cmd, FZ_LOG_DBG);
+    assign_string(@game.m_pVoteCommand, PAnsiChar(cmd));
+  end;
+end;
+
+procedure OnMapChanged(); stdcall;
+begin
+  _last_map_change_time:=FZCommonHelper.GetGameTickCount();
+end;
+
+function Init(): boolean;
+begin
+  _last_map_change_time:=0;
+  result:=true;
 end;
 
 end.

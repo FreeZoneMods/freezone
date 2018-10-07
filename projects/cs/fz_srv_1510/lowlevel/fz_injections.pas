@@ -4,7 +4,7 @@ interface
 function Init():boolean; stdcall;
 
 implementation
-uses srcBase, basedefs, GameSpy, srcInjections, Voting, Console, BasicProtection, Chat, Players, ConfigMgr, LogMgr, Bans{, PacketFilter}, PlayerSkins, UpdateRate, ControlGUI, Servers, ServerStuff, misc_stuff, SACE_hacks, xrstrings;
+uses srcBase, basedefs, GameSpy, srcInjections, Voting, Console, BasicProtection, Chat, Players, ConfigMgr, LogMgr, Bans{, PacketFilter}, PlayerSkins, UpdateRate, ControlGUI, Servers, ServerStuff, misc_stuff, SACE_hacks, xrstrings, ge_filter;
 
 function PatchBanSystem():boolean;
 begin
@@ -16,12 +16,11 @@ begin
   //[bug]Клиент тут может нам отослать все, что ему заблагорассудится, и чего не окажется в банлисте... непорядок.
   //[bug] По умолчанию, в xrCL->m_cdkey_digest попадает именно хеш от НИЖНЕГО регистра, то есть НЕ проверенный геймспаем!
   //Решение - делаем так, чтобы в xrCL->m_cdkey_digest оказался полученный в CHALLENGE_RESPOND хеш
-  //Кроме того, система HWID заменяет хеш от нижнего регистра самим HWID
   if xrGameDllType()=XRGAME_SV_1510 then begin
-    srcBaseInjection.Create(pointer(xrGame+$307AC7), @xrServer__ProcessClientDigest_ProtectFromKeyChange, 5,[F_RMEM+F_PUSH_EBP+$0C, F_PUSH_ECX, F_PUSH_ESI], false, true);
+    srcBaseInjection.Create(pointer(xrGame+$307AC7), @xrServer__ProcessClientDigest_ProtectFromKeyChange, 5,[F_RMEM+F_PUSH_EBP+$0C, F_PUSH_ECX, F_PUSH_ESI], false, false);
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$307B37),@xrServer__ProcessClientDigest_CheckAdditionalRejectingConditions,6,[F_PUSH_EDI],pointer(xrGame+$307B4C), JUMP_IF_FALSE, false, false);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
-    srcBaseInjection.Create(pointer(xrGame+$31D947), @xrServer__ProcessClientDigest_ProtectFromKeyChange, 5,[F_RMEM+F_PUSH_EBP+$0C, F_PUSH_ECX, F_PUSH_ESI], false, true);
+    srcBaseInjection.Create(pointer(xrGame+$31D947), @xrServer__ProcessClientDigest_ProtectFromKeyChange, 5,[F_RMEM+F_PUSH_EBP+$0C, F_PUSH_ECX, F_PUSH_ESI], false, false);
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$31D9B7),@xrServer__ProcessClientDigest_CheckAdditionalRejectingConditions,6,[F_PUSH_EDI],pointer(xrGame+$31D9CC), JUMP_IF_FALSE, false, false);
   end;
 
@@ -82,6 +81,13 @@ begin
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$30AE54),@CanSafeStartVoting,5,[F_PUSH_EBX, F_PUSH_ECX, F_RMEM+F_PUSH_ESP+$424],pointer(xrGame+$30B05E), JUMP_IF_FALSE, true, false);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$320CA4),@CanSafeStartVoting,5,[F_PUSH_EBX, F_PUSH_ECX, F_RMEM+F_PUSH_ESP+$424],pointer(xrGame+$320EAE), JUMP_IF_FALSE, true, false);
+  end;
+
+  //Изменим sv_changelevel на sv_changelevelgametype если в настройках явно задан тип игры для карты (game_sv_mp::OnVoteStart)
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$30cd63), @ProvideDefaultGameTypeForMapchangeVoting, 6,[], true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$322C03), @ProvideDefaultGameTypeForMapchangeVoting, 6,[], true, false);
   end;
 
   //[bug]исправление логики подсчета голосов в void game_sv_mp::UpdateVote(); по-хорошему, надо ее полностью переписать, но накостылим, имея стандартное
@@ -478,15 +484,17 @@ begin
 
   //[bug] Если в трупе остаются дочерние предметы, они препятствуют его удалению и вызывают спам в консоль в game_sv_mp::Update
   if xrGameDllType()=XRGAME_SV_1510 then begin
-    srcInjectionWithConditionalJump.Create(pointer(xrGame+$30a6a4),@game_sv_mp__Update_could_corpse_be_removed,6,[F_RMEM+F_PUSH_ESP+$18, F_PUSH_EAX], pointer(xrGame+$30a6cf), JUMP_IF_TRUE, true, false);
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$30a6a4),@game_sv_mp__Update_could_corpse_be_removed,6,[F_PUSH_EAX], pointer(xrGame+$30a6cf), JUMP_IF_TRUE, true, false);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
-    srcInjectionWithConditionalJump.Create(pointer(xrGame+$3204f4),@game_sv_mp__Update_could_corpse_be_removed,6,[F_RMEM+F_PUSH_ESP+$18, F_PUSH_EAX], pointer(xrGame+$32051f), JUMP_IF_TRUE, true, false);
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$3204f4),@game_sv_mp__Update_could_corpse_be_removed,6,[F_PUSH_EAX], pointer(xrGame+$32051f), JUMP_IF_TRUE, true, false);
   end;
 
   result:=true;
 end;
 
 function Init():boolean; stdcall;
+var
+  tmp:cardinal;
 begin
 
   result:=false;
@@ -602,17 +610,46 @@ begin
 
   //В xrServer::Connect нам надо получить обновленное имя карты
   if xrGameDllType()=XRGAME_SV_1510 then begin
-    srcBaseInjection.Create(pointer(xrGame+$307688),@xrServer__Connect_updatemapname,5,[F_PUSH_EDI], false, false);
+    srcBaseInjection.Create(pointer(xrGame+$30760d),@xrServer__Connect_updatemapname,5,[F_PUSH_EDI], false, false);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
-    srcBaseInjection.Create(pointer(xrGame+$31d508),@xrServer__Connect_updatemapname,5,[F_PUSH_EDI], false, false);
+    srcBaseInjection.Create(pointer(xrGame+$31d48d),@xrServer__Connect_updatemapname,5,[F_PUSH_EDI], false, false);
+  end;
+
+  //Загрузка использованных ранее имени карты и режима
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$1d629f),@CLevel__net_Start_overridelevelgametype,8,[], false, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$1e833f),@CLevel__net_Start_overridelevelgametype,8,[], false, false);
   end;
 
   //[bug] или не совсем баг... патч в IPureServer::SendTo_LL : убираем ассерт при несуществующем клиенте, ибо если его нет - то и хрен с ним, обойдемся как-нибудь :)
   if not srcKit.Get.nop_code(pointer(xrNetServer+$B098), 1, chr($EB)) then exit;
 
-  //[bug] полнейшее дерьмо с синхронизацией коннекта и дисконнекта игроков. Дисконнект убивает игрока сразу, даже не думая о том, что кто-то еще может с ним работать
-  //как результат - куча гонок и глюков, которые могут вылезти в самый неожиданный момент. Как фиксать - хз.
-  //...
+  //[bug] Дерьмо с синхронизацией: IPureServer::DisconnectClient убивает клиента моментально, не проверяя ничего. Между тем, к уничтоженному клиенту еще могут обратиться потом, что вызовет проблемы
+  //Полностью, похоже, не пофиксать. Но можно уменьшить частоту крешей.
+  //Проверим в game_sv_mp::OnEvent (и наследниках), существует ли еще клиент, перед тем, как выполнять действия (так как у нас "отложенная" очередь событий, от момента получения сообщения до момента обработки клиент мог сдохнуть)
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    //game_sv_mp::OnEvent
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$30ad4e),@OnGameEvent_CheckClientExist,7,[F_RMEM+F_PUSH_ESP+$418, F_RMEM+F_PUSH_ESP+$41C, F_RMEM+F_PUSH_ESP+$424], pointer(xrGame+$30ad83), JUMP_IF_FALSE, true, false);
+    //game_sv_Deathmatch::OnEvent
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$305f11),@OnGameEvent_CheckClientExist,6,[F_RMEM+F_PUSH_ESP+$8, F_RMEM+F_PUSH_ESP+$C, F_RMEM+F_PUSH_ESP+$14], pointer(xrGame+$305f3b), JUMP_IF_FALSE, true, false);
+    //game_sv_CaptureTheArtefact::OnEvent
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$31c818),@OnGameEvent_CheckClientExist,7,[F_RMEM+F_PUSH_ESP+$10, F_RMEM+F_PUSH_ESP+$14, F_RMEM+F_PUSH_ESP+$1c], pointer(xrGame+$31c861), JUMP_IF_FALSE, true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    //game_sv_mp::OnEvent
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$320b9e),@OnGameEvent_CheckClientExist,7,[F_RMEM+F_PUSH_ESP+$418, F_RMEM+F_PUSH_ESP+$41C, F_RMEM+F_PUSH_ESP+$424], pointer(xrGame+$320bd3), JUMP_IF_FALSE, true, false);
+    //game_sv_Deathmatch::OnEvent
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$31b071),@OnGameEvent_CheckClientExist,6,[F_RMEM+F_PUSH_ESP+$8, F_RMEM+F_PUSH_ESP+$C, F_RMEM+F_PUSH_ESP+$14], pointer(xrGame+$31b09b), JUMP_IF_FALSE, true, false);
+    //game_sv_CaptureTheArtefact::OnEvent
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$332538),@OnGameEvent_CheckClientExist,7,[F_RMEM+F_PUSH_ESP+$10, F_RMEM+F_PUSH_ESP+$14, F_RMEM+F_PUSH_ESP+$1c], pointer(xrGame+$332581), JUMP_IF_FALSE, true, false);
+  end;
+
+  //[bug] В game_sv_GameState::OnEvent вызов R_ASSERT совсем не смотрится - злоумышленник может запросто крешнуть сервак с его помощью.
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$2f39c2), @OnGameEventNotImplenented, 60, [F_RMEM+F_PUSH_ESP+$420, F_RMEM+F_PUSH_ESP+$424, F_RMEM+F_PUSH_ESP+$42c], true, true);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$308932), @OnGameEventNotImplenented, 60, [F_RMEM+F_PUSH_ESP+$420, F_RMEM+F_PUSH_ESP+$424, F_RMEM+F_PUSH_ESP+$42c], true, true);
+  end;
 
   //В xrServer::client_Destroy - добавляем проверку на наличие игрока
   if xrGameDllType()=XRGAME_SV_1510 then begin
@@ -705,6 +742,74 @@ begin
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     srcBaseInjection.Create(pointer(xrGame+$3a124c),@SplitEventPackPackets,5,[F_PUSH_ESI], false, false);
   end;
+
+  //В CGameObject::CGameObject заставляем создавать m_ai_location всегда
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcKit.Get().nop_code(pointer(xrGame+$207c9d), 2, chr($90));
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcKit.Get().nop_code(pointer(xrGame+$219b8d), 2, chr($90));
+  end;
+
+  //[bug] Логика обработка события GE_ADDON_DETACH позволяет клиентам заспавнить себе в рюкзак что угодно (или крешнуть сервак)
+  //На исходниках - перерабатывать обработчик события.
+  //Так как у нас бинарный патч - можем закостылять так:
+  //1)В CInventoryItem::OnEvent производить вызов Detach(i_name, false); - тем самым у нас вообще не будет детача от произвольной хрени
+  //2)В CWeaponMagazinedWGrenade::Detach и CWeaponMagazined::Detach при обнаружении валидного детача - исправлять аргумент на true
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    //правка аргумента с true на false в CInventoryItem::OnEvent
+    srcKit.Get().nop_code(pointer(xrGame+$22f6ff), 1, chr($00));
+
+    //Исправления в CWeaponMagazined::Detach для постоянного детача аддонов со спавном
+    tmp:=$9040c031; //xor eax, eax; inc eax
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$24f8c4), sizeof(tmp));
+    tmp:=$9041c931; //xor ecx, ecx; inc ecx
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$24f93a), sizeof(tmp));
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$24f9ad), sizeof(tmp));
+
+    //Исправления в CWeaponMagazinedWGrenade::Detach для постоянного детача аддонов со спавном
+    tmp:=$9040c031; //xor eax, eax; inc eax
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$2532e5), sizeof(tmp));
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    //правка аргумента с true на false в CInventoryItem::OnEvent
+    srcKit.Get().nop_code(pointer(xrGame+$241e2f), 1, chr($00));
+
+    //Исправления в CWeaponMagazined::Detach для постоянного детача аддонов со спавном
+    tmp:=$9040c031; //xor eax, eax; inc eax
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$262234), sizeof(tmp));
+    tmp:=$9041c931; //xor ecx, ecx; inc ecx
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$2622aa), sizeof(tmp));
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$26231d), sizeof(tmp));
+
+    //Исправления в CWeaponMagazinedWGrenade::Detach для постоянного детача аддонов со спавном
+    tmp:=$9040c031; //xor eax, eax; inc eax
+    srcKit.Get().CopyBuf(@tmp, pointer(xrGame+$265cb5), sizeof(tmp));
+  end;
+
+  //Подключаем фильтр для исправления проблем с xrServer::Process_event
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$38a1b1),@CheckGameEventPacket,6,[F_PUSH_ESI, F_RMEM+F_PUSH_EBP+$8], pointer(xrGame+$38a867), JUMP_IF_FALSE, true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$3a05f1),@CheckGameEventPacket,6,[F_PUSH_ESI, F_RMEM+F_PUSH_EBP+$8], pointer(xrGame+$3a0ca7), JUMP_IF_FALSE, true, false);
+  end;
+
+  //Удаляем спам сообщениями '* comparing with cheater' при подключении
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcKit.Get().nop_code(pointer(xrGame+$3093d9), 2);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcKit.Get().nop_code(pointer(xrGame+$31f219), 2);
+  end;
+
+  //Дополнительные вещи в апдейте game
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$30a4c0),@game_sv_mp__Update_additionals,6,[], true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$320310),@game_sv_mp__Update_additionals,6,[], true, false);
+  end;
+
+  //Cars:
+  //client CActorMP::net_Relevant	 - xrgame.dll+1f61d0
+  //server CActorMP::net_Relevant	 - xrgame.dll+
+
 
   //фильтрация пакетов
 //  srcBaseInjection.Create(pointer(xrNetServer+$A149),@net_Handler,5,[F_PUSH_ESP], false, false);

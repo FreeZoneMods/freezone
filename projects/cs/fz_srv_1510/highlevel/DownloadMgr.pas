@@ -19,6 +19,7 @@ type
    function GetCompressionType(map:string; ver:string):FZArchiveCompressionType;
    function IsSaceFakeNeeded(map: string; ver: string):boolean;
    function IsPatchAndReconnectAfterMapload(map: string; ver: string):boolean;
+   function IsPreferParentAppdataDl(map: string; ver: string):boolean;
 
    class function GetCompressionTypeByIndex(i:longint):FZArchiveCompressionType;
   end;
@@ -32,19 +33,19 @@ var
 
 { FZDownloadMgr }
 
-constructor FZDownloadMgr.Create;
+constructor FZDownloadMgr.Create();
 begin
   inherited Create();
   self.load('fz_download_links.ini');
 end;
 
-destructor FZDownloadMgr.Destroy;
+destructor FZDownloadMgr.Destroy();
 begin
 
   inherited;
 end;
 
-class function FZDownloadMgr.Get: FZDownloadMgr;
+class function FZDownloadMgr.Get(): FZDownloadMgr;
 begin
   result:=_instance;
 end;
@@ -112,6 +113,15 @@ var
   s:string;
 begin
   s:='%patchengineandreconnect_'+map+'_'+ver+'%';
+  s:=self.GetString(s,'');
+  result:=(strtointdef(s, 0) <> 0);
+end;
+
+function FZDownloadMgr.IsPreferParentAppdataDl(map: string; ver: string): boolean;
+var
+  s:string;
+begin
+  s:='%preferparentappdata_'+map+'_'+ver+'%';
   s:=self.GetString(s,'');
   result:=(strtointdef(s, 0) <> 0);
 end;

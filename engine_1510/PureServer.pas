@@ -1,7 +1,7 @@
 unit PureServer;
 {$MODE Delphi}
 interface
-uses xrstrings, vector, Synchro, basedefs, Packets, Time;
+uses xrstrings, vector, Synchro, basedefs, Packets, xr_time;
 
 function Init():boolean; stdcall;
 
@@ -73,7 +73,7 @@ var
 begin
   result:=false;
   cl:=pIClient(player);
-  result:=((cl.flags and ICLIENT_FLAG_LOCAL)>0);
+  IsLocalServerClient(cl);
 end;
 
 function OneIDSearcher(player:pointer; id:pointer; parameter2:pointer=nil):boolean; stdcall;
