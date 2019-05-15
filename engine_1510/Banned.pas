@@ -1,5 +1,7 @@
 unit Banned;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 uses Vector, xrstrings, Packets, xr_time, Clients;
 

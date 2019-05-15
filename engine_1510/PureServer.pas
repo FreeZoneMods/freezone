@@ -1,5 +1,6 @@
 unit PureServer;
 {$MODE Delphi}
+{$I _pathes.inc}
 interface
 uses xrstrings, vector, Synchro, basedefs, Packets, xr_time;
 

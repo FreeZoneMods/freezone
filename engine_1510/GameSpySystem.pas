@@ -1,6 +1,7 @@
 unit GameSpySystem;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 type

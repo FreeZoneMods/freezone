@@ -1,9 +1,10 @@
 unit Weapons;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
-uses MatVectors, Vector, xrstrings, ai_sounds;
+uses MatVectors, Vector, xrstrings, ai_sounds, AnticheatStuff;
 
 type
   EWeaponAddonState = byte;
@@ -125,9 +126,83 @@ type
   end;
   pCWeaponAmmo = ^CWeaponAmmo;
 
+  SilencerKoeffs = packed record
+    hit_power:single;
+    hit_impulse:single;
+    bullet_speed:single;
+    fire_dispersion:single;
+    cam_dispersion:single;
+    cam_disper_inc:single;
+  end;
+
+  CShootingObject = packed record //sizeof = 0x108
+    base_IAnticheatDumpable:IAnticheatDumpable;
+    m_vCurrentShootDir:FVector3;
+    m_vCurrentShootPos:FVector3;
+    m_iCurrentParentID:word;
+    bWorking:byte;
+    _unused1:byte;
+    //offset:0x20
+    fOneShotTime:single;
+    fvHitPower:array[0..3] of single; //FVector4;
+    fvHitPowerCritical:array[0..3] of single; //FVector4;
+    fHitImpulse:single;
+    m_fStartBulletSpeed:single;
+    fireDistance:single;
+    //offset:0x50
+    fireDispersionBase:single;
+    fShotTimeCounter:single;
+    m_silencer_koef:SilencerKoeffs;
+    cur_silencer_koef:SilencerKoeffs;
+    //offset:0x88
+    m_fMinRadius:single;
+    m_fMaxRadius:single;
+    light_base_color:Fcolor;
+    light_base_range:single;
+    light_build_color:Fcolor;
+    light_build_range:single;
+    //offset:0xB8
+    light_render:pointer; {ref_light}
+    light_var_color:single;
+    light_var_range:single;
+    light_lifetime:single;
+    light_frame:single;
+    light_time:single;
+    //offset:0xD0
+    m_bLightShotEnabled:byte;
+    _unused2:byte;
+    _unused3:word;
+    m_sShellParticles:shared_str;
+    vLoadedShellPoint:FVector3;
+    m_fPredBulletTime:single;
+    m_fTimeToAim:single;
+    m_bUseAimBullet:cardinal;
+    m_sFlameParticlesCurrent:shared_str;
+    m_sFlameParticles:shared_str;
+    m_pFlameParticles:pointer; {CParticlesObject*}
+    m_sSmokeParticlesCurrent:shared_str;
+    //offset:0x100
+    m_sSmokeParticles:shared_str;
+    m_sShotParticles:shared_str;
+  end;
+
   CWeapon = packed record    //sizeof = 0x730
     //todo:finish
-    _unknown1:array[0..$45F] of byte;
+    _unknown1:array[0..$33F] of byte;
+
+    //offset:0x340
+    base_CShootingObject:CShootingObject;
+    //offset:0x448
+    m_dwWeaponRemoveTime:int64;
+    m_dwWeaponIndependencyTime:int64;
+
+    //offset:0x458
+  	m_bTriStateReload:byte;
+  	m_sub_state:byte;
+  	bMisfire:byte;
+    _unused1:byte;
+  	m_bAutoSpawnAmmo:cardinal;
+
     m_flagsAddOnState:byte; //offset: $460
     _unusedx1:byte;
     _unusedx2:word;
@@ -211,6 +286,26 @@ type
   end;
   pCWeapon=^CWeapon;
 
+  CWeaponKnife = packed record //sizeof = 0x798
+    base_CWeapon:CWeapon;
+    fWallmarkSize:single;
+    knife_material_idx:word;
+    _unused1:word;
+    m_eHitType:cardinal;
+    m_eHitType_1:cardinal;
+    fvHitPower_1:array[0..3] of single; //FVector4;
+    fvHitPowerCritical_1:array[0..3] of single; //FVector4;
+    fHitImpulse_1:single;
+    m_eHitType_2:cardinal;
+    fvHitPower_2:array[0..3] of single; //FVector4;
+    fvHitPowerCritical_2:array[0..3] of single; //FVector4;
+    fHitImpulse_2:single;
+    fCurrentHit:single;
+    fCurrentHitCritical:single;
+    fHitImpulse_cur:single;
+  end;
+  pCWeaponKnife=^CWeaponKnife;
+
   CWeaponMagazined = packed record //sizeof = 0x798
     base_CWeapon:CWeapon;
     //offset:0x730
@@ -268,4 +363,5 @@ type
 implementation
 
 end.
+
 

@@ -180,8 +180,9 @@ end;
 
 function Init():boolean; stdcall;
 begin
-  rtc_lzo_compressor:=GetProcAddress(xrCore, '?rtc9_compress@@YAIPAXIPBXI@Z');
-  rtc_lzo_decompressor:=GetProcAddress(xrCore, '?rtc9_decompress@@YAIPAXIPBXI@Z');
+  result:=false;
+  if not InitSymbol(@rtc_lzo_compressor, xrCore, '?rtc9_compress@@YAIPAXIPBXI@Z') then exit;
+  if not InitSymbol(@rtc_lzo_decompressor, xrCore, '?rtc9_decompress@@YAIPAXIPBXI@Z') then exit;
 
   AddConsoleCommand('fz_lzo_compress', @LzoCompressFile, @LzoCompressCmdInfo);
   AddConsoleCommand('fz_lzo_decompress', @LzoDecompressFile, @LzoDecompressCmdInfo);

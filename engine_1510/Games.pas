@@ -1,13 +1,14 @@
 unit Games;
 {$mode delphi}
+{$I _pathes.inc}
 interface
-uses BaseClasses, Packets, Vector, BuyWnd, xrstrings, Banned, Objects, Schedule, HUD, Clients, srcCalls, CSE;
+uses BaseClasses, Packets, Vector, BuyWnd, xrstrings, Banned, Objects, Schedule, HUD, Clients, srcCalls, CSE, Synchro;
 
 type
 game_GameState = packed record
   base_DLL_Pure:DLL_Pure;
   m_type:cardinal;
-  m_phase:cardinal;
+  m_phase:cardinal; //Check - maybe word+unused
   m_round:cardinal;
   m_start_time:cardinal;
   m_round_start_time:cardinal;
@@ -47,11 +48,10 @@ game_cl_GameState = packed record
   m_game_type_name:shared_str;
   m_game_ui_custom:pCUIGameCustom;
   m_u16VotingEnabled:word;
-  _unused1:word;
+  //offset: 0xaa
   m_bServerControlHits:byte; {boolean}
-  _unused2:byte;
-  _unused3:word;
-  players:array[0..19] of byte;
+  _unused1:byte;
+  players:array[0..23] of byte;
   local_svdpnid:ClientID;
   local_player:pgame_PlayerState;
   m_WeaponUsageStatistic:pWeaponUsageStatistic;
@@ -113,12 +113,12 @@ type game_sv_GameState = packed record
   m_server:pointer;{pxrServer;}
   m_event_queue:pGameEventQueue;
   m_item_respawner:item_respawn_manager;
-  m_bMapRotation:boolean;
-  m_bMapNeedRotation:boolean;
-  m_bMapSwitched:boolean;
-  m_bFastRestart:boolean;
+  m_bMapRotation:byte;{boolean}
+  m_bMapNeedRotation:byte;{boolean}
+  m_bMapSwitched:byte;{boolean}
+  m_bFastRestart:byte;{boolean}
   m_pMapRotationList:xr_deque;
-  sv_force_sync:boolean;
+  sv_force_sync:byte;{boolean}
   _reserved1:byte;
   _reserved2:word;
   rpoints_MinDist:array[0..3] of single;
@@ -133,7 +133,7 @@ type game_sv_mp = packed record
   base_game_sv_GameState:game_sv_GameState;
   m_CorpseList:xr_deque;
   m_aRanks:xr_vector {Rank_Struct};
-  m_bRankUp_Allowed:boolean;
+  m_bRankUp_Allowed:byte;{boolean}
   _unused1:byte;
   _unused2:word;
   TeamList:xr_deque;
@@ -224,6 +224,7 @@ const
   procedure game_RejectGameItem(pgame:pgame_sv_mp; entity:pCSE_Abstract); stdcall;
   procedure game_KillPlayer(pgame:pgame_sv_mp; id_who:cardinal; GameID:cardinal); stdcall;
   procedure game_OnPlayerSelectTeam(pgame:pgame_sv_mp; client_id:cardinal; team:int16); stdcall;
+  procedure game_OnPlayerSelectSkin(pgame:pgame_sv_mp; client_id:cardinal; skin:int16); stdcall;
   function GetPlayerStateByGameID(game:pgame_sv_GameState; gameid:cardinal):pgame_PlayerState; stdcall;
   function GetClientByGameID(gameid:cardinal):pxrClientData; stdcall;
   function GetClientDataByPlayerState(ps:pgame_PlayerState):pxrClientData;
@@ -231,6 +232,7 @@ const
   function GetCurrentGame():pgame_sv_mp;
   procedure DestroyAllPlayerItems(game:pgame_sv_mp; client_id:cardinal); stdcall;
   function EntityFromEid(game:pgame_sv_GameState; gameid:cardinal):pCSE_Abstract; stdcall;
+  procedure game_signal_Syncronize(); stdcall;
   function Init():boolean; stdcall;
 
 implementation
@@ -241,6 +243,7 @@ var
   game_sv_mp__RejectGameItem:srcECXCallFunction;
   virtual_game_sv_mp__Player_AddMoney:srcVirtualECXCallFunction;
   virtual_game_sv_mp__OnPlayerSelectTeam:srcVirtualECXCallFunction;
+  virtual_game_sv_mp__OnPlayerSelectSkin:srcVirtualECXCallFunction;
   virtual_game_sv_mp__DestroyAllPlayerItems:srcVirtualECXCallFunction;
   game_sv_GameState__get_entity_from_eid:srcEDXCallFunctionWEAXArg;
   virtual_game_sv_GameState__get_eid:srcVirtualECXCallFunction;
@@ -251,6 +254,7 @@ const
   game_sv_GameState__get_eid_index:cardinal=$98;
   game_sv_mp__DestroyAllPlayerItems_index:cardinal=$154;
   game_sv_mp__OnPlayerSelectTeam_index:cardinal=$1a0;
+  game_sv_mp__OnPlayerSelectSkin_index:cardinal=$1a4;
 
 procedure game_PlayerAddMoney(pgame:pgame_sv_mp; ps:pgame_PlayerState; amount:int32); stdcall;
 begin
@@ -265,6 +269,16 @@ begin
   WriteToPacket(@p, @team, sizeof(team));
 
   virtual_game_sv_mp__OnPlayerSelectTeam.Call([pgame, @p, client_id]);
+end;
+
+procedure game_OnPlayerSelectSkin(pgame:pgame_sv_mp; client_id:cardinal; skin:int16); stdcall;
+var
+  p:NET_Packet;
+begin
+  ClearPacket(@p);
+  WriteToPacket(@p, @skin, sizeof(skin));
+
+  virtual_game_sv_mp__OnPlayerSelectSkin.Call([pgame, @p, client_id]);
 end;
 
 function IsServerControlsHits():boolean;
@@ -336,6 +350,16 @@ begin
   R_ASSERT((result = nil) or (result.ID = gameid), 'Cannot get entity by eid ('+inttostr(gameid)+') - something gone wrong');
 end;
 
+procedure game_signal_Syncronize(); stdcall;
+var
+  game:pgame_sv_mp;
+begin
+  game:=GetCurrentGame();
+  if game<>nil then begin
+    game.base_game_sv_GameState.sv_force_sync:=1;
+  end;
+end;
+
 function Init():boolean; stdcall;
 begin
   if xrGameDllType()=XRGAME_SV_1510 then begin
@@ -351,7 +375,8 @@ begin
   end;
   virtual_game_sv_mp__Player_AddMoney:=srcVirtualECXCallFunction.Create(game_sv_mp__Player_AddMoney_index, [vtPointer, vtPointer, vtInteger], 'Player_AddMoney','game_sv_mp');
   virtual_game_sv_mp__DestroyAllPlayerItems:=srcVirtualECXCallFunction.Create(game_sv_mp__DestroyAllPlayerItems_index, [vtPointer, vtInteger], 'DestroyAllPlayerItems', 'game_sv_mp');
-  virtual_game_sv_mp__OnPlayerSelectTeam:=srcVirtualECXCallFunction.Create(game_sv_mp__OnPlayerSelectTeam_index, [vtPointer, vtPointer, vtInteger], 'OnPlayerGameMenu','game_sv_mp');
+  virtual_game_sv_mp__OnPlayerSelectTeam:=srcVirtualECXCallFunction.Create(game_sv_mp__OnPlayerSelectTeam_index, [vtPointer, vtPointer, vtInteger], 'OnPlayerSelectTeam','game_sv_mp');
+  virtual_game_sv_mp__OnPlayerSelectSkin:=srcVirtualECXCallFunction.Create(game_sv_mp__OnPlayerSelectSkin_index, [vtPointer, vtPointer, vtInteger], 'OnPlayerSelectSkin','game_sv_mp');
 
   virtual_game_sv_GameState__get_eid:=srcVirtualECXCallFunction.Create(game_sv_GameState__get_eid_index, [vtPointer, vtInteger], 'get_eid', 'game_sv_GameState');
   result:=true;

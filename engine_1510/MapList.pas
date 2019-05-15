@@ -1,6 +1,7 @@
 unit MapList;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses xrstrings, Vector;

@@ -32,6 +32,7 @@ type
   public
     class function Get():FZLogMgr;
     class function NumberForSeverity(severity:FZLogMessageSeverity):cardinal;
+    function IsSeverityLogged(severity:FZLogMessageSeverity):boolean;
 
     procedure Write(data:string; severity:FZLogMessageSeverity; JustInFile:boolean = false);
     procedure SetTargetSeverityLevel(severity:cardinal);
@@ -135,6 +136,11 @@ begin
   end;
 end;
 
+function FZLogMgr.IsSeverityLogged(severity: FZLogMessageSeverity): boolean;
+begin
+  result:=(_target_severity<=NumberForSeverity(severity));
+end;
+
 constructor FZLogMgr.Create();
 begin
   inherited;
@@ -173,7 +179,7 @@ begin
         _logfun:=srcKit.Get.FindEngineCall('Log');
       end;
 
-      if (_logfun<>nil) and (_target_severity<=NumberForSeverity(severity)) then begin
+      if (_logfun<>nil) and IsSeverityLogged(severity) then begin
         if severity = FZ_LOG_ERROR then
           _logfun.Call([PChar('! FZ: ' + data)])
         else

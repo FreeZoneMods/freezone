@@ -1,5 +1,6 @@
 unit NET_Common;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses vector, Synchro;
 type

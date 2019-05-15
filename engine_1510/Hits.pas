@@ -1,6 +1,7 @@
 unit Hits;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses MatVectors, Objects, Packets;
@@ -41,6 +42,7 @@ const
   SPECIAL_KILL_TYPE__SKT_NONE:cardinal = 0;
 
 procedure ReadHitFromPacket(p:pNET_Packet; h:pSHit); stdcall;
+procedure OverWriteHitPowerToPacket(p:pNET_Packet; power:single); stdcall;
 
 implementation
 
@@ -92,7 +94,7 @@ begin
   h.aim_bullet := 0;
 
   h.hit_type := (pword(@p.B.data[pos]))^;
-  pos:=pos+sizeof(h.hit_type);
+  pos:=pos+sizeof(word);
 
   if ALife__eHitTypeFireWound = h.hit_type then begin
     h.armor_piercing := (psingle(@p.B.data[pos]))^;
@@ -107,6 +109,11 @@ begin
     h.SenderID := (pcardinal(@p.B.data[pos]))^;
     pos:=pos+sizeof(h.SenderID);
   end;
+end;
+
+procedure OverWriteHitPowerToPacket(p:pNET_Packet; power:single); stdcall;
+begin
+  psingle(@p.B.data[16])^:=power;
 end;
 
 end.

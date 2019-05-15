@@ -1,6 +1,7 @@
 unit UI;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 
@@ -8,7 +9,7 @@ uses BaseClasses, Vector, Schedule, UIWindows, srcCalls;
 
 type
   CDialogHolder = packed record
-    base_IScheduled:IScheduled;
+    base_IScheduled:ISheduled;
     base_pureFrame:pureFrame;
     m_input_receivers:xr_vector;
     m_dialogsToRender:xr_vector;

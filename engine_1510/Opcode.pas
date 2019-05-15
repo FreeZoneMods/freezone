@@ -1,5 +1,6 @@
 unit Opcode;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 
 type

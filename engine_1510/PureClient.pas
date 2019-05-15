@@ -1,5 +1,6 @@
 unit PureClient;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses Packets, NET_Common, xr_time, Synchro, vector, Clients;
 type

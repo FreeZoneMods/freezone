@@ -19,6 +19,9 @@ type
      function GetInt(Key:string; default:integer = 0; section:string = 'main'):integer;
      function GetFloat(Key:string; default:single = 0; section:string = 'main'):single;
      function GetString(key:string; default:string = ''; section:string = 'main'):string;
+     function IsSectionExist(section:string):boolean;
+     function IsKeyExist(section:string; key:string):boolean;
+
      procedure Reload();
     protected
      _lock:TCriticalSection;
@@ -39,7 +42,7 @@ begin
   _inifile:=nil;
 end;
 
-destructor FZConfigBase.Destroy;
+destructor FZConfigBase.Destroy();
 begin
   _inifile.Free();
   _lock.Free();
@@ -66,6 +69,20 @@ begin
   end;
 
   _lock.Leave();
+end;
+
+function FZConfigBase.IsSectionExist(section: string): boolean;
+begin
+  _lock.Enter();
+  result:=_inifile.SectionExists(section);
+  _lock.Leave();
+end;
+
+function FZConfigBase.IsKeyExist(section: string; key: string): boolean;
+begin
+  _lock.Enter;
+  result:=IsSectionExist(section) and _inifile.ValueExists(section, key);
+  _lock.Leave;
 end;
 
 function FZConfigBase.GetData(Key: string; var Value: string; section:string = 'main'): boolean;

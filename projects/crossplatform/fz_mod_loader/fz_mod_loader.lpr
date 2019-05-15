@@ -39,6 +39,17 @@ type
     fsltx_settings:FZFsLtxBuilderSettings;
   end;
 
+  FZModMirrorsSettings = record
+    binlist_urls:FZMasterLinkListAddr;
+    gamelist_urls:FZMasterLinkListAddr;
+  end;
+
+  FZConfigBackup = record
+    filename:string;
+    buf:pAnsiChar;
+    sz:cardinal;
+  end;
+
 var
   _mod_rel_path:PChar;
   _mod_name:PChar;
@@ -85,19 +96,46 @@ begin
   a[i]:=s;
 end;
 
-function DownloadAndParseMasterModsList(var settings:FZModSettings):boolean;
+procedure ClearModMirrors(var mirrors:FZModMirrorsSettings);
+begin
+  setlength(mirrors.binlist_urls, 0);
+  setlength(mirrors.gamelist_urls, 0);
+end;
+
+procedure PushModMirror(var mirrors:FZModMirrorsSettings; binlist:string; gamelist:string);
+begin
+  PushToArray(mirrors.binlist_urls, binlist);
+  PushToArray(mirrors.gamelist_urls, gamelist);
+end;
+
+function GenerateMirrorSuffixForIndex(index:integer):string;
+const
+  MASTERLINKS_MIRROR_SUFFIX = '_mirror_';
+begin
+  result:='';
+  if index>0 then begin
+    result:=MASTERLINKS_MIRROR_SUFFIX+inttostr(index);
+  end;
+end;
+
+type
+  FZMasterListApproveType = (FZ_MASTERLIST_NOT_APPROVED, FZ_MASTERLIST_APPROVED, FZ_MASTERLIST_ONLY_OLD_CONFIG);
+
+function DownloadAndParseMasterModsList(var settings:FZModSettings; var mirrors:FZModMirrorsSettings):FZMasterListApproveType;
 var
   master_links:FZMasterLinkListAddr;
   list_downloaded:boolean;
   dlThread:FZDownloaderThread;
   dl:FZFileDownloader;
-  i:integer;
+  i, j:integer;
   full_path:string;
   cfg:FZIniFile;
-  params_approved:boolean;
+  params_approved:FZMasterListApproveType;
   core_params:string;
 
   tmp_settings:FZModSettings;
+  tmp1, tmp2:string;
+  binlist_valid, gamelist_valid:boolean;
 const
   DEBUG_MODE_KEY:string='-fz_customlists';
   MASTERLINKS_BINLIST_KEY = 'binlist';
@@ -107,12 +145,13 @@ const
   MASTERLINKS_CONFIGS_DIR_KEY = 'configsdir';
   MASTERLINKS_EXE_NAME_KEY = 'exename';
 begin
-  result:=false;
+  result:=FZ_MASTERLIST_NOT_APPROVED;
 
   PushToArray(master_links, 'https://raw.githubusercontent.com/FreeZoneMods/modmasterlinks/master/links.ini');
   PushToArray(master_links, 'http://www.gwrmod.tk/files/mods_links.ini');
   PushToArray(master_links, 'http://www.stalker-life.ru/mods_links/links.ini');
   PushToArray(master_links, 'http://stalker.stagila.ru:8080/stcs_emergency/mods_links.ini');
+  PushToArray(master_links, 'http://www.gwrmod.tk/files/mods_links_low_priority.ini');
 
   list_downloaded:=false;
   full_path:= settings.root_dir+master_mods_list_name;
@@ -126,6 +165,8 @@ begin
   end;
   dlThread.Free();
 
+  ClearModMirrors(mirrors);
+
   tmp_settings:=settings;
   tmp_settings.binlist_url:=GetCustomBinUrl(_mod_params);
   tmp_settings.gamelist_url:=GetCustomGamedataUrl(_mod_params);
@@ -134,61 +175,139 @@ begin
   tmp_settings.fsltx_settings.share_patches_dir:=IsSharedPatches(_mod_params);
   tmp_settings.fsltx_settings.configs_dir:=GetConfigsDir(_mod_params, '');
 
-  params_approved:=false;
+  params_approved:=FZ_MASTERLIST_NOT_APPROVED;
   if list_downloaded then begin
     // Мастер-список успешно скачался, будем парсить его содержимое
     cfg:=FZIniFile.Create(full_path);
     for i:=0 to cfg.GetSectionsCount()-1 do begin
       if cfg.GetSectionName(i) = tmp_settings.modname then begin
+        //Нашли в мастер-конфиге секцию, отвечающую за наш мод
         FZLogMgr.Get.Write('Mod '+tmp_settings.modname+' found in master list', FZ_LOG_INFO);
-        if (length(tmp_settings.binlist_url) > 0) and (tmp_settings.binlist_url <> cfg.GetStringDef(tmp_settings.modname, MASTERLINKS_BINLIST_KEY, '')) then begin
-          FZLogMgr.Get.Write('Master binlist link differs from specified in mod parameters', FZ_LOG_ERROR);
-          params_approved:=false;
+        params_approved:=FZ_MASTERLIST_NOT_APPROVED;
+
+        //Заполняем список всех доступных зеркал, попутно ищем ссылки из binlist и gamelist в списке зеркал
+        j:=0;
+        if (length(tmp_settings.gamelist_url)=0) and (length(tmp_settings.binlist_url)=0) then begin
+          //Юзер не заморачивается указыванием списков, выбираем их сами
+          binlist_valid:=true;
+          gamelist_valid:=true;
+        end else begin
+          binlist_valid:=false;
+          gamelist_valid:=false;
+        end;
+
+        while (true) do begin
+          //Конструируем имя параметров зеркала
+          tmp1:=GenerateMirrorSuffixForIndex(j);
+          tmp2:=MASTERLINKS_GAMELIST_KEY+tmp1;
+          tmp1:=MASTERLINKS_BINLIST_KEY+tmp1;
+
+          //Вычитываем параметры зеркала
+          tmp1:=cfg.GetStringDef(tmp_settings.modname, tmp1, '');
+          tmp2:=cfg.GetStringDef(tmp_settings.modname, tmp2, '');
+
+          //Проверяем и сохраняем
+          if (length(tmp1)=0) and (length(tmp2)=0) then begin
+            break;
+          end;
+          FZLogMgr.Get.Write('Pushing mirror #'+inttostr(length(mirrors.binlist_urls))+': binlist '+tmp1+', gamelist '+tmp2, FZ_LOG_INFO);
+          PushModMirror(mirrors, tmp1, tmp2);
+          if tmp1=tmp_settings.binlist_url then binlist_valid:=true;
+          if tmp2=tmp_settings.gamelist_url then gamelist_valid:=true;
+
+          j:=j+1;
+        end;
+
+        //Убеждаемся, что пользователь не подсунул нам "левую" ссылку
+        if (length(mirrors.binlist_urls) = 0) and (length(mirrors.gamelist_urls)=0) then begin
+          FZLogMgr.Get.Write('Invalid mod parameters in master links', FZ_LOG_ERROR);
           break;
-        end else if (length(tmp_settings.gamelist_url)>0) and (tmp_settings.gamelist_url <> cfg.GetStringDef(tmp_settings.modname, MASTERLINKS_GAMELIST_KEY, '')) then begin
-          FZLogMgr.Get.Write('Master gamelist link differs from specified in mod parameters', FZ_LOG_ERROR);
-          params_approved:=false;
+        end else if (not binlist_valid) then begin
+          FZLogMgr.Get.Write('The binlist URL specified in mod parameters can''t be found in the master links list', FZ_LOG_ERROR);
+          break;
+        end else if (not gamelist_valid) then begin
+          FZLogMgr.Get.Write('The gamelist URL specified in mod parameters can''t be found in the master links list', FZ_LOG_ERROR);
           break;
         end;
-        tmp_settings.gamelist_url := cfg.GetStringDef(tmp_settings.modname, MASTERLINKS_GAMELIST_KEY, '');
-        tmp_settings.binlist_url  := cfg.GetStringDef(tmp_settings.modname, MASTERLINKS_BINLIST_KEY,  '');
+
+        //Если пользователь не передал нам в строке запуска ссылок - берем указанные в "основном" зеркале
+        if (length(tmp_settings.gamelist_url)=0) and (length(tmp_settings.binlist_url)=0) then begin
+          if (length(mirrors.gamelist_urls)>0) then begin
+            tmp_settings.gamelist_url:=mirrors.gamelist_urls[0];
+          end;
+
+          if (length(mirrors.binlist_urls)>0) then begin
+            tmp_settings.binlist_url:=mirrors.binlist_urls[0];
+          end;
+
+          for j:=0 to length(mirrors.binlist_urls)-2 do begin
+            mirrors.gamelist_urls[j]:=mirrors.gamelist_urls[j+1];
+            mirrors.binlist_urls[j]:=mirrors.binlist_urls[j+1];
+          end;
+
+          setlength(mirrors.gamelist_urls, length(mirrors.gamelist_urls)-1);
+          setlength(mirrors.binlist_urls, length(mirrors.binlist_urls)-1);
+        end;
+
         tmp_settings.fsltx_settings.full_install := cfg.GetBoolDef(tmp_settings.modname, MASTERLINKS_FULLINSTALL_KEY, false);
         tmp_settings.fsltx_settings.share_patches_dir:= cfg.GetBoolDef(tmp_settings.modname, MASTERLINKS_SHARED_PATCHES_KEY, false);
         tmp_settings.fsltx_settings.configs_dir:=cfg.GetStringDef(tmp_settings.modname, MASTERLINKS_CONFIGS_DIR_KEY, '');
         tmp_settings.exe_name:=cfg.GetStringDef(tmp_settings.modname, MASTERLINKS_EXE_NAME_KEY, '');
-        params_approved := true;
+        params_approved := FZ_MASTERLIST_APPROVED;
         break;
-      end else if (not params_approved) and ( (length(tmp_settings.binlist_url) = 0) or (tmp_settings.binlist_url = cfg.GetStringDef(cfg.GetSectionName(i), MASTERLINKS_BINLIST_KEY, ''))) then begin
-        // Ссылка на движок нас удовлетворяет, но надо продолжать проверять остальные секции
-        if not params_approved then begin
+      end else if (params_approved=FZ_MASTERLIST_NOT_APPROVED) then begin
+        //Если ссылка на binlist пустая или находится в конфиге какого-либо мода - можно заапрувить ее
+        //Однако заканчивать рано - надо перебирать и проверять также следующие секции, так как в них может найтись секция с модом, в которой будут другие движок и/или геймдата!
+        binlist_valid:=length(tmp_settings.binlist_url) = 0;
+        j:=0;
+        tmp2:=cfg.GetSectionName(i);
+        while (not binlist_valid) do begin
+          tmp1:=cfg.GetStringDef(tmp2, MASTERLINKS_BINLIST_KEY + GenerateMirrorSuffixForIndex(j), '');
+          if (length(tmp1) = 0) and (length(cfg.GetStringDef(tmp2, MASTERLINKS_GAMELIST_KEY + GenerateMirrorSuffixForIndex(j), '')) = 0) then break;
+          binlist_valid := (tmp1=tmp_settings.binlist_url);
+          j:=j+1;
+        end;
+
+        if binlist_valid then begin
           if (length(tmp_settings.binlist_url) = 0) then begin
             FZLogMgr.Get.Write('No engine mod, approved', FZ_LOG_INFO);
           end else begin
             FZLogMgr.Get.Write('Engine "'+tmp_settings.binlist_url+'" approved by mod "'+cfg.GetSectionName(i)+'"', FZ_LOG_INFO);
           end;
-          params_approved:=true;
+          params_approved:=FZ_MASTERLIST_APPROVED;
         end;
       end;
     end;
     cfg.Free;
   end else begin
-    //Список почему-то не скачался. Ограничимся геймдатными модами.
+    //Список почему-то не скачался. Ограничимся геймдатными и скачанными ранее модами.
     FZLogMgr.Get.Write('Cannot download master links!', FZ_LOG_ERROR);
-    params_approved:=( length(tmp_settings.binlist_url) = 0);
+    if (length(tmp_settings.binlist_url) = 0) and (length(tmp_settings.gamelist_url) <> 0) then begin
+      FZLogMgr.Get.Write('Gamedata mod approved', FZ_LOG_INFO);
+      params_approved:=FZ_MASTERLIST_APPROVED;
+    end else begin
+      params_approved:=FZ_MASTERLIST_ONLY_OLD_CONFIG;
+      FZLogMgr.Get.Write('Only old mods approved', FZ_LOG_INFO);
+    end;
   end;
 
   core_params:=VersionAbstraction().GetCoreParams();
-  if params_approved or (Pos(DEBUG_MODE_KEY, core_params)>0) then begin
+  if (params_approved<>FZ_MASTERLIST_NOT_APPROVED) or (Pos(DEBUG_MODE_KEY, core_params)>0) then begin
     settings:=tmp_settings;
     settings.exe_name:=StringReplace(settings.exe_name, '\', '_', [rfReplaceAll]);
     settings.exe_name:=StringReplace(settings.exe_name, '/', '_', [rfReplaceAll]);
     settings.exe_name:=StringReplace(settings.exe_name, '..', '__', [rfReplaceAll]);
-    result:=true;
+    if (Pos(DEBUG_MODE_KEY, core_params)>0) then begin
+      FZLogMgr.Get.Write('Debug mode - force approve', FZ_LOG_INFO);
+      result:=FZ_MASTERLIST_APPROVED;
+    end else begin
+      result:=params_approved;
+    end;
   end;
 
 end;
 
-function DownloadAndApplyFileList(url:string; list_filename:string; root_dir:string; fileList:FZFiles; update_progress:boolean):boolean;
+function DownloadAndApplyFileList(url:string; list_filename:string; root_dir:string; masterlinks_type:FZMasterListApproveType; fileList:FZFiles; update_progress:boolean):boolean;
 var
   dl:FZFileDownloader;
   filepath:string;
@@ -206,22 +325,31 @@ const
   MAX_NO_UPDATE_DELTA = 5000;
 begin
   result:=false;
-  if length(url)=0 then begin
-    FZLogMgr.Get.Write('No list URL specified', FZ_LOG_ERROR);
-    exit;
-  end;
-
   filepath:=root_dir+list_filename;
-  FZLogMgr.Get.Write('Downloading list '+url+' to '+filepath, FZ_LOG_INFO);
 
-  thread:=CreateDownloaderThreadForUrl(PAnsiChar(url));
-  dl:=thread.CreateDownloader(url, filepath, 0);
-  result:=dl.StartSyncDownload();
-  dl.Free();
-  thread.Free();
-  if not result then begin
-    FZLogMgr.Get.Write('Downloading list failed', FZ_LOG_ERROR);
+  if masterlinks_type = FZ_MASTERLIST_ONLY_OLD_CONFIG then begin
+    //Не загружаем ничего! В параметрах URL вообще может ничего не быть
+    //Просто пытаемся использовать старую конфигурацию
+  end else if masterlinks_type = FZ_MASTERLIST_NOT_APPROVED then begin
+    FZLogMgr.Get.Write('Master links don''t allow the mod', FZ_LOG_ERROR);
     exit;
+  end else begin
+    if length(url)=0 then begin
+      FZLogMgr.Get.Write('No list URL specified', FZ_LOG_ERROR);
+      exit;
+    end;
+
+    FZLogMgr.Get.Write('Downloading list '+url+' to '+filepath, FZ_LOG_INFO);
+
+    thread:=CreateDownloaderThreadForUrl(PAnsiChar(url));
+    dl:=thread.CreateDownloader(url, filepath, 0);
+    result:=dl.StartSyncDownload();
+    dl.Free();
+    thread.Free();
+    if not result then begin
+      FZLogMgr.Get.Write('Downloading list failed', FZ_LOG_ERROR);
+      exit;
+    end;
   end;
   result:=false;
 
@@ -506,12 +634,103 @@ begin
   end;
 end;
 
+function CreateConfigBackup(filename:string):FZConfigBackup;
+var
+  f:handle;
+  sz, readcnt:cardinal;
+  success:boolean;
+const
+  MAX_LEN:cardinal = 1*1024*1024;
+begin
+  result.filename:='';
+  result.buf:=nil;
+  result.sz:=0;
+  if length(filename) = 0 then exit;
+
+  f:=CreateFile(PAnsiChar(filename), GENERIC_READ, FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+  FZLogMgr.Get.Write('Backup config '+filename+', handle '+inttostr(f), FZ_LOG_INFO);
+  if f = INVALID_HANDLE_VALUE then begin
+    FZLogMgr.Get.Write('Error opening file '+filename, FZ_LOG_ERROR);
+    exit;
+  end;
+
+  try
+    success:=false;
+    readcnt:=0;
+
+    sz:=GetFileSize(f, nil);
+    FZLogMgr.Get.Write('Size of the config file '+filename+' is '+inttostr(sz), FZ_LOG_INFO);
+
+    if sz > MAX_LEN then begin
+      FZLogMgr.Get.Write('Config '+filename+' too large, skip it', FZ_LOG_ERROR);
+      exit;
+    end;
+
+    result.buf:=VirtualAlloc(nil, sz, MEM_COMMIT or MEM_RESERVE, PAGE_READWRITE);
+    if result.buf = nil then begin
+      FZLogMgr.Get.Write('Error while allocating buffer for the config '+filename, FZ_LOG_ERROR);
+      exit;
+    end;
+
+    if not ReadFile(f, result.buf[0], sz, readcnt, nil) or (sz <> readcnt) then begin
+      FZLogMgr.Get.Write('Error reading file '+filename, FZ_LOG_ERROR);
+      exit;
+    end;
+
+    result.sz:=sz;
+    result.filename:=filename;
+    success:=true;
+  finally
+    if not success then begin
+      if result.buf<>nil then begin
+        VirtualFree(result.buf, 0, MEM_RELEASE);
+      end;
+
+      result.filename:='';
+      result.buf:=nil;
+      result.sz:=0;
+    end;
+    CloseHandle(f);
+  end;
+
+end;
+
+function FreeConfigBackup(backup:FZConfigBackup; need_restore:boolean):boolean;
+var
+  f:handle;
+  writecnt:cardinal;
+begin
+  result:=false;
+  if need_restore then begin
+    f:=CreateFile(PAnsiChar(backup.filename), GENERIC_WRITE, 0, nil, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    FZLogMgr.Get.Write('Restoring backup config '+backup.filename+', handle '+inttostr(f), FZ_LOG_INFO);
+
+    if f = INVALID_HANDLE_VALUE then begin
+      FZLogMgr.Get.Write('Error opening file '+backup.filename, FZ_LOG_ERROR);
+    end else begin
+      writecnt:=0;
+      if not WriteFile(f, backup.buf[0], backup.sz, writecnt, nil) or (backup.sz<>writecnt) then begin
+        FZLogMgr.Get.Write('Error writing file '+backup.filename, FZ_LOG_ERROR);
+      end else begin
+        result:=true;
+      end;
+      CloseHandle(f);
+    end;
+  end;
+
+  if backup.buf<>nil then begin
+    VirtualFree(backup.buf, 0, MEM_RELEASE);
+  end;
+end;
+
 function DoWork(modname:string; modpath:string):boolean; //Выполняется в отдельном потоке
 var
   ip:string;
   port:integer;
-  files:FZFiles;
+  files, files_cp:FZFiles;
   last_downloaded_bytes:int64;
+
+  masterlinks_parse_result:FZMasterListApproveType;
 
   cmdline, cmdapp, workingdir:string;
   si:TStartupInfo;
@@ -522,12 +741,16 @@ var
   sz:cardinal;
 
   mod_settings:FZModSettings;
+  mirrors:FZModMirrorsSettings;
   playername:string;
 
   message_initially_shown:boolean;
 
   add_params_file:textfile;
   add_params:string;
+  mirror_id:integer;
+  flag:boolean;
+  old_gamelist, old_binlist:FZConfigBackup;
 begin
   result:=false;
 
@@ -588,8 +811,11 @@ begin
 
   VersionAbstraction().AssignStatus('Parsing master links list...');
 
-  if not DownloadAndParseMasterModsList(mod_settings) then begin
-    FZLogMgr.Get.Write('Parsing master links list failed!', FZ_LOG_ERROR);
+  ClearModMirrors(mirrors);
+  masterlinks_parse_result:=DownloadAndParseMasterModsList(mod_settings, mirrors);
+  if masterlinks_parse_result = FZ_MASTERLIST_NOT_APPROVED then begin
+    FZLogMgr.Get.Write('Master links disallow running the mod!', FZ_LOG_ERROR);
+    ClearModMirrors(mirrors);
     exit;
   end;
 
@@ -607,32 +833,90 @@ begin
   if not files.ScanPath(mod_settings.root_dir) then begin
     FZLogMgr.Get.Write('Scanning root directory failed!', FZ_LOG_ERROR);
     files.Free;
+    ClearModMirrors(mirrors);
     exit;
   end;
 
-  //Загрузим с сервера требуемую конфигурацию корневой директории и сопоставим ее с текущей
-  FZLogMgr.Get.Write('=======Processing game resources list=======', FZ_LOG_INFO);
-  if length(mod_settings.gamelist_url)=0 then begin
-    FZLogMgr.Get.Write('Empty game files list URL found!', FZ_LOG_ERROR);
-    files.Free;
-    exit;
-  end;
+  //Создадим копию текущего состояния - пригодится при переборе зеркал
+  files_cp:=FZFiles.Create();
+  files_cp.Copy(files);
+  //Также прочитаем и запомним содержимое binlist и gamelist - чтобы попробовать использовать старый конфиг, если ни одно из зеркал окажется недоступным.
+  old_gamelist:=CreateConfigBackup(mod_settings.root_dir + gamedata_files_list_name);
+  old_binlist:=CreateConfigBackup(mod_settings.root_dir + engine_files_list_name);
 
-  VersionAbstraction().AssignStatus('Verifying resources...');
-  VersionAbstraction().SetVisualProgress(0);
-  if not DownloadAndApplyFileList(mod_settings.gamelist_url, gamedata_files_list_name, mod_settings.root_dir, files, true) then begin
-    FZLogMgr.Get.Write('Applying game files list failed!', FZ_LOG_ERROR);
-    files.Free;
-    exit;
-  end;
+  mirror_id:=0;
 
-  VersionAbstraction().AssignStatus('Verifying engine...');
-  if length(mod_settings.binlist_url)>0 then begin
-    if not DownloadAndApplyFileList(mod_settings.binlist_url, engine_files_list_name, mod_settings.root_dir, files, false) then begin
-      FZLogMgr.Get.Write('Applying engine files list failed!', FZ_LOG_ERROR);
-      files.Free;
-      exit;
+  repeat
+    files.Copy(files_cp);
+
+    //Загрузим с сервера требуемую конфигурацию корневой директории и сопоставим ее с текущей
+    FZLogMgr.Get.Write('=======Processing URLs combination #'+inttostr(mirror_id)+'=======', FZ_LOG_INFO);
+    FZLogMgr.Get.Write('binlist: '+mod_settings.binlist_url, FZ_LOG_INFO);
+    FZLogMgr.Get.Write('gamelist: '+mod_settings.gamelist_url, FZ_LOG_INFO);
+
+    flag:=true;
+    if (masterlinks_parse_result<>FZ_MASTERLIST_ONLY_OLD_CONFIG) and (length(mod_settings.gamelist_url)=0) then begin
+      FZLogMgr.Get.Write('Empty game files list URL found!', FZ_LOG_ERROR);
+      flag:=false;
     end;
+
+    if (flag) then begin
+      VersionAbstraction().AssignStatus('Verifying resources...');
+      VersionAbstraction().SetVisualProgress(0);
+      if not DownloadAndApplyFileList(mod_settings.gamelist_url, gamedata_files_list_name, mod_settings.root_dir, masterlinks_parse_result, files, true) then begin
+        FZLogMgr.Get.Write('Applying game files list failed!', FZ_LOG_ERROR);
+        flag:=false;
+      end;
+    end;
+
+    if (flag) then begin
+      VersionAbstraction().AssignStatus('Verifying engine...');
+      if length(mod_settings.binlist_url)>0 then begin
+        if not DownloadAndApplyFileList(mod_settings.binlist_url, engine_files_list_name, mod_settings.root_dir, masterlinks_parse_result, files, false) then begin
+          FZLogMgr.Get.Write('Applying engine files list failed!', FZ_LOG_ERROR);
+          flag:=false;
+        end;
+      end;
+    end;
+
+    if flag or (masterlinks_parse_result=FZ_MASTERLIST_ONLY_OLD_CONFIG) or IsMirrorsDisabled(_mod_params) then begin
+      break;
+    end;
+
+    //Попытка использовать зеркало окончилась неудачей - пробуем следующее
+    if (mirror_id < length(mirrors.binlist_urls)) then mod_settings.binlist_url:=mirrors.binlist_urls[mirror_id];
+    if (mirror_id < length(mirrors.gamelist_urls)) then mod_settings.gamelist_url:=mirrors.gamelist_urls[mirror_id];
+
+    mirror_id:=mirror_id+1;
+  until (mirror_id > length(mirrors.binlist_urls)) or (mirror_id > length(mirrors.gamelist_urls));  //Внимание! Тут все верно! Не ставить больше либо равно - первая итерация берет ссылки не из mirrors!
+
+  //Если не удалось скачать ни с одного из зеркал - пробуем запуститься с тем, что уже есть у нас
+  if not flag and (masterlinks_parse_result<>FZ_MASTERLIST_ONLY_OLD_CONFIG) then begin
+    FZLogMgr.Get.Write('Mirrors unavailable, trying to apply backup', FZ_LOG_INFO);
+    files.Copy(files_cp);
+
+    if FreeConfigBackup(old_gamelist, true) then begin
+      flag:=DownloadAndApplyFileList('', gamedata_files_list_name, mod_settings.root_dir, FZ_MASTERLIST_ONLY_OLD_CONFIG, files, true);
+    end;
+
+    if flag and (old_binlist.sz<>0) then begin
+      flag:=FreeConfigBackup(old_binlist, true) and DownloadAndApplyFileList('', engine_files_list_name, mod_settings.root_dir, FZ_MASTERLIST_ONLY_OLD_CONFIG, files, false);
+    end else begin
+      FreeConfigBackup(old_binlist, false);
+    end;
+
+  end else begin
+    FreeConfigBackup(old_binlist, false);
+    FreeConfigBackup(old_gamelist, false);
+  end;
+
+  ClearModMirrors(mirrors);
+  files_cp.Free;
+
+  if not flag then begin
+    FZLogMgr.Get.Write('Cannot apply lists from the mirrors!', FZ_LOG_ERROR);
+    files.Free;
+    exit;
   end;
 
   //удалим файлы из юзердаты из списка синхронизируемых; скопируем доступные файлы вместо загрузки их
@@ -1059,6 +1343,7 @@ end;
 //-exename <string> - имя исполняемого файла мода
 //-includename - включить в строку запуска мода параметр /name= с именем игрока
 //-preservemessage - показывать окно с сообщением о загрузке мода
+//-nomirrors - запретить скачивание списков файлов мода с URL, отличающихся от указанных в ключах -binlist/-gamelist
 
 function ModLoad(mod_name:PAnsiChar; mod_params:PAnsiChar):FZDllModFunResult; stdcall;
 var
@@ -1098,7 +1383,8 @@ end;
 {$IFNDEF RELEASE}
 procedure ModLoadTest(); stdcall;
 begin
-  ModLoad('sace3', ' -srvname localhost -srvport 5449 -includename'{ ' -srvname localhost -srvport 5449 '});
+  //ModLoad('sace3', ' -srvname localhost -srvport 5449 -includename'{ ' -srvname localhost -srvport 5449 '});
+  ModLoad('fz_test', ' -srvname localhost -srvport 5449 -includename'{ ' -srvname localhost -srvport 5449 '});
 end;
 {$ENDIF}
 

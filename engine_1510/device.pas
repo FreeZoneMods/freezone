@@ -1,15 +1,25 @@
 unit Device;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
-uses Windows, xr_time, Vector, Synchro, MatVectors;
+uses Windows, xr_time, Vector, Synchro, MatVectors, Statistics, BaseClasses;
 
 type
 CRegistrator = packed record
   R:xr_vector;
   flags:cardinal;
 end;
+
+CDeviceResetNotifier = packed record
+  base_pureDeviceReset:pureDeviceReset;
+end;
+
+IRenderDeviceRender = packed record
+  //todo: fill
+end;
+pIRenderDeviceRender = ^IRenderDeviceRender;
 
 CRenderDevice = packed record
   m_dwWindowStyle:cardinal;
@@ -31,7 +41,7 @@ CRenderDevice = packed record
   //offset: 0x110
   b_is_Ready:cardinal;
   b_is_Active:cardinal;
-  m_pRender:pointer; {IRenderDeviceRender*}
+  m_pRender:pIRenderDeviceRender;
   m_bNearer:cardinal;
   //offset:0x120
   seqRender:CRegistrator; {<pureRender>}
@@ -44,7 +54,7 @@ CRenderDevice = packed record
   seqDeviceReset:CRegistrator; {<pureDeviceReset>}
   //offset: 0x1A0
   seqParallel:xr_vector;
-  Statistic:pointer; {CStats*}
+  Statistic:pCStats;
   fTimeDelta:single;
   fTimeGlobal:single;
   dwTimeDelta:cardinal;
@@ -77,6 +87,7 @@ uses basedefs;
 
 var
   g_pDevice:pCRenderDevice;
+  g_pbRendering:pcardinal;
 
 function GetDevice():pCRenderDevice;
 begin
@@ -85,8 +96,10 @@ end;
 
 function Init():boolean;
 begin
-  g_pDevice:=GetProcAddress(xrEngine,'?Device@@3VCRenderDevice@@A');
-  result := g_pDevice<>nil;
+  result:=false;
+  if not InitSymbol(g_pDevice, xrEngine, '?Device@@3VCRenderDevice@@A') then exit;
+  if not InitSymbol(g_pbRendering, xrEngine, '?g_bRendering@@3HA') then exit;
+  result:=true;
 end;
 
 end.

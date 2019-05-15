@@ -1,6 +1,7 @@
 unit GameCore;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses xrstrings;
@@ -22,12 +23,15 @@ var
 function Init():boolean;
 
 implementation
-uses basedefs, Windows;
+uses basedefs;
 
 function Init():boolean;
 begin
-  Core:=GetProcAddress(xrCore, '?Core@@3VxrCore@@A');
-  result:=(Core<>nil);
+  result:=false;
+
+  if not InitSymbol(Core, xrCore, '?Core@@3VxrCore@@A') then exit;
+
+  result:=true;
 end;
 
 end.

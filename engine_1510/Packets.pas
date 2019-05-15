@@ -1,5 +1,6 @@
 unit Packets;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses srcCalls, Synchro, Vector, xr_configs, MatVectors;
 
@@ -245,7 +246,7 @@ function Init():boolean; stdcall;
 function UnreadBytesCountInPacket(p:pNET_Packet):cardinal;
 
 implementation
-uses sysutils, srcBase, basedefs, windows;
+uses sysutils, srcBase, basedefs;
 
 function ip_address_to_str(a:ip_address):string; stdcall;
 begin
@@ -261,20 +262,23 @@ function Init():boolean; stdcall;
 var
   ptr:pointer;
 begin
+  result:=false;
+  ptr:=nil;
+
   pCompressor:=pointer(xrNetServer+$14630);
 
-  ptr:=GetProcAddress(xrNetServer, '?Decompress@NET_Compressor@@QAEGPAEABI01@Z');
+  if not InitSymbol(ptr, xrNetServer, '?Decompress@NET_Compressor@@QAEGPAEABI01@Z') then exit;
   NET_Compressor__Decompress:=srcECXCallFunction.Create(ptr,[vtPointer, vtInteger, vtPointer, vtInteger], 'Decompress', 'NET_Compressor');
 
-  ptr:=GetProcAddress(xrCore, '?r_stringZ@NET_Packet@@QAEXAAVshared_str@@@Z');
+  if not InitSymbol(ptr, xrCore, '?r_stringZ@NET_Packet@@QAEXAAVshared_str@@@Z') then exit;
   NET_Packet__r_stringZ:=srcECXCallFunction.Create(ptr, [vtPointer, vtPointer], 'r_stringZ', 'NET_Packet');
 
   //Write arg (uint)
-  ptr:=GetProcAddress(xrCore, '?w_u8@NET_Packet@@QAEXE@Z');
+  if not InitSymbol(ptr, xrCore, '?w_u8@NET_Packet@@QAEXE@Z') then exit;
   NET_Packet__w_u8:=srcECXCallFunction.Create(ptr, [vtPointer, vtInteger], 'w_u8', 'NET_Packet' );
 
   //read to arg (puint)
-  ptr:=GetProcAddress(xrCore, '?r_u8@NET_Packet@@QAEXAAE@Z');
+  if not InitSymbol(ptr, xrCore, '?r_u8@NET_Packet@@QAEXAAE@Z') then exit;
   NET_Packet__r_u8:=srcECXCallFunction.Create(ptr, [vtPointer, vtPointer], 'r_u8', 'NET_Packet');
 
   result:=true;

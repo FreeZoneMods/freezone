@@ -1,7 +1,8 @@
 unit Objects;
 {$mode delphi}
+{$I _pathes.inc}
 interface
-uses vector, CDB, MatVectors, BaseClasses, Schedule, Spatial, Renderable, Collidable, xrstrings, xr_configs;
+uses vector, CDB, MatVectors, BaseClasses, Schedule, Spatial, Renderable, Collidable, xrstrings, xr_configs, Synchro;
 
 function Init():boolean; stdcall;
 type

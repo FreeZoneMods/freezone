@@ -1,5 +1,6 @@
 unit Servers;
-{$MODE Delphi}
+{$mode delphi}
+{$I _pathes.inc}
 interface
 uses xrstrings, PureServer, Clients, vector, Synchro, Games, Packets, CSE;
 function Init():boolean; stdcall;
@@ -90,7 +91,7 @@ const
   xrServer__ErrNoErr:cardinal=2;
 
 implementation
-uses basedefs, SrcCalls, Level, dynamic_caster, xr_debug, windows;
+uses basedefs, SrcCalls, Level, dynamic_caster, xr_debug;
 
 var
   IPureServer__SendTo:srcECXCallFunction;
@@ -275,27 +276,36 @@ const
   IPureServer__DisconnectClient_index:cardinal = $40;
   IPureServer__Flush_Clients_Buffers_index:cardinal = $1C;
   IPureServer__OnMessage_index:cardinal = $24;
+var
+   tmp:pointer;
 begin
- IPureServer__SendTo:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?SendTo@IPureServer@@QAEXVClientID@@AAVNET_Packet@@II@Z'), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger], 'SendTo', 'IPureServer'); ;
- IPureServer__SendTo_LL:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?SendTo_LL@IPureServer@@UAEXVClientID@@PAXIII@Z'), [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger, vtInteger], 'SendTo_LL', 'IPureServer'); ;
- IPureServer__SendBroadcast:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?SendBroadcast@IPureServer@@UAEXVClientID@@AAVNET_Packet@@I@Z'), [vtPointer, vtInteger, vtPointer, vtInteger], 'SendBroadcast', 'IPureServer'); ;
- IPureServer__GetClientAddress:=srcECXCallFunction.Create(GetProcAddress(xrNetServer, '?GetClientAddress@IPureServer@@QAE_NVClientID@@AAUip_address@@PAK@Z'), [vtPointer, vtInteger, vtPointer, vtPointer], 'GetClientAddress', 'IPureServer'); ;
+  result:=false;
+  tmp:=nil;
 
- virtual_IPureServer__DisconnectClient:=srcVirtualECXCallFunction.Create(IPureServer__DisconnectClient_index, [vtPointer, vtPointer, vtPChar], 'DisconnectClient','IPureServer');
- virtual_IPureServer__Flush_Clients_Buffers:=srcVirtualECXCallFunction.Create(IPureServer__Flush_Clients_Buffers_index, [vtPointer], 'Flush_Clients_Buffers','IPureServer');
- virtual_IPureServer__OnMessage:=srcVirtualECXCallFunction.Create(IPureServer__OnMessage_index, [vtPointer, vtPointer, vtInteger], 'OnMessage', 'IPureServer' );
- if xrGameDllType()=XRGAME_SV_1510 then begin
-   CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$5F370), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
-   xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2c6f20), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
- end else if xrGameDllType()=XRGAME_CL_1510 then begin
-   CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$60F00), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
-   xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2dbf90), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
- end;
+  if not InitSymbol(tmp, xrNetServer, '?SendTo@IPureServer@@QAEXVClientID@@AAVNET_Packet@@II@Z') then exit;
+  IPureServer__SendTo:=srcECXCallFunction.Create(tmp, [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger], 'SendTo', 'IPureServer'); ;
 
- result:= (IPureServer__SendTo.GetMyAddress()<>nil) and
-          (IPureServer__SendTo_LL.GetMyAddress()<>nil) and
-          (IPureServer__SendBroadcast.GetMyAddress()<>nil) and
-          (IPureServer__GetClientAddress.GetMyAddress()<>nil);
+  if not InitSymbol(tmp, xrNetServer, '?SendTo_LL@IPureServer@@UAEXVClientID@@PAXIII@Z') then exit;
+  IPureServer__SendTo_LL:=srcECXCallFunction.Create(tmp, [vtPointer, vtInteger, vtPointer, vtInteger, vtInteger, vtInteger], 'SendTo_LL', 'IPureServer'); ;
+
+  if not InitSymbol(tmp, xrNetServer, '?SendBroadcast@IPureServer@@UAEXVClientID@@AAVNET_Packet@@I@Z') then exit;
+  IPureServer__SendBroadcast:=srcECXCallFunction.Create(tmp, [vtPointer, vtInteger, vtPointer, vtInteger], 'SendBroadcast', 'IPureServer'); ;
+
+  if not InitSymbol(tmp, xrNetServer, '?GetClientAddress@IPureServer@@QAE_NVClientID@@AAUip_address@@PAK@Z') then exit;
+  IPureServer__GetClientAddress:=srcECXCallFunction.Create(tmp, [vtPointer, vtInteger, vtPointer, vtPointer], 'GetClientAddress', 'IPureServer'); ;
+
+  virtual_IPureServer__DisconnectClient:=srcVirtualECXCallFunction.Create(IPureServer__DisconnectClient_index, [vtPointer, vtPointer, vtPChar], 'DisconnectClient','IPureServer');
+  virtual_IPureServer__Flush_Clients_Buffers:=srcVirtualECXCallFunction.Create(IPureServer__Flush_Clients_Buffers_index, [vtPointer], 'Flush_Clients_Buffers','IPureServer');
+  virtual_IPureServer__OnMessage:=srcVirtualECXCallFunction.Create(IPureServer__OnMessage_index, [vtPointer, vtPointer, vtInteger], 'OnMessage', 'IPureServer' );
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$5F370), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
+    xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2c6f20), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    CID_Generator__tfGetID:=srcESICallFunctionWEAXArg.Create(pointer(xrGame+$60F00), [vtPointer, vtInteger], 'tfGetID', 'CID_Generator');
+    xrServer__ID_to_entity:=srcECXCallFunction.Create(pointer(xrGame+$2dbf90), [vtPointer, vtPointer], 'ID_to_entity', 'xrServer');
+  end;
+
+  result:=true;
 end;
 
 end.

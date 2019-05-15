@@ -1,10 +1,11 @@
 unit MainMenu;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses
-  xrstrings, Vector, GameSpySystem, srcCalls, BaseClasses, RenderDevice, UI;
+  xrstrings, Vector, GameSpySystem, srcCalls, BaseClasses, Device, UI;
 
 type
   Patch_Dawnload_Progress = packed record
@@ -69,9 +70,6 @@ const
   CMainMenu_EErrorDlg_ErrMax:cardinal =18;
   CMainMenu_EErrorDlg_ErrNoError:cardinal =18;
 
-const
-  IMainMenu__Activate_index:cardinal=$4;
-
 var
   virtual_IMainMenu__Activate:srcVirtualECXCallFunction;
 
@@ -80,6 +78,8 @@ function Init():boolean;
 implementation
 
 function Init():boolean;
+const
+  IMainMenu__Activate_index:cardinal=$4;
 begin
   virtual_IMainMenu__Activate:=srcVirtualECXCallFunction.Create(IMainMenu__Activate_index, [vtPointer, vtBoolean], 'IMainMenu', 'Activate');
   result:=true;

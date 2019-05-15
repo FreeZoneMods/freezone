@@ -1,5 +1,8 @@
 unit Keys;
 {$mode delphi}
+
+//Copied from BaseEngineFramework to avoid initialization in AdWrap a LOT of stuff!
+
 interface
 
 function ConvertToBase32(pcIn:PAnsiChar; nInBytes:integer):string; stdcall;

@@ -245,7 +245,7 @@ end;
 
 procedure TeleportCmdExecute(cmdstr:PChar); stdcall;
 var
-  args, tmp:string;
+  args:string;
   clid, raid:cardinal;
   pos,dir:FVector3;
 begin
@@ -258,15 +258,10 @@ begin
     exit;
   end;
 
-  args:=args+',';
-  FZCommonHelper.GetNextParam(args, tmp, ',');
-  pos.x:=FZCommonHelper.StringToFloatDef(trim(tmp), 0);
-
-  FZCommonHelper.GetNextParam(args, tmp, ',');
-  pos.y:=FZCommonHelper.StringToFloatDef(trim(tmp), 0);
-
-  FZCommonHelper.GetNextParam(args, tmp, ',');
-  pos.z:=FZCommonHelper.StringToFloatDef(trim(tmp), 0);
+  if not MatVectors.StringToFVector3(args, pos) then begin
+    FZLogMgr.Get.Write('Cannot parse position', FZ_LOG_ERROR);
+    exit;
+  end;
 
   dir.x:=0;
   dir.y:=1;
@@ -337,14 +332,73 @@ end;
 ////////////////////////////////////////////////////////////////////////////////
 procedure ChangeteamCmdInfo(args:PChar); stdcall;
 begin
-  strcopy(args, 'Change player''s team, arguments - client ID, team ID');
+  strcopy(args, 'Change player''s team and blocks teamchange, arguments - client ID, team ID (0 for leaving current team), time of blocking (-1 for unblocking)');
 end;
 
 procedure ChangeteamCmdExecute(cmdstr:PChar); stdcall;
 var
   args:string;
+  teamstr:string;
+  blocktime:integer;
   clid, raid:cardinal;
   team:integer;
+  cmd_teamchange, cmd_teamblock:FZAdminCommand;
+begin
+  args:=cmdstr;
+  raid:=ExtractRaId(args);
+  cmd_teamblock:=nil;
+  cmd_teamchange:=nil;
+
+  clid:=0;
+  if not ExtractIdFromConsoleCommandArgs(args, clid) then begin
+    FZLogMgr.Get.Write('Cannot parse ID', FZ_LOG_ERROR);
+    exit;
+  end;
+
+  if FZCommonHelper.GetNextParam(args, teamstr, ' ') then begin
+    //team is parsed
+    team:=strtointdef(teamstr, 0);
+    blocktime:=strtointdef(args, 0);
+  end else begin
+    team:=strtointdef(trim(args), 0);
+    blocktime:=0;
+  end;
+
+  if (team = 0) and (blocktime = 0) then begin
+    //print status
+    cmd_teamchange:=FZAdminChangeTeamCommand.Create(clid, team, true, GetConsoleReporter(raid));
+    cmd_teamblock:=FZAdminBlockChangeTeamCommand.Create(clid, blocktime, true, GetConsoleReporter(raid));
+    cmd_teamchange.SetNextStageCommand(cmd_teamblock);
+    AddAdminCommandToQueue(cmd_teamchange);
+    AddAdminCommandToQueue(cmd_teamblock);
+  end else begin
+    if (team<>0) then begin
+      cmd_teamchange:=FZAdminChangeTeamCommand.Create(clid, team, false, GetConsoleReporter(raid));
+      AddAdminCommandToQueue(cmd_teamchange);
+    end;
+
+    if (blocktime<>0) then begin
+      cmd_teamblock:=FZAdminBlockChangeTeamCommand.Create(clid, blocktime, false, GetConsoleReporter(raid));
+      if cmd_teamchange<>nil then begin
+        cmd_teamchange.SetNextStageCommand(cmd_teamblock);
+      end;
+      AddAdminCommandToQueue(cmd_teamblock);
+    end;
+  end;
+end;
+
+////////////////////////////////////////////////////////////////////////////////
+procedure ForceInvincibilityCmdInfo(args:PChar); stdcall;
+begin
+  strcopy(args, 'manages invincibility of the player, arguments - client ID and status: -1 (default behavior), 0 (always disabled), 1 (always enabled)');
+end;
+
+procedure ForceInvincibilityCmdExecute(cmdstr:PChar); stdcall;
+var
+  args:string;
+  clid, raid:cardinal;
+  status:integer;
+  needhelp:boolean;
 begin
   args:=cmdstr;
   raid:=ExtractRaId(args);
@@ -355,13 +409,9 @@ begin
     exit;
   end;
 
-  team:=strtointdef(trim(args), 0);
-  if team = 0 then begin
-    FZLogMgr.Get.Write('Invalid team', FZ_LOG_ERROR);
-    exit;
-  end;
-
-  AddAdminCommandToQueue(FZAdminChangeTeamCommand.Create(clid, team, GetConsoleReporter(raid)));
+  status:=0;
+  needhelp:=not FZCommonHelper.TryStringToInt(trim(args), status);
+  AddAdminCommandToQueue(FZAdminForceInvincibilityCommand.Create(clid, status, needhelp, GetConsoleReporter(raid)));
 end;
 
 function Init():boolean;
@@ -376,6 +426,7 @@ begin
   AddConsoleCommand('fz_setupdrate', @UpdrateCmdExecute, @UpdrateCmdInfo);
   AddConsoleCommand('fz_addmoney', @AddmoneyCmdExecute, @AddmoneyCmdInfo);
   AddConsoleCommand('fz_changeteam', @ChangeteamCmdExecute, @ChangeteamCmdInfo);
+  AddConsoleCommand('fz_invincibilityforce', @ForceInvincibilityCmdExecute, @ForceInvincibilityCmdInfo);
 
   AddConsoleCommand('fz_ban_hwid', @BanHwid_exec, @BanHwid_info);
   result:=true;

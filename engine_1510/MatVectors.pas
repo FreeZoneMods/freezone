@@ -1,5 +1,6 @@
 unit MatVectors;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 
   function Init():boolean; stdcall;
@@ -45,6 +46,13 @@ interface
     R:single;
   end;
 
+  type Fcolor = packed record
+    r:single;
+    g:single;
+    b:single;
+    a:single;
+  end;
+
   type PFVector2 = ^FVector2;
   type PFVector3 = ^FVector3;
   type PFVector4 = ^FVector4;
@@ -73,11 +81,12 @@ interface
   procedure v_zero(v:pFVector3);
   function v_projection_to_v(from_v, to_v:pfVector3):single; stdcall;
 
-
+  function StringToFVector3(s: string; var out_vec: FVector3): boolean; stdcall;
 
   procedure build_projection(m:pFMatrix4x4; hat:single; aspect:single; near_plane:single; far_plane:single);
 
 implementation
+uses CommonHelper, sysutils;
 
 const EPS:single = 0.0001;
 
@@ -270,9 +279,31 @@ begin
   end;
 end;
 
+function StringToFVector3(s: string; var out_vec: FVector3): boolean; stdcall;
+var
+  tmp:FVector3;
+  num:string;
+begin
+  s:=s + ',';
+  v_zero(@tmp);
 
+  result:=FZCommonHelper.GetNextParam(s, num, ',');
+  if not result then exit;
+  result:=FZCommonHelper.TryStringToFloat(trim(num), tmp.x);
+  if not result then exit;
 
+  result:=FZCommonHelper.GetNextParam(s, num, ',');
+  if not result then exit;
+  result:=FZCommonHelper.TryStringToFloat(trim(num), tmp.y);
+  if not result then exit;
 
+  result:=FZCommonHelper.GetNextParam(s, num, ',');
+  if not result then exit;
+  result:=FZCommonHelper.TryStringToFloat(trim(num), tmp.z);
+  if not result then exit;
+
+  out_vec:=tmp;
+end;
 
 procedure build_projection(m:pFMatrix4x4; hat:single; aspect:single; near_plane:single; far_plane:single);
 var

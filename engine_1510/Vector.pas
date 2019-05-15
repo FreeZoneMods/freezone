@@ -1,5 +1,6 @@
 unit Vector;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 function Init():boolean; stdcall;
 

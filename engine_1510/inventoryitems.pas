@@ -1,6 +1,7 @@
 unit InventoryItems;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses xrstrings, MatVectors, Hits, Physics, Vector;
@@ -102,6 +103,9 @@ type
     m_need_osoznanie_mode:cardinal;
   end;
   pCInventoryOwner = ^CInventoryOwner;
+
+const
+  INV_STATE_BLOCK_ALL:cardinal = $FFFFFFFF;
 
 implementation
 

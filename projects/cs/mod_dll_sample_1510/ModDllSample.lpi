@@ -31,35 +31,11 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="7">
+    <Units Count="1">
       <Unit0>
         <Filename Value="ModDllSample.lpr"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
-      <Unit1>
-        <Filename Value="..\..\..\shared\SourceKit\srcBase.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit1>
-      <Unit2>
-        <Filename Value="..\..\..\shared\SourceKit\srcCalls.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit2>
-      <Unit3>
-        <Filename Value="..\..\..\shared\SourceKit\srcFunctionsMgr.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit3>
-      <Unit4>
-        <Filename Value="..\..\..\shared\SourceKit\srcInjections.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit4>
-      <Unit5>
-        <Filename Value="..\..\..\shared\SourceKit\srcInjectMgr.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit5>
-      <Unit6>
-        <Filename Value="..\..\..\shared\SourceKit\srcLogging.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit6>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

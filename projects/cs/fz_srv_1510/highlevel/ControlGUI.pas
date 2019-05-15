@@ -3,8 +3,6 @@ unit ControlGUI;
 interface
 
 uses
-{  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ActnList, Clients, Menus, ExtCtrls, ComCtrls, math;}
   Interfaces, Classes, SysUtils, FileUtil,
   Forms, Controls, Graphics, Dialogs, Clients, ActnList, stdctrls, extctrls,
   Comctrls, windows, math, Types,LazUTF8,CLIPBrd;
@@ -31,8 +29,13 @@ const
   STR_KILL_PLAYER:PChar = 'Kill player';
   STR_ADD_MONEY:PChar = 'Add money';
   STR_SET_TEAM:PChar = 'Change team';
+  STR_BLOCK_TEAMCHANGE:PChar = 'Block teamchange';
   STR_RANK_UP:PChar = 'Rank Up';
   STR_RANK_DOWN:PChar = 'Rank Down';
+  STR_INVINCIBILITY:PChar = 'Invincibility';
+
+  STR_STOP_SERVER:PChar = 'Stop the server';
+  STR_GENERATE_CDKEY:PChar = 'Generate CDKEY';
 
   //Строки для лейблов под комбобоксом
   STR_REASON:PChar = 'Reason:';
@@ -42,8 +45,6 @@ const
   STR_TEXT:PChar='Text: ';
   STR_INPUT:PChar='Input: ';
   STR_OUTPUT:PChar='Output: ';
-  STR_STOP_SERVER:PChar = 'Stop the server';
-  STR_GENERATE_CDKEY:PChar = 'Generate CDKEY';      
   STR_POS:PChar = 'Position:';
   STR_DIR:PChar = 'Direction:';
   STR_COMMAND:PChar = 'Command:';   
@@ -66,9 +67,10 @@ const
   INFO_TEAMKILLS:PChar =        'Teamkills: ';
   INFO_DEATHES:PChar =          'Deathes: ';
   INFO_HWID:PChar =             'HWID: ';
-  INFO_ORIG_CDKEY:PChar =       'CDKEY: ';
+  INFO_ORIG_CDKEY:PChar =       'KEY: ';
   INFO_SACE:PChar =             'SACE: ';
-
+  INFO_INVINCIBILITY:PChar =    'Invincibility: ';
+  INFO_TEAMCHANGE:PChar=        'Teamchange: ';
 
 type
   TFZPlayerData = class
@@ -96,6 +98,8 @@ type
     team:integer;
     hwid:string;
     orig_cdkey:string;
+    invincibility_string:string;
+    teamchange_blocked:boolean;
 
     item_color:TColor;
 
@@ -114,10 +118,17 @@ type
   { TFZControlGUI }
 
   TFZControlGUI = class(TForm)
+    ActBlockTeamchange: TAction;
+    ActInvincibility: TAction;
     btn_clear_chat: TButton;
+    btn_inverse_chat: TButton;
+    btn_options_chat: TButton;
+    check_autorefresh: TCheckBox;
     lbl_hwid: TLabel;
+    lbl_teamchangeblock: TLabel;
     lbl_sace: TLabel;
     lbl_orig_cdkey: TLabel;
+    lbl_invincibility: TLabel;
     ListPlayers: TListBox;
     ActList: TActionList;
     ActRefresh: TAction;
@@ -162,12 +173,11 @@ type
     ActChangeUpdrate: TAction;
     ActOptValue: TAction;
     ActOptInputOutput: TAction;
-    check_autorefresh: TCheckBox;
     ActClosePanel: TAction;
     btn_close: TButton;
     btn_minimize: TButton;
     Panel1: TPanel;
-    Label3: TLabel;
+    lbl_fz_caption: TLabel;
     ActCheckSACE_Changename: TAction;
     ActBugUpdate: TAction;
     ActBugSpawn: TAction;
@@ -189,12 +199,16 @@ type
     lbl_teamkills: TLabel;
     lbl_deathes: TLabel;
     procedure ActBanExecute(Sender: TObject);
+    procedure ActBlockTeamchangeExecute(Sender: TObject);
+    procedure ActInvincibilityExecute(Sender: TObject);
     procedure ActRankDownExecute(Sender: TObject);
     procedure ActRankUpExecute(Sender: TObject);
     procedure ActRefreshExecute(Sender: TObject);
     procedure ActSetTeamExecute(Sender: TObject);
     procedure ActStopServerExecute(Sender: TObject);
     procedure btn_clear_chatClick(Sender: TObject);
+    procedure btn_inverse_chatClick(Sender: TObject);
+    procedure btn_options_chatClick(Sender: TObject);
     procedure chatlogContextPopup(Sender: TObject; {%H-}MousePos: TPoint;
       var Handled: Boolean);
     procedure FormShow(Sender: TObject);
@@ -250,7 +264,12 @@ type
     { Private declarations }
     _mousedown:boolean;
     _mousepoint:TPoint;
+
     procedure _ClearListPlayers();
+    procedure _ClearChat();
+    procedure _InverseChat();
+    procedure _ActualizeChatControlsPos();
+    procedure ChatOptionsState(display:boolean);
   public
     { Public declarations }
     procedure RefreshSelectedInfo();    
@@ -263,21 +282,128 @@ procedure Clean();
 var
   FZControlGUI: TFZControlGUI;
 implementation
-uses Console, PureServer, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, Chat, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog, MapGametypes, AdminCommands;
+uses Console, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog, MapGametypes, AdminCommands, GameSpy, Games, whitehashes, TeleportMgr, HitMgr;
 
 {$R *.lfm}
 
+type
+TFZChatDirectionMode = (FZ_CHAT_DIRECTION_NEW_UP, FZ_CHAT_DIRECTION_NEW_DOWN);
+
+{ TFZChatMessagesContainer }
+
+TFZChatMessagesContainer = class
+private
+  _chatdirection:TFZChatDirectionMode;
+  _lock:TRTLCriticalSection;
+  _messages: TStrings;
+
+  procedure Lock();
+  procedure Unlock();
+public
+  constructor Create();
+  destructor Destroy(); override;
+  procedure AddMessage(sender:string; msg:string);
+  procedure UpdateMessages(dest:TMemo);
+  procedure ClearMessages();
+  function GetChatDir():TFZChatDirectionMode;
+  procedure AssignDirection(mode:TFZChatDirectionMode);
+end;
+
+constructor TFZChatMessagesContainer.Create();
+begin
+  _messages:=TStringList.Create;
+  InitializeCriticalSection(_lock);
+
+  if FZConfigCache.Get().GetDataCopy().gui_chat_direction = 1 then begin
+    _chatdirection:=FZ_CHAT_DIRECTION_NEW_DOWN;
+  end else begin
+    _chatdirection:=FZ_CHAT_DIRECTION_NEW_UP;
+  end;
+end;
+
+destructor TFZChatMessagesContainer.Destroy();
+begin
+  DeleteCriticalSection(_lock);
+  _messages.Free;
+  inherited Destroy();
+end;
+
+procedure TFZChatMessagesContainer.AddMessage(sender: string; msg: string);
+begin
+  Lock();
+  if _chatdirection = FZ_CHAT_DIRECTION_NEW_UP then begin
+    _messages.Insert(0, '['+FZCommonHelper.GetCurTime+'] '+WinCPToUTF8(sender+': '+msg));
+  end else begin
+    _messages.Insert(_messages.Count, '['+FZCommonHelper.GetCurTime+'] '+WinCPToUTF8(sender+': '+msg));
+  end;
+  Unlock();
+end;
+
+procedure TFZChatMessagesContainer.UpdateMessages(dest:TMemo);
 var
-  ChatMessages: TStrings;
-  ChatMessagesLock:TRTLCriticalSection;
+  i:integer;
+begin
+  Lock();
+  if _chatdirection = FZ_CHAT_DIRECTION_NEW_UP then begin
+    dest.Lines := _messages;
+  end else begin
+    for i:=dest.Lines.Count to _messages.Count-1 do begin
+      dest.Lines.Add(_messages[i]);
+    end;
+  end;
+  Unlock();
+end;
+
+procedure TFZChatMessagesContainer.ClearMessages();
+begin
+  Lock();
+  _messages.Clear();
+  Unlock();
+end;
+
+function TFZChatMessagesContainer.GetChatDir(): TFZChatDirectionMode;
+begin
+  Lock();
+  result:=_chatdirection;
+  Unlock();
+end;
+
+procedure TFZChatMessagesContainer.AssignDirection(mode: TFZChatDirectionMode);
+var
+  i:integer;
+  tmp:string;
+begin
+  Lock();
+  if _chatdirection<>mode then begin
+    if _messages.Count > 1 then begin
+      for i:=0 to _messages.Count div 2 do begin
+        tmp:=_messages[i];
+        _messages[i]:=_messages[_messages.Count-i-1];
+        _messages[_messages.Count-i-1]:=tmp;
+      end;
+    end;
+    _chatdirection:=mode;
+  end;
+  Unlock();
+end;
+
+procedure TFZChatMessagesContainer.Lock();
+begin
+  EnterCriticalSection(_lock);
+end;
+
+procedure TFZChatMessagesContainer.Unlock();
+begin
+  LeaveCriticalSection(_lock);
+end;
+
+var
+  ChatMessagesContainer:TFZChatMessagesContainer;
 
 procedure AddChatMessageToList(name:pAnsiChar; msg:pAnsiChar);stdcall;
 begin
   if (name=nil) then name:='ServerAdmin';
-
-  EnterCriticalSection(ChatMessagesLock);
-  ChatMessages.Insert(0, '['+FZCommonHelper.GetCurTime+'] '+WinCPToUTF8(name+': '+msg));
-  LeaveCriticalSection(ChatMessagesLock);
+  ChatMessagesContainer.AddMessage(name, msg);
 end;
 
 procedure GUIConsoleCommand_Execute(arg:PChar); stdcall;
@@ -309,8 +435,7 @@ end;
 
 procedure Clean();
 begin
-  DeleteCriticalSection(ChatMessagesLock);
-  ChatMessages.Free;
+  ChatMessagesContainer.Free;
   FZControlGUI.Free;
 end;
 
@@ -323,19 +448,22 @@ procedure ReloadFZConfigs_execute({%H-}arg:PChar); stdcall;
 begin
   FZConfigCache.Get.Reload;
   FZTranslationMgr.Get.Reload;
+  FZHitMgr.Get.Reload();
   FZDownloadMgr.Get.Reload;
   FZCensor.Get.ReloadDefaultFile;
   FZSubnetBanList.Get.ReloadDefaultFile();
   FZItemCfgMgr.Get.Reload;
+  FZTeleportMgr.Get.Reload();
+  FZHashesMgr.Get.Reload;
   FZMapGametypesMgr.Get.Reload;
   FZPlayersConnectionMgr.Get.Reset;
+  GameSpy.OnConfigReloaded();
   FZLogMgr.Get.Write('Configs reloaded.', FZ_LOG_USEROUT);
 end;
 
 function Init():boolean; stdcall;
 begin
-  ChatMessages:=TStringList.Create;
-  InitializeCriticalSection(ChatMessagesLock);
+  ChatMessagesContainer:=TFZChatMessagesContainer.Create;
   FZControlGUI:=nil;
   AddConsoleCommand('fz_gui', @GUIConsoleCommand_Execute, @GUIConsoleCommand_Info);
   AddConsoleCommand('fz_reload_configs',@ReloadFZConfigs_execute, @ReloadFZConfigs_info);
@@ -370,6 +498,57 @@ begin
   self.ListPlayers.Clear;
 end;
 
+procedure TFZControlGUI._ClearChat();
+begin
+  ChatMessagesContainer.ClearMessages();
+  chatlog.Clear;
+  RefreshChat();
+end;
+
+procedure TFZControlGUI._InverseChat();
+begin
+  if ChatMessagesContainer.GetChatDir() = FZ_CHAT_DIRECTION_NEW_UP then begin
+    ChatMessagesContainer.AssignDirection(FZ_CHAT_DIRECTION_NEW_DOWN);
+  end else begin
+    ChatMessagesContainer.AssignDirection(FZ_CHAT_DIRECTION_NEW_UP);
+  end;
+
+  _ActualizeChatControlsPos();
+  chatlog.Clear;
+  RefreshChat();
+end;
+
+procedure TFZControlGUI._ActualizeChatControlsPos();
+var
+  dir:TFZChatDirectionMode;
+  options_top, chatsend_top:integer;
+begin
+  dir:=ChatMessagesContainer.GetChatDir();
+  options_top:=btn_options_chat.Top;
+  chatsend_top:=btn_sendmsg.Top;
+
+  if ((dir = FZ_CHAT_DIRECTION_NEW_UP) and (chatsend_top > options_top)) or ((dir = FZ_CHAT_DIRECTION_NEW_DOWN) and (chatsend_top < options_top)) then begin
+    edit_chatmsg.Top:=options_top+3;
+    btn_sendmsg.Top:=options_top;
+
+    btn_inverse_chat.Top:=chatsend_top;
+    btn_options_chat.Top:=chatsend_top;
+    btn_clear_chat.Top:=chatsend_top;
+  end;
+
+end;
+
+procedure TFZControlGUI.ChatOptionsState(display: boolean);
+begin
+  if display then begin
+    btn_inverse_chat.Visible:=true;
+    btn_clear_chat.Visible:=true;
+  end else begin
+    btn_inverse_chat.Visible:=false;
+    btn_clear_chat.Visible:=false;
+  end;
+end;
+
 procedure TFZControlGUI.RefreshSelectedInfo();
 var
   sel:TFZPlayerData;
@@ -387,11 +566,24 @@ begin
     lbl_updrate.Caption:=INFO_UPDRATE + inttostr(sel.updrate);
     lbl_money.Caption:=INFO_MONEY+inttostr(sel.money);
     lbl_rank.Caption:=INFO_RANK+inttostr(sel.rank);
-    lbl_team.Caption:=INFO_TEAM+inttostr(sel.team);
+
+    if dynamic_cast(GetCurrentGame(), 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_CaptureTheArtefact, false) <> nil then begin
+      lbl_team.Caption:=INFO_TEAM+inttostr(sel.team+1);
+    end else begin
+      lbl_team.Caption:=INFO_TEAM+inttostr(sel.team);
+    end;
+
     lbl_frags.Caption:=INFO_FRAGS+inttostr(sel.frags);
     lbl_selfkills.Caption:=INFO_SELFKILLS+inttostr(sel.selfkills);
     lbl_teamkills.Caption:=INFO_TEAMKILLS+inttostr(sel.teamkills);
     lbl_deathes.Caption:=INFO_DEATHES+inttostr(sel.deathes);
+    lbl_invincibility.Caption:=INFO_INVINCIBILITY+sel.invincibility_string;
+
+    if sel.teamchange_blocked then begin
+      lbl_teamchangeblock.Caption:=INFO_TEAMCHANGE+'blocked';
+    end else begin
+      lbl_teamchangeblock.Caption:=INFO_TEAMCHANGE+'allowed';
+    end;
 
     lbl_hwid.visible:= length(sel.hwid) > 0;
     lbl_hwid.Caption:=INFO_HWID+sel.hwid;
@@ -418,6 +610,8 @@ begin
     lbl_selfkills.Caption:=INFO_SELFKILLS;
     lbl_teamkills.Caption:=INFO_TEAMKILLS;
     lbl_deathes.Caption:=INFO_DEATHES;
+    lbl_invincibility.Caption:=INFO_INVINCIBILITY;
+    lbl_teamchangeblock.Caption:=INFO_TEAMCHANGE;
 
     lbl_hwid.visible:=false;
     lbl_hwid.Caption:=INFO_HWID;
@@ -436,13 +630,11 @@ var
   si:SCROLLINFO;
 begin
   if not self.visible then exit;
-  EnterCriticalSection(ChatMessagesLock);
-  chatlog.Lines:=ChatMessages;
-  LeaveCriticalSection(ChatMessagesLock);
-  
+  ChatMessagesContainer.UpdateMessages(chatlog);
+
   si.cbSize:=sizeof(SCROLLINFO);
   si.fMask:=SIF_ALL;
-  if GetScrollInfo(chatlog.Handle, SB_VERT, si) then begin
+  if (ChatMessagesContainer.GetChatDir() = FZ_CHAT_DIRECTION_NEW_UP) and GetScrollInfo(chatlog.Handle, SB_VERT, si) then begin
     if not TrackChat.Focused then begin
       //устанавливаем положение трека
       TrackChat.Max:=si.nMax-si.nMin{%H-}-si.nPage;
@@ -456,7 +648,6 @@ begin
     end;
   end;
 end;
-
 
 { TFZPlayerData }
 
@@ -489,6 +680,7 @@ begin
   self.team:=cl.ps.team;
   self.hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(false);
   self.orig_cdkey:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetOrigCdkeyHash();
+  self.teamchange_blocked:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsTeamChangeBlocked();
 
   if self.sace_status = SACE_NOT_FOUND then begin
     self.item_color:=clRed;
@@ -504,6 +696,14 @@ begin
     self.item_color:=clWhite;
   end;
 
+  case FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetForceInvincibilityStatus() of
+    FZ_INVINCIBLE_DEFAULT: self.invincibility_string:='default';
+    FZ_INVINCIBLE_FORCE_DISABLE: self.invincibility_string:='always off';
+    FZ_INVINCIBLE_FORCE_ENABLE: self.invincibility_string:='always on';
+  else
+    self.invincibility_string:=INFO_INVINCIBILITY+'unknown';
+  end;
+
 end;
 
 destructor TFZPlayerData.Destroy;
@@ -513,11 +713,19 @@ end;
 
 procedure TFZControlGUI.btn_clear_chatClick(Sender: TObject);
 begin
-  EnterCriticalSection(ChatMessagesLock);
-  ChatMessages.Clear();
-  chatlog.Clear;
-  RefreshChat();
-  LeaveCriticalSection(ChatMessagesLock);
+  _ClearChat();
+  ChatOptionsState(false);
+end;
+
+procedure TFZControlGUI.btn_inverse_chatClick(Sender: TObject);
+begin
+  _InverseChat();
+  ChatOptionsState(false);
+end;
+
+procedure TFZControlGUI.btn_options_chatClick(Sender: TObject);
+begin
+  ChatOptionsState(not (btn_clear_chat.Visible or btn_inverse_chat.Visible));
 end;
 
 procedure TFZControlGUI.chatlogContextPopup(Sender: TObject; MousePos: TPoint;
@@ -526,9 +734,10 @@ begin
   Handled:=true;
 end;
 
-
 procedure TFZControlGUI.FormShow(Sender: TObject);
 begin
+  ChatOptionsState(false);
+  _ActualizeChatControlsPos();
   ActRefresh.Execute;
 end;
 
@@ -587,10 +796,12 @@ begin
   combo_options.AddItem(STR_KILL_PLAYER, FZOptionsItem.Create(ActOptDisableAll, ActKill) as TObject);
   combo_options.AddItem(STR_ADD_MONEY, FZOptionsItem.Create(ActOptValue, ActMoneyAdd) as TObject);
   combo_options.AddItem(STR_SET_TEAM, FZOptionsItem.Create(ActOptValue, ActSetTeam) as TObject);
+  combo_options.AddItem(STR_BLOCK_TEAMCHANGE, FZOptionsItem.Create(ActOptValue, ActBlockTeamchange) as TObject);
 
   combo_options.AddItem(STR_RANK_UP, FZOptionsItem.Create(ActOptDisableAll, ActRankUp) as TObject);
   combo_options.AddItem(STR_RANK_DOWN, FZOptionsItem.Create(ActOptDisableAll, ActRankDown) as TObject);
   combo_options.AddItem(STR_TELEPORT_PLAYER, FZOptionsItem.Create(ActOptPosDir, ActTeleport) as TObject);
+  combo_options.AddItem(STR_INVINCIBILITY, FZOptionsItem.Create(ActOptValue, ActInvincibility) as TObject);
 
 {$IFDEF REVO}
   combo_options.AddItem(STR_GENERATE_CDKEY, FZOptionsItem.Create(ActOptValue, ActKeyGen) as TObject);
@@ -948,7 +1159,31 @@ begin
   if ListPlayers.ItemIndex>=0 then begin
     team:=strtointdef(edit1.Text, 0);
     if team<>0 then begin
-      AddAdminCommandToQueue(FZAdminChangeTeamCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, team, FZConsoleReporter.Create(0)));
+      AddAdminCommandToQueue(FZAdminChangeTeamCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, team, false, FZConsoleReporter.Create(0)));
+    end;
+  end;
+end;
+
+procedure TFZControlGUI.ActBlockTeamchangeExecute(Sender: TObject);
+var
+  time:integer;
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    time:=strtointdef(edit1.Text, 0);
+    if time<>0 then begin
+      AddAdminCommandToQueue(FZAdminBlockChangeTeamCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, time, false, FZConsoleReporter.Create(0)));
+    end;
+  end;
+end;
+
+procedure TFZControlGUI.ActInvincibilityExecute(Sender: TObject);
+var
+  status:integer;
+begin
+  if ListPlayers.ItemIndex>=0 then begin
+    status:=strtointdef(edit1.Text, -10);
+    if status<>-10 then begin
+      AddAdminCommandToQueue(FZAdminForceInvincibilityCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, status, false, FZConsoleReporter.Create(0)));
     end;
   end;
 end;
@@ -966,34 +1201,15 @@ end;
 procedure TFZControlGUI.ActTeleportExecute(Sender: TObject);
 var
   vp, vd:FVector3;
-  tmp, coord:string;
 begin
   if (ListPlayers.ItemIndex>=0) then begin
-
-    tmp:=edit1.Text;
-    tmp:=tmp+',';
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.x:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.y:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vp.z:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
-
-    tmp:=edit2.Text;
-    tmp:=tmp+',';
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.x:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.y:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
-
-    FZCommonHelper.GetNextParam(tmp, coord, ',');
-    vd.z:=FZCommonHelper.StringToFloatDef(trim(coord), 0);
-
-    AddAdminCommandToQueue(FZAdminTeleportPlayerCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, vp, vd, FZConsoleReporter.Create(0)));
+    v_zero(@vp);
+    v_zero(@vd);
+    if StringToFVector3(edit1.Text, vp) and StringToFVector3(edit2.Text, vd) then begin
+      AddAdminCommandToQueue(FZAdminTeleportPlayerCommand.Create((ListPlayers.Items.Objects[ListPlayers.ItemIndex] as TFZPlayerData).id.id, vp, vd, FZConsoleReporter.Create(0)));
+    end else begin
+      FZLogMgr.Get.Write('Cannot parse coordinates!', FZ_LOG_ERROR);
+    end;
   end;
 end;
 

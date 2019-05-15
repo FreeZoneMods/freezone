@@ -88,6 +88,13 @@ const
   GE_FILTER_GROUP:string = '[GE_FILTER] ';
   GE_FILTER_GROUP_BAD:string = '[GE_FILTER_BAD] ';
 
+procedure log_ge_error(message:string);
+begin
+  if FZConfigCache.Get.GetDataCopy().log_ge_filter_errors then begin
+    FZLogMgr.Get.Write(GE_FILTER_GROUP+message, FZ_LOG_ERROR);
+  end;
+end;
+
 { FZGEHandler }
 constructor FZGEHandler.Create(eventType: word; eventDescr: string);
 begin
@@ -139,9 +146,9 @@ function FZGELengthCheckerPacketHandler.ValidatePacket(sender:pxrClientData; rec
 begin
   result.success:=false;
   if receiver = nil then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'));
   end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(receiver, sender) then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'));
   end else begin
     result.success:=remained_cnt >= _counter;
 
@@ -161,15 +168,15 @@ begin
   if not FZCommonHelper.MovingPointerReader(pData, remained_cnt, @entity_id, sizeof(entity_id)) then begin
     FireBadEvent(sender, true, 'corrupted '+_eventDescr);
   end else if receiver=nil then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'), FZ_LOG_DBG);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'));
   end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(receiver, sender) then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'));
   end else begin
     entity:=EntityFromEid(@GetCurrentGame.base_game_sv_GameState, entity_id);
     if entity=nil then begin
-      FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for unexistent item ('+inttostr(entity_id)+')'), FZ_LOG_DBG);
+      log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for unexistent item ('+inttostr(entity_id)+')'));
     end else if (entity.ID_Parent<>$FFFF) and (entity.ID_Parent<>receiver.ID) then begin
-      FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for item ('+inttostr(entity_id)+') with existent parent'), FZ_LOG_ERROR);
+      log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for item ('+inttostr(entity_id)+') with existent parent'));
     end else begin
       result.success:=true;
     end;
@@ -192,19 +199,19 @@ begin
   if not FZCommonHelper.MovingPointerReader(pData, remained_cnt, @entity_id, sizeof(entity_id)) then begin
     FireBadEvent(sender, true, 'corrupted '+_eventDescr);
   end else if receiver=nil then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'));
   end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(receiver, sender) then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'));
   end else begin
     entity:=EntityFromEid(@GetCurrentGame.base_game_sv_GameState, entity_id);
     //Проверкой на локального клиента подавляем спам на GEG_PLAYER_ITEM2RUCK
     if (entity=nil) then begin
       if not IsLocalServerClient(@sender.base_IClient) then begin
-        if not _allow_unexistant then FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for unexistent item'), FZ_LOG_ERROR);
+        if not _allow_unexistant then log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for unexistent item'));
       end;
     end else if entity.ID_Parent<>receiver.ID then begin
       if not IsLocalServerClient(@sender.base_IClient) then begin
-        FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own item'), FZ_LOG_ERROR);
+        log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own item'));
       end;
     end else begin
       result.success:=true;
@@ -222,15 +229,15 @@ begin
   if not FZCommonHelper.MovingPointerReader(pData, remained_cnt, @addon_id, sizeof(addon_id)) then begin
     FireBadEvent(sender, true, 'corrupted '+_eventDescr);
   end else if receiver=nil then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'));
   end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(receiver, sender) then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'));
   end else begin
     addon:=EntityFromEid(@GetCurrentGame.base_game_sv_GameState, addon_id);
     if addon=nil then begin
-      FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for unexistent addon  ('+inttostr(addon_id)+')'), FZ_LOG_ERROR);
+      log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for unexistent addon  ('+inttostr(addon_id)+')'));
     end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(addon, sender) then begin
-      FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own addon ('+inttostr(addon_id)+')'), FZ_LOG_ERROR);
+      log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own addon ('+inttostr(addon_id)+')'));
     end else begin
       result.success:=true;
     end;
@@ -247,10 +254,10 @@ begin
   result.success:=false;
 
   if receiver=nil then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'));
     exit;
   end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(receiver, sender) then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'));
     exit;
   end;
 
@@ -276,9 +283,9 @@ begin
   result.success:=false;
 
   if receiver=nil then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for entity which doesn''t exist'));
   end else if not IsLocalServerClient(@sender.base_IClient) and not IsServerObjectControlledByClient(receiver, sender) then begin
-    FZLogMgr.Get.Write(GE_FILTER_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'), FZ_LOG_ERROR);
+    log_ge_error(GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent '+_eventDescr+' event for not own entity'));
   end else if FZCommonHelper.MovingPointerReader(pData, remained_cnt, @slot, sizeof(slot)) then begin
     if (slot < -1) or (slot > 10) then begin
       FireBadEvent(sender, true, 'invalid '+_eventDescr);
@@ -311,13 +318,13 @@ var
 begin
   result:=false;
   if p=nil then begin
-    FZLogMgr.Get().Write(GE_FILTER_GROUP+'No packet in CheckGameEventPacket', FZ_LOG_ERROR);
+    log_ge_error('No packet in CheckGameEventPacket');
     exit;
   end;
 
   cld:=ID_to_client(clid);
   if cld = nil then begin
-    FZLogMgr.Get().Write(GE_FILTER_GROUP+'Packet from unexistent client with ID='+inttostr(clid), FZ_LOG_ERROR);
+    log_ge_error('Packet from unexistent client with ID='+inttostr(clid));
     exit;
   end;
 
@@ -342,6 +349,9 @@ begin
     result:=true;
   end else begin
     result:=GEHandlers[header.eventtype].ValidatePacket(cld, receiver, pData, remained_cnt).success;
+    if not result and FZConfigCache.Get().GetDataCopy().log_events then begin
+      FZLogMgr.Get().Write(GenerateMessageForClientId(clid, ': filtered '+inttostr(header.eventtype)+' for #'+inttostr(header.destination)), FZ_LOG_ERROR);
+    end;
   end;
 
 end;

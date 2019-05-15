@@ -11,8 +11,12 @@ procedure WriteMapnameToClientRequest({%H-}old_name:PChar; buf:pointer; BufWrite
 function OnAuthSend(cl:pgsclient_t):boolean; stdcall;
 function IsSameCdKeyValidated():boolean; stdcall;
 
+procedure OnConfigReloaded();
+
+function Init():boolean; stdcall;
+
 implementation
-uses sysutils, TranslationMgr, ConfigCache, ServerStuff;
+uses sysutils, TranslationMgr, ConfigCache, ServerStuff, Console, strutils, LogMgr;
 
 function IsClientAuthNotRequired:boolean; stdcall;
 begin
@@ -38,6 +42,10 @@ begin
   result:=FZConfigCache.Get.GetDataCopy.is_same_cdkey_validated;
 end;
 
+procedure OnConfigReloaded();
+begin
+end;
+
 procedure WriteHostnameToClientRequest(old_hostname:PChar; buf:pointer; BufWriter:gsBufWriter); stdcall;
 var
   new_hostname:string;
@@ -57,6 +65,12 @@ begin
   GetMapStatus(name, ver, link);
   new_name:=FZTranslationMgr.Get.TranslateSingle(name);
   BufWriter(buf, PChar(new_name));
+end;
+
+function Init():boolean; stdcall;
+begin
+  OnConfigReloaded();
+  result:=true;
 end;
 
 end.

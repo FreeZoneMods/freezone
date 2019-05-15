@@ -1,5 +1,7 @@
 unit srcInjectMgr;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 uses srcInjections, SyncObjs;
 

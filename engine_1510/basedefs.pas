@@ -1,11 +1,14 @@
 unit basedefs;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 
 function Init():boolean; stdcall;
 procedure Free(); stdcall;
 
 function xrGameDllType():cardinal;
+function InitSymbol(var dest:pointer; module:cardinal; symbolname:PAnsiChar):boolean; stdcall;
 
 var
   xrGame:cardinal;
@@ -16,10 +19,10 @@ var
   xrAPI:cardinal;
 
 const
-  difficulty_gdNovice:single=0;
-  difficulty_gdStalker:single=1;
-  difficulty_gdVeteran:single=2;
-  difficulty_gdMaster:single=3;
+  difficulty_gdNovice:integer=0;
+  difficulty_gdStalker:integer=1;
+  difficulty_gdVeteran:integer=2;
+  difficulty_gdMaster:integer=3;
 
   badchars:PAnsiChar = '~!@#$%^&?*/\|"+- ';
 
@@ -36,7 +39,7 @@ const
   XRGAME_UNKNOWN:cardinal = $FFFFFFFF;
 
 implementation
-uses Windows;
+uses Windows, sysutils;
 
 function xrGameDllType():cardinal;
 var
@@ -53,16 +56,60 @@ begin
   end;
 end;
 
+function InitSymbol(var dest:pointer; module:cardinal; symbolname:PAnsiChar):boolean; stdcall;
+var
+  module_name:string;
+begin
+  result:=false;
+  dest:=GetProcAddress(module, symbolname);
+  if dest = nil then begin
+    if module = xrEngine then begin
+      module_name:=XENGINE_EXE;
+    end else if module = xrGame then begin
+      module_name:=XRGAME_DLL;
+    end else if module = xrGameSpy then begin
+      module_name:=XRGAMESPY_DLL;
+    end else if module = xrCore then begin
+      module_name:=XRCORE_DLL;
+    end else if module = xrNetServer then begin
+      module_name:=XRNETSERVER_DLL;
+    end else if module = xrAPI then begin
+      module_name:=XRAPI_DLL;
+    end else begin
+      module_name:='[unknown]';
+    end;
+    MessageBox(0, PAnsiChar('Module "'+module_name+'" [0x'+inttohex(module,8)+'] doesn''t export symbol "'+symbolname+'"'), 'FreeZone', MB_ICONERROR or MB_OK);
+    exit;
+  end;
+  result:=true;
+end;
+
+function InitModule(var dest:cardinal; name:PAnsiChar; reload:boolean):boolean; stdcall;
+begin
+  result:=false;
+  if reload then begin
+    dest:=LoadLibrary(name);
+  end else begin
+    dest:=GetModuleHandle(name);
+  end;
+
+  if dest = 0 then begin
+    MessageBox(0, PAnsiChar('Module "'+name+'" cannot be found'), 'FreeZone', MB_ICONERROR or MB_OK);
+    exit;
+  end;
+  result:=true;
+end;
+
 function Init():boolean; stdcall;
 begin
-  xrEngine:=GetModuleHandle(XENGINE_EXE);
-  xrGame:=LoadLibrary(XRGAME_DLL);
-  xrGameSpy:=LoadLibrary(XRGAMESPY_DLL);
-  xrCore:=LoadLibrary(XRCORE_DLL);
-  xrNetServer:=LoadLibrary(XRNETSERVER_DLL);
-  xrAPI:=LoadLibrary(XRAPI_DLL);
-
-   result:=true;
+  result:=false;
+  if not InitModule(xrEngine, XENGINE_EXE, false) then exit;
+  if not InitModule(xrGame, XRGAME_DLL, true) then exit;
+  if not InitModule(xrGameSpy, XRGAMESPY_DLL, true) then exit;
+  if not InitModule(xrCore, XRCORE_DLL, true) then exit;
+  if not InitModule(xrNetServer, XRNETSERVER_DLL, true) then exit;
+  if not InitModule(xrAPI, XRAPI_DLL, true) then exit;
+  result:=true;
 end;
 
 procedure Free(); stdcall;
@@ -75,3 +122,4 @@ begin
 end;
 
 end.
+

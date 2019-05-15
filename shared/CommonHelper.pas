@@ -23,6 +23,8 @@ type
     class function HexToInt(hex:string; default:cardinal=0):cardinal;
     class function TryHexToInt(hex:string; var out_val:cardinal):boolean;
     class function StringToFloatDef(str:string; def:single):single;
+    class function TryStringToFloat(str:string; var out_val:single):boolean;
+    class function TryStringToInt(str:string; var out_val:integer):boolean;
     class function FloatToString(value: single; precision:integer = 4; digits:integer = 2): string;
     class function ReadFileAsString(fname:string; var str:string):boolean;
     class function MovingPointerReader(var src: pointer; var srcsize: cardinal; dst: pointer; sizetoread: cardinal):boolean;
@@ -284,6 +286,50 @@ begin
   formatSettings.DecimalSeparator:='.';
   formatSettings.ThousandSeparator:=' ';
   result:=strtofloatdef(str, def, formatSettings);
+end;
+
+class function FZCommonHelper.TryStringToFloat(str: string; var out_val: single): boolean;
+var
+  r:single;
+const
+  fake_value_1:single = 107.0;
+  fake_value_2:single = 204.0;
+begin
+  result:=true;
+
+  r:=StringToFloatDef(str, fake_value_1);
+  if r = fake_value_1 then begin
+    r:=StringToFloatDef(str, fake_value_2);
+    if r = fake_value_2 then begin
+      result:=false;
+    end else begin
+      out_val:=r;
+    end;
+  end else begin
+    out_val:=r;
+  end;
+end;
+
+class function FZCommonHelper.TryStringToInt(str: string; var out_val: integer): boolean;
+var
+  r:integer;
+const
+  fake_value_1:integer = -1965;
+  fake_value_2:integer = -2954;
+begin
+  result:=true;
+
+  r:=StrToIntDef(str, fake_value_1);
+  if r = fake_value_1 then begin
+    r:=StrToIntDef(str, fake_value_2);
+    if r = fake_value_2 then begin
+      result:=false;
+    end else begin
+      out_val:=r;
+    end;
+  end else begin
+    out_val:=r;
+  end;
 end;
 
 class function FZCommonHelper.FloatToString(value: single; precision:integer; digits:integer): string;

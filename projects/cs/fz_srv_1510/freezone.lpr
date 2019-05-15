@@ -1,10 +1,16 @@
 library freezone;
 {$MODE Delphi}
-uses
-  windows, Forms, Interfaces, lazcontrols,
-  srcBase, srcInjections, appinit, basedefs, ConfigMgr, Console, LogMgr,
-  PlayersConnectionLog, ge_filter, PlayersConsole, AdminCommands;
 
+uses
+  Forms, Interfaces, lazcontrols,     //For GUI
+  BaseEngineFrameworkFunctions,       //must be the first unit to properly init unit pathes
+
+  appinit,                            //Initialization of all modules
+  windows,                            //for messageboxes with errors
+  srcBase, srcInjections, basedefs,   //Setting up debug mode & cleanup
+  Console,                            //for hacking votes
+  ConfigMgr,
+  LogMgr;
 
 {$R *.res}
 
@@ -59,8 +65,8 @@ begin
 
   Init();
 
-  CApplication_destructor:=GetProcAddress(xrEngine, '??1CApplication@@QAE@XZ');
-  if CApplication_destructor<>nil then begin
+  CApplication_destructor:=nil;
+  if InitSymbol(CApplication_destructor, xrEngine, '??1CApplication@@QAE@XZ') then begin
     srcCleanupInjection.Create(CApplication_destructor, @Cleanup, 5);
   end;
   srcKit.Get.InjectAll;

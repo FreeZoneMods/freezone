@@ -1,5 +1,6 @@
 unit Synchro;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses Windows;
 

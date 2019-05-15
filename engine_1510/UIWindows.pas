@@ -1,6 +1,7 @@
 unit UIWindows;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses Fonts, MatVectors, xrstrings;

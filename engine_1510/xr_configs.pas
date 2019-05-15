@@ -1,6 +1,7 @@
 unit xr_configs;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses srcCalls;
@@ -20,21 +21,29 @@ ppCIniFile = ^pCInifile;
 var
   CInifile__r_string:srcECXCallFunction;
   CInifile__line_exist:srcECXCallFunction;
+  CInifile__section_exist:srcECXCallFunction;
   ppSettings:ppCIniFile;
 
 function game_ini_line_exist(section:string; key:string):boolean;
+function game_ini_section_exist(section:string):boolean;
 function game_ini_read_string(section:string; key:string):string;
 function game_ini_read_string_def(section:string; key:string; def:string = ''):string;
 function game_ini_read_int_def(section:string; key:string; def:integer):integer;
+function game_ini_read_float_def(section:string; key:string; def:single):single;
 
 function Init():boolean;
 
 implementation
-uses basedefs, windows, sysutils;
+uses basedefs, sysutils, CommonHelper;
 
 function game_ini_line_exist(section:string; key:string):boolean;
 begin
   result:=CInifile__line_exist.Call([ppSettings^, PAnsiChar(section), PAnsiChar(key)]).VBoolean;
+end;
+
+function game_ini_section_exist(section: string): boolean;
+begin
+  result:=CInifile__section_exist.Call([ppSettings^, PAnsiChar(section)]).VBoolean;
 end;
 
 function game_ini_read_string(section:string; key:string):string;
@@ -56,13 +65,30 @@ begin
   result:=strtointdef(game_ini_read_string_def(section, key, ''), def);
 end;
 
+function game_ini_read_float_def(section:string; key:string; def:single):single;
+begin
+  result:=FZCommonHelper.StringToFloatDef(game_ini_read_string_def(section, key, ''), def);
+end;
+
 function Init():boolean;
+var
+  tmp:pointer;
 begin
   result:=false;
-  ppSettings:=GetProcAddress(xrCore,'?pSettings@@3PAVCInifile@@A');
-  CInifile__r_string:=srcECXCallFunction.Create(GetProcAddress(xrCore, '?r_string@CInifile@@QAEPBDPBD0@Z'), [vtPointer, vtPChar, vtPChar], 'r_string', 'CInifile');
-  CInifile__line_exist:=srcECXCallFunction.Create(GetProcAddress(xrCore, '?line_exist@CInifile@@QAEHPBD0@Z'), [vtPointer, vtPChar, vtPChar], 'line_exist', 'CInifile');
-  result:=(ppSettings<>nil) and (CInifile__r_string.GetMyAddress()<>nil) and (CInifile__line_exist.GetMyAddress()<>nil);
+  tmp:=nil;
+
+  if not InitSymbol(ppSettings, xrCore, '?pSettings@@3PAVCInifile@@A') then exit;
+
+  if not InitSymbol(tmp, xrCore, '?r_string@CInifile@@QAEPBDPBD0@Z') then exit;
+  CInifile__r_string:=srcECXCallFunction.Create(tmp, [vtPointer, vtPChar, vtPChar], 'r_string', 'CInifile');
+
+  if not InitSymbol(tmp, xrCore, '?line_exist@CInifile@@QAEHPBD0@Z') then exit;
+  CInifile__line_exist:=srcECXCallFunction.Create(tmp, [vtPointer, vtPChar, vtPChar], 'line_exist', 'CInifile');
+
+  if not InitSymbol(tmp, xrCore, '?section_exist@CInifile@@QAEHPBD@Z') then exit;
+  CInifile__section_exist:=srcECXCallFunction.Create(tmp, [vtPointer, vtPChar], 'section_exist', 'CInifile');
+
+  result:=true;
 end;
 
 end.

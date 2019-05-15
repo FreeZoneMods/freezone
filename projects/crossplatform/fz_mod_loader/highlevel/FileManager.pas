@@ -79,6 +79,8 @@ type
     procedure UpdateEntryAction(i:cardinal; action:FZFileItemAction );                                          //обновить действие для файла
 
     procedure SetDlMode(mode:FZDlMode);
+
+    procedure Copy(from:FZFiles);
   end;
 
 function GetFileChecks(path:string; out_check_params:pFZCheckParams; needMD5:boolean):boolean;
@@ -626,6 +628,24 @@ end;
 procedure FZFiles.SetDlMode(mode: FZDlMode);
 begin
   _mode:=mode;
+end;
+
+procedure FZFiles.Copy(from: FZFiles);
+var
+  i:integer;
+  filedata:pFZFileItemData;
+begin
+  Clear();
+  _cb_userdata:=from._cb_userdata;
+  _callback:=from._callback;
+  _parent_path:=from._parent_path;
+  _mode:=from._mode;
+
+  for i:=0 to from._files.Count-1 do begin
+    New(filedata);
+    filedata^ := pFZFileItemData(from._files.Items[i])^;
+    _files.Add(filedata);
+  end;
 end;
 
 end.

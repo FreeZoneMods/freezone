@@ -1,8 +1,12 @@
-cd crossplatform
+cd cs
 start clean.bat
 cd ..
 
-cd cs
+cd cop
+start clean.bat
+cd ..
+
+cd crossplatform
 start clean.bat
 cd ..
 exit

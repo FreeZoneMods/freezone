@@ -1,5 +1,6 @@
 unit Schedule;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 
 type ISheduled = packed record

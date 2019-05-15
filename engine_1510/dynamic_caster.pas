@@ -1,5 +1,6 @@
 unit dynamic_caster;
 {$MODE Delphi}
+{$I _pathes.inc}
 interface
 
 function dynamic_cast(inptr:pointer; vfdelta:cardinal; srctype:cardinal; targettype:cardinal; isreference:boolean):pointer; stdcall;
@@ -9,6 +10,7 @@ var
   //XRGAME-based
   RTTI_CSE_Abstract:cardinal;
   RTTI_CSE_ALifeItemWeaponMagazined:cardinal;
+  RTTI_CSE_ALifeCreatureActor:cardinal;
   RTTI_IClient:cardinal;
   RTTI_xrClientData:cardinal;
   RTTI_game_sv_CaptureTheArtefact:cardinal;
@@ -29,6 +31,7 @@ var
   RTTI_CWeaponMagazinedWGrenade:cardinal;
   RTTI_CWeaponKnife:cardinal;
   RTTI_CWeaponAmmo:cardinal;
+  RTTI_CShootingObject:cardinal;
 
 
 
@@ -68,6 +71,7 @@ begin
   if xrGameDllType()=XRGAME_SV_1510 then begin
     RTTI_CSE_Abstract:= $5C33D0;
     RTTI_CSE_ALifeItemWeaponMagazined:=$5e39ec;
+    RTTI_CSE_ALifeCreatureActor:=$5c45d0;
 
     RTTI_IClient:= $5E0A14;
     RTTI_xrClientData:= $5E0A2C;
@@ -90,11 +94,14 @@ begin
     RTTI_CWeaponMagazinedWGrenade:=$5DEDE8;
 
     RTTI_CWeaponAmmo:=$5DF59C;
+    RTTI_CShootingObject:=$5D5F90;
 
     _RTTI_function:=$4BF2DC;
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     RTTI_CSE_Abstract:= $5DF3F0;
     RTTI_CSE_ALifeItemWeaponMagazined:= $600b34;
+    RTTI_CSE_ALifeCreatureActor:=$5e0b58;
+
     RTTI_IClient:= $5FD194;
     RTTI_xrClientData:= $5FD1AC;
 
@@ -115,6 +122,7 @@ begin
     RTTI_CWeaponMagazinedWGrenade:=$5FB568;
 
     RTTI_CWeaponAmmo:=$5FBD1C;
+    RTTI_CShootingObject:=$5F2728;
 
     _RTTI_function:=$4D563C;
   end;

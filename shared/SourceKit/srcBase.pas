@@ -1,5 +1,7 @@
 unit srcBase;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 uses srcInjectMgr, srcLogging, srcInjections, srcFunctionsMgr, srcCalls;
 

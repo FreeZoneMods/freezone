@@ -1,6 +1,7 @@
 unit Statistics;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 type

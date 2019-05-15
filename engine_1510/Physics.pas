@@ -1,5 +1,6 @@
 unit Physics;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses Objects;
 

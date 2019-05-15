@@ -5,6 +5,12 @@ uses Clients, windows, Servers,PureServer,MatVectors,Packets, xrstrings, Games, 
 
 type
 
+FZPlayerInvincibleStatus = (
+                              FZ_INVINCIBLE_DEFAULT, //Состояние по умолчанию - определяется игрой;
+                              FZ_INVINCIBLE_FORCE_ENABLE, //Форсировать включение
+                              FZ_INVINCIBLE_FORCE_DISABLE //форсировать выключение
+                           );
+
 { FZPlayerStateAdditionalInfo }
 
 FZPlayerStateAdditionalInfo = class
@@ -32,6 +38,8 @@ protected
   _speechmute_start_time:cardinal;
   _speechmute_time_period:cardinal;
 
+  _teamchangeblock_start_time:cardinal;
+  _teamchangeblock_time_period:cardinal;
 
   _badwords_counter:cardinal;
 
@@ -42,17 +50,26 @@ protected
 
   _last_ping_warning_time:cardinal;
 
+  _slots_block_counter:cardinal;
+
   _hwid:string;
+  _hwhash:string;
   _orig_cdkey_hash:string;
   _hwid_received:boolean;
+
+  _force_invincibility_cur:FZPlayerInvincibleStatus;
+  _force_invincibility_next:FZPlayerInvincibleStatus;
 
   {%H-}constructor Create(ps:pgame_PlayerState);
 public
   procedure SetUpdrate(d:cardinal);
-  procedure SetHwId(hwid:string);
+  procedure SetHwId(hwid:string; hwhash:string);
   function GetHwId(allow_old:boolean):string;
+  function GetHwHash(allow_old:boolean):string;
   procedure SetOrigCdkeyHash(hash:string);
   function GetOrigCdkeyHash():string;
+
+  function GetHwhashSaceStatus():integer;
 
   property updrate:cardinal read _updrate write SetUpdrate;
   property last_ready:cardinal read _last_ready_time write _last_ready_time;
@@ -68,6 +85,9 @@ public
 
   procedure OnDisconnected();
 
+  function GetForceInvincibilityStatus():FZPlayerInvincibleStatus;
+  function SetForceInvincibilityStatus(status:FZPlayerInvincibleStatus):boolean;
+  function UpdateForceInvincibilityStatus():FZPlayerInvincibleStatus;
 
   function IsMuted():boolean;
   procedure UnMute();
@@ -77,6 +97,14 @@ public
 
   function OnChatMessage():cardinal;
   function OnSpeechMessage():cardinal;
+
+  function IsTeamChangeBlocked():boolean;
+  procedure BlockTeamChange(time:cardinal);
+  procedure UnBlockTeamChange();
+  function OnTeamChange():boolean;
+
+  function SlotsBlockCount(delta:integer = 0):cardinal;
+  procedure ResetSlotsBlockCount();
 
   function OnBadWordsInChat():cardinal;
   destructor Destroy; override;
@@ -91,13 +119,21 @@ procedure FromPlayerStateClear({%H-}ps:pgame_PlayerState); stdcall;
 procedure DisconnectPlayer(cl:pIClient; reason:string); stdcall;
 function MutePlayer(cl: pxrClientData; time:cardinal):boolean; stdcall;
 function UnMutePlayer(cl: pxrClientData):boolean; stdcall;
+function BlockPlayerTeamChange(cl: pxrClientData; time:cardinal):boolean; stdcall;
+function UnBlockPlayerTeamChange(cl: pxrClientData): boolean; stdcall;
+function IsPlayerTeamChangeBlocked(cl: pxrClientData): boolean; stdcall;
 procedure SetUpdRate(cl: pxrClientData; updrate:cardinal); stdcall;
 procedure KillPlayer(cl: pxrClientData); stdcall;
 procedure AddMoney(cl: pxrClientData; amount:integer); stdcall;
 function ChangePlayerRank(cl: pxrClientData; delta:integer):boolean; stdcall;
+function IsSlotsBlocked(cl: pxrClientData): boolean; stdcall;
+function GetForceInvincibilityStatus(cl: pxrClientData): FZPlayerInvincibleStatus; stdcall;
+function SetForceInvincibilityStatus(cl: pxrClientData; status:FZPlayerInvincibleStatus):boolean;
+function UpdateForceInvincibilityStatus(cl: pxrClientData):FZPlayerInvincibleStatus; //переключить на следующее состояние, вернуть его
 
-procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
+procedure SetHwId(cl: pxrClientData; hwid: string; hwhash:string); stdcall;
 function GetHwId(cl: pxrClientData; allow_old:boolean): string; stdcall;
+function GetHwHash(cl: pxrClientData; allow_old:boolean): string; stdcall;
 procedure SetOrigCdkeyHash(cl: pxrClientData; hash:string);
 function GetOrigCdkeyHash(cl: pxrClientData):string;
 
@@ -118,7 +154,7 @@ function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdca
 procedure xrServer__OnCL_Disconnected_appendToPacket({%H-}p:pNET_Packet; pname:ppshared_str; cl:pxrClientData); stdcall;
 function game_sv_mp__OnPlayerDisconnect_is_message_needed(name:PAnsiChar):boolean; stdcall;
 
-procedure SendTeleportPlayerPacket(client:pxrClientData; pos:pFVector3; dir:pFVector3); stdcall;
+function SendTeleportPlayerPacket(client:pxrClientData; pos:pFVector3; dir:pFVector3):boolean; stdcall;
 
 function BeforeSpawnBoughtItems_DM(ps:pgame_PlayerState; game:pgame_sv_Deathmatch):boolean; stdcall;
 function BeforeSpawnBoughtItems_CTA(ps:pgame_PlayerState; game:pgame_sv_CaptureTheArtefact):boolean; stdcall;
@@ -130,20 +166,32 @@ function GenerateMessageForClientId(id:cardinal; message: string):string;
 
 function IsWeaponKnife(item:pCSE_Abstract):boolean;stdcall;
 
+procedure UpdatePlayer(cld:pxrClientData);
+
+//function CheckPlayerInvincible(ps:pgame_PlayerState; onshot:cardinal):boolean; stdcall;
+
+function IsInvincibilityControlledByFZ(ps:pgame_PlayerState):boolean; stdcall;
+function IsInvinciblePersistAfterShot(ps:pgame_PlayerState):boolean; stdcall;
+
 implementation
-uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug, Banned, xr_time;
+uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug, Banned, xr_time, SACE_interface, whitehashes, TeleportMgr;
 
 const
   SHOP_GROUP = '[SHOP] ';
 
-procedure SetHwId(cl: pxrClientData; hwid: string); stdcall;
+procedure SetHwId(cl: pxrClientData; hwid: string; hwhash:string); stdcall;
 begin
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetHwId(hwid);
+  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetHwId(hwid, hwhash);
 end;
 
 function GetHwId(cl: pxrClientData; allow_old: boolean): string; stdcall;
 begin
   result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(allow_old);
+end;
+
+function GetHwHash(cl: pxrClientData; allow_old: boolean): string; stdcall;
+begin
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwHash(allow_old);
 end;
 
 procedure SetOrigCdkeyHash(cl: pxrClientData; hash: string);
@@ -216,11 +264,43 @@ var
   newrank:integer;
 begin
   result:=false;
+  if cl.ps = nil then exit;
+
   newrank:=cl.ps.rank+delta;
   if (newrank >= 0) and (newrank < integer(_RANK_COUNT)) then begin
     cl.ps.rank:=byte(newrank);
+    game_signal_Syncronize();
     result:=true;
   end;
+end;
+
+function IsSlotsBlocked(cl: pxrClientData): boolean; stdcall;
+begin
+  result:=true;
+  if cl.ps = nil then exit;
+
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SlotsBlockCount() > 0;
+end;
+
+function GetForceInvincibilityStatus(cl: pxrClientData): FZPlayerInvincibleStatus; stdcall;
+begin
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetForceInvincibilityStatus();
+end;
+
+function SetForceInvincibilityStatus(cl: pxrClientData; status: FZPlayerInvincibleStatus): boolean;
+begin
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetForceInvincibilityStatus(status);
+end;
+
+function UpdateForceInvincibilityStatus(cl: pxrClientData):FZPlayerInvincibleStatus;
+begin
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).UpdateForceInvincibilityStatus();
+end;
+
+function IsPlayerTeamChangeBlocked(cl: pxrClientData): boolean; stdcall;
+begin
+  R_ASSERT(cl <> nil, 'client is nil', 'IsPlayerTeamChangeBlocked');
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsTeamChangeBlocked();
 end;
 
 procedure SetUpdRate(cl: pxrClientData; updrate: cardinal); stdcall;
@@ -254,6 +334,35 @@ begin
       time:=cardinal(newtime);
     end;
     FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).AssignMute(time);
+    result:=true;
+  end;
+end;
+
+function UnBlockPlayerTeamChange(cl: pxrClientData): boolean; stdcall;
+begin
+  R_ASSERT(cl <> nil, 'client is nil',  'UnBlockPlayerTeamChange');
+  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsTeamChangeBlocked();
+
+  if result then begin
+    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).UnBlockTeamChange();
+  end;
+end;
+
+function BlockPlayerTeamChange(cl: pxrClientData; time: cardinal): boolean; stdcall;
+var
+  newtime:int64;
+begin
+  R_ASSERT(cl <> nil, 'client is nil',  'BlockPlayerTeamChange');
+
+  result:=false;
+  if time>0 then begin
+    newtime:= int64(time) * MSecsPerSec;
+    if newtime > $FFFFFFFF then begin
+      time:=$FFFFFFFF;
+    end else begin
+      time:=cardinal(newtime);
+    end;
+    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).BlockTeamChange(time);
     result:=true;
   end;
 end;
@@ -331,6 +440,23 @@ begin
   self._hwid_received:=false;
 end;
 
+function FZPlayerStateAdditionalInfo.GetForceInvincibilityStatus(): FZPlayerInvincibleStatus;
+begin
+  result:=_force_invincibility_cur;
+end;
+
+function FZPlayerStateAdditionalInfo.SetForceInvincibilityStatus(status: FZPlayerInvincibleStatus):boolean;
+begin
+  result:=(_force_invincibility_cur<>status);
+  if result then _force_invincibility_next:=status;
+end;
+
+function FZPlayerStateAdditionalInfo.UpdateForceInvincibilityStatus(): FZPlayerInvincibleStatus;
+begin
+  result:=_force_invincibility_next;
+  _force_invincibility_cur:=_force_invincibility_next;
+end;
+
 procedure FZPlayerStateAdditionalInfo.AssignVoteMute(time: cardinal);
 var
   new_period:cardinal;
@@ -380,13 +506,21 @@ begin
   _speechmute_start_time:=0;
   _speechmute_time_period:=0;
 
+  _teamchangeblock_start_time:=0;
+  _teamchangeblock_time_period:=0;
+  _slots_block_counter:=0;
+
   _updrate:=0;
   _last_ready_time:=0;
   _last_ping_warning_time:=0;
 
   _hwid:='';
+  _hwhash:='';
   _orig_cdkey_hash:='';
   _hwid_received:=false;
+
+  _force_invincibility_cur:=FZ_INVINCIBLE_DEFAULT;
+  _force_invincibility_next:=FZ_INVINCIBLE_DEFAULT;
 end;
 
 destructor FZPlayerStateAdditionalInfo.Destroy;
@@ -460,6 +594,95 @@ begin
   finally
     LeaveCriticalSection(_lock);
   end;
+end;
+
+function FZPlayerStateAdditionalInfo.IsTeamChangeBlocked(): boolean;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if self._teamchangeblock_start_time = 0 then begin
+      result:=false;
+    end else begin
+      result:=FZCommonHelper.GetTimeDeltaSafe(self._teamchangeblock_start_time)<self._teamchangeblock_time_period;
+      if not result then begin
+        self._teamchangeblock_start_time:=0;
+      end;
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.BlockTeamChange(time: cardinal);
+var
+  new_period:cardinal;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if not IsTeamChangeBlocked() then begin
+      self._teamchangeblock_start_time:=FZCommonHelper.GetGameTickCount();
+      self._teamchangeblock_time_period:=0;
+    end;
+
+    new_period:=self._teamchangeblock_time_period+time;
+
+    if new_period<self._teamchangeblock_time_period then begin
+      self._teamchangeblock_time_period:=$FFFFFFFF;
+    end else begin;
+      self._teamchangeblock_time_period:=new_period
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.UnBlockTeamChange();
+begin
+  EnterCriticalSection(_lock);
+  try
+    self._teamchangeblock_start_time:=0;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.OnTeamChange(): boolean;
+var
+  _data:FZCacheData;
+begin
+  _data:=FZConfigCache.Get.GetDataCopy();
+  result:=false;
+  EnterCriticalSection(_lock);
+  try
+    result:=not IsTeamChangeBlocked();
+    if result and (_data.teamchange_minimal_period > 0) then begin
+      BlockTeamChange(_data.teamchange_minimal_period);
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.SlotsBlockCount(delta: integer):cardinal;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if (delta < 0) and ((-1)*delta > _slots_block_counter) then begin
+      _slots_block_counter:=0;
+    end else if ( _slots_block_counter > $FFFFFFFF - delta) then begin
+      _slots_block_counter:=$FFFFFFFF;
+    end else begin
+      _slots_block_counter:=_slots_block_counter+delta;
+    end;
+    result:=_slots_block_counter;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.ResetSlotsBlockCount();
+begin
+  _slots_block_counter:=0;
 end;
 
 function FZPlayerStateAdditionalInfo.IsSpeechMuted(): boolean;
@@ -599,10 +822,11 @@ begin
   self._updrate:=d;
 end;
 
-procedure FZPlayerStateAdditionalInfo.SetHwId(hwid: string);
+procedure FZPlayerStateAdditionalInfo.SetHwId(hwid: string; hwhash:string);
 begin
   if not _hwid_received then begin
     self._hwid:=hwid;
+    self._hwhash:=hwhash;
     self._hwid_received:=true;
   end;
 end;
@@ -613,6 +837,15 @@ begin
     result:='';
   end else begin
     result:=_hwid;
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.GetHwHash(allow_old: boolean): string;
+begin
+  if not allow_old and not self._hwid_received then begin
+    result:='';
+  end else begin
+    result:=_hwhash;
   end;
 end;
 
@@ -627,6 +860,18 @@ begin
     result:='';
   end else begin
     result:=_orig_cdkey_hash;
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.GetHwhashSaceStatus(): integer;
+var
+  h:string;
+begin
+  h:=GetHwHash(false);
+  if length(h) > 0 then begin
+    result:=GetSACEStatusForHash(PAnsiChar(GetSACEStatusForHash));
+  end else begin
+    result:=SACE_NOT_FOUND;
   end;
 end;
 
@@ -675,17 +920,28 @@ begin
   SendPacketToClient(srv, cl_id, @p);
 end;
 
-procedure SendTeleportPlayerPacket(client:pxrClientData; pos:pFVector3; dir:pFVector3); stdcall;
+function SendTeleportPlayerPacket(client:pxrClientData; pos:pFVector3; dir:pFVector3):boolean; stdcall;
 var
   p:NET_Packet;
+  owner_entity:pCSE_Abstract;
 begin
   R_ASSERT(client<>nil, 'client is nil', 'SendTeleportPlayerPacket');
 
+  result:=false;
   if GetPureServer() = nil then exit;
+
+  owner_entity:=client.owner;
+  if (owner_entity = nil) or (dynamic_cast(owner_entity, 0, xrGame+RTTI_CSE_Abstract, xrGame+RTTI_CSE_ALifeCreatureActor, false) = nil) then exit;
+
   MakeMovePlayerPacket(@p, client.ps.GameID, pos, dir);
   //Заставим пропускать апдейт-пакеты от игрока до подтверждения о перемещении (чтобы старые апдейты не "перебили" позицию)
-  client.net_PassUpdates:=false;
+  client.net_PassUpdates:=0;
+  //Запишем в серверный объект игрока его новую позицию (чтобы до получения ответа о перемещении в вызовах ReplicatePlayersStateToPlayer в AH отправлялась новая позиция)
+  owner_entity.o_Position := pos^;
+  owner_entity.o_Angle := dir^;
+
   SendPacketToClient(GetPureServer(), client.base_IClient.ID.id, @p);
+  result:=true;
 end;
 
 function CanChangeName(client:pxrClientData):boolean; stdcall;
@@ -913,25 +1169,67 @@ procedure OnClientReady(srv:pIPureServer; cl:pxrClientData); stdcall;
 var
   hwid:string;
   banned_cl:pbanned_client;
+  cfg:FZCacheData;
+  sace_status:integer;
+  error_message:string;
+  cdkey:string;
 begin
+  //Клиент прогрузился и окончательно готов к игре, не путать с сигналами при респавне
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid:=true;
   FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._connected_and_ready:=true;
 
   if not IsLocalServerClient(@cl.base_IClient) then begin
+    error_message:='';
+    cdkey:=PAnsiChar(@cl.base_IClient.m_guid[0]);
     hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(false);
-    if (length(hwid) = 0) then begin
-      if FZConfigCache.Get().GetDataCopy().strict_hwid then begin
-        FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no assigned HWID, disconnecting'), FZ_LOG_INFO);
-        IPureServer__DisconnectClient(srv, @cl.base_IClient, FZTranslationMgr.Get().TranslateSingle('fz_invalid_hwid'));
-      end;
-    end else begin
-      banned_cl:=CheckDigestForBan(@GetCurrentGame.m_cdkey_ban_list, hwid);
-      if banned_cl<>nil then begin
-        FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'is FZ-banned ('+get_string_value(@banned_cl.client_hexstr_digest)+') by '+get_string_value(@banned_cl.admin_name)+', disconnecting'), FZ_LOG_INFO);
-        IPureServer__DisconnectClient(GetPureServer(), @cl.base_IClient, FZTranslationMgr.Get().TranslateSingle('fz_player_banned')+' '+get_string_value(@banned_cl.admin_name)+', '+FZTranslationMgr.Get().TranslateSingle('fz_expiration_date')+' '+TimeToString(banned_cl.ban_end_time));
+
+    if length(error_message) = 0 then begin
+      cfg:=FZConfigCache.Get().GetDataCopy();
+
+      //Сначала проверяем наличие HWID, и если он есть - копируем его в m_guid (особенно если тот пустой - это при локальном сервере)
+      //на этом этапе коннекта хеш уже был гарантированно проверем геймспаем (но еще пока не был добавлен в BattleEye - добавляется сразу после выхода из этой процедуры, после врезки)
+      //Если выставлять m_guid в ProcessHwidPacket, то есть риск, что валидация геймспая произойдет позже, и перезапишет hwid значением ключа
+      if (length(hwid) = 0) then begin
+        if cfg.strict_hwid then begin
+          //проверяем, разрешено ли игроку с таким CDKEY заходить к нам без hwid
+          if not FZHashesMgr.Get.IsHashWhitelisted(cdkey) then begin
+            FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no assigned HWID, disconnecting'), FZ_LOG_INFO);
+            error_message:=FZTranslationMgr.Get().TranslateSingle('fz_invalid_hwid');
+          end else begin
+            FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no HWID, but CDKEY '+cdkey+' is whitelisted'), FZ_LOG_INFO);
+          end;
+        end;
       end else begin
-        FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id,'has approved FZ digest ['+hwid+']'), FZ_LOG_INFO);
+        banned_cl:=CheckDigestForBan(@GetCurrentGame.m_cdkey_ban_list, hwid);
+        if banned_cl<>nil then begin
+          FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'is FZ-banned ('+get_string_value(@banned_cl.client_hexstr_digest)+') by '+get_string_value(@banned_cl.admin_name)+', disconnecting'), FZ_LOG_INFO);
+          error_message:=FZTranslationMgr.Get().TranslateSingle('fz_player_banned')+' '+get_string_value(@banned_cl.admin_name)+', '+FZTranslationMgr.Get().TranslateSingle('fz_expiration_date')+' '+TimeToString(banned_cl.ban_end_time);
+        end else begin
+          FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id,'has approved FZ digest ['+hwid+']'), FZ_LOG_INFO);
+          //все хорошо, в m_guid отправляется hwhash
+          strcopy(@cl.base_IClient.m_guid[0], PAnsiChar(GetHwHash(cl, false)));
+        end;
       end;
+    end;
+
+    if (length(error_message) = 0) and cfg.strict_sace then begin
+      sace_status:=GetSACEStatus(cl.base_IClient.ID.id);
+      if sace_status = SACE_UNSUPPORTED then begin
+        FZLogMgr.Get.Write('strict_sace parameter doesn''t work - seems like your server has no installed SACE!', FZ_LOG_ERROR);
+      end else if sace_status<>SACE_OK then begin
+        if (length(hwid) > 0) and FZHashesMgr.Get.IsHashWhitelisted(hwid) then begin
+          FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no SACE, but HWID '+hwid+' is whitelisted'), FZ_LOG_INFO);
+        end else if (length(cdkey)>0) and FZHashesMgr.Get.IsHashWhitelisted(cdkey) then begin
+          FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no SACE, but CDKEY '+cdkey+' is whitelisted'), FZ_LOG_INFO);
+        end else begin
+          FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'has no SACE, disconnecting'), FZ_LOG_INFO);
+          error_message:=FZTranslationMgr.Get().TranslateSingle('fz_required_sace');
+        end;
+      end;
+    end;
+
+    if length(error_message) <> 0 then begin
+      IPureServer__DisconnectClient(srv, @cl.base_IClient, error_message);
     end;
   end;
 end;
@@ -1529,6 +1827,55 @@ begin
   ammos.Free();
 end;
 
+procedure UpdatePlayer(cld: pxrClientData);
+var
+  owner_entity:pCSE_Abstract;
+  pos, dir:FVector3;
+
+  old_state, new_state:FZPlayerInvincibleStatus;
+  cur_inv_flag:boolean;
+begin
+  R_ASSERT(cld<>nil, 'UpdatePlayer got nil player');
+
+  //Проверим состояние форсирования неуязвимости
+  old_state:=GetForceInvincibilityStatus(cld);
+  new_state:=UpdateForceInvincibilityStatus(cld);
+  cur_inv_flag:=(cld.ps.flags__ and GAME_PLAYER_FLAG_INVINCIBLE) <> 0;
+
+  if new_state = FZ_INVINCIBLE_FORCE_ENABLE then begin
+    //Неуязвимость всегда должна быть включена
+    if not cur_inv_flag then begin
+      cld.ps.flags__:=cld.ps.flags__ or GAME_PLAYER_FLAG_INVINCIBLE;
+      game_signal_Syncronize();
+    end;
+  end else if new_state = FZ_INVINCIBLE_FORCE_DISABLE then begin
+    //Неуязвимость в любом случае должна быть выключена
+    if cur_inv_flag then begin
+      cld.ps.flags__:=cld.ps.flags__ and (not GAME_PLAYER_FLAG_INVINCIBLE);
+      game_signal_Syncronize();
+    end;
+  end else if new_state <> old_state then begin
+    //Новый стейт в нашем случае может быть ТОЛЬКО дефолтовым!
+    R_ASSERT(new_state = FZ_INVINCIBLE_DEFAULT, 'Invincibility is in unexpected state');
+
+    //Выключаем неуязвимость от греха подальше
+    if cur_inv_flag then begin
+      cld.ps.flags__:=cld.ps.flags__ and (not GAME_PLAYER_FLAG_INVINCIBLE);
+      game_signal_Syncronize();
+    end;
+  end;
+
+  //Проверим, не зашел ли игрок в зону телепорта, и телепортнем его при необходимости
+  if (cld.net_Ready<>0) and (cld.net_PassUpdates<>0) and (cld.ps.flags__ and GAME_PLAYER_FLAG_VERY_VERY_DEAD = 0) then begin
+    owner_entity:=cld.owner;
+    if (owner_entity <> nil) and (dynamic_cast(owner_entity, 0, xrGame+RTTI_CSE_Abstract, xrGame+RTTI_CSE_ALifeCreatureActor, false) <> nil)  then begin
+      if FZTeleportMgr.Get().IsTeleportingNeeded(@owner_entity.o_Position, @owner_entity.o_Angle, @pos, @dir) then begin
+        SendTeleportPlayerPacket(cld, @pos, @dir);
+      end;
+    end;
+  end;
+end;
+
 function CanPlayerBuyNow(cl:pxrClientData):boolean;stdcall;
 begin
  result:=false;
@@ -1584,6 +1931,22 @@ begin
   ip:='';
   name:=GetNameAndIpByClientId(id, ip);
   result:='Player "'+name+'" (ID='+inttostr(id)+', IP='+ip+') '+message;
+end;
+
+function IsInvincibilityControlledByFZ(ps:pgame_PlayerState):boolean; stdcall;
+var
+  buf:FZPlayerStateAdditionalInfo;
+begin
+  R_ASSERT(ps<>nil, 'ps is nil', 'IsInvincibilityControlledByFZ');
+
+  buf:=FZPlayerStateAdditionalInfo(ps.FZBuffer);
+  result:=buf.GetForceInvincibilityStatus()<>FZ_INVINCIBLE_DEFAULT;
+end;
+
+function IsInvinciblePersistAfterShot(ps:pgame_PlayerState):boolean; stdcall;
+begin
+  R_ASSERT(ps<>nil, 'ps is nil', 'IsInvinciblePersistAfterShot');
+  result:=FZConfigCache.Get().GetDataCopy().invincibility_after_shot;
 end;
 
 end.

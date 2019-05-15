@@ -25,28 +25,44 @@ end;
 FZAdminCommand = class
   _reporter:FZAdminCommandInfoReporter;
   _name:string;
+  //Одна консольная команда может выдавать последовательность FZAdminCommand
+  //Чтобы при неуспехе одной стадии в последовательности абортить все последующие стадии, мы сохраняем ссылку на следующую
+  //Почему на следующую? Потому что предыдущей может уже не существовать в памяти, когда мы попробуем к ней обратиться
+  //При взведенном флаге неуспеха каждая стадия сетит флаг неуспеха у следующей
+  _next_command:FZAdminCommand;
+  _previous_command_failed:boolean;
+
   procedure Report(s:string; iserror:boolean);
+  procedure OnCommandFailed();
+
+protected
+  function Execute_internal():boolean; virtual; abstract;
 public
   constructor Create(reporter:FZAdminCommandInfoReporter);
   destructor Destroy(); override;
-  function Execute():boolean; virtual; abstract;
+  function Execute():boolean;
   function GetName():string;
+  procedure SetNextStageCommand(cmd:FZAdminCommand);
 end;
 
 { FZSimpleConsoleCmd }
 FZSimpleConsoleCmd = class (FZAdminCommand)
   _cmd:string;
+
+protected
+  function Execute_internal():boolean; override;
 public
   constructor Create(cmd:string; reporter:FZAdminCommandInfoReporter);
-  function Execute():boolean; override;
 end;
 
 { FZReportPlayersCommand }
 FZReportPlayersCommand = class (FZAdminCommand)
   _first_symbs:string;
+
+protected
+  function Execute_internal():boolean; override;
 public
   constructor Create(first_symbs:string; reporter:FZAdminCommandInfoReporter);
-  function Execute():boolean; override;
 end;
 
 { FZAdminBanHwidCommand }
@@ -55,9 +71,11 @@ FZAdminBanHwidCommand = class (FZAdminCommand)
   _raid:cardinal;
   _time:cardinal;
   _reason:string;
+
+protected
+  function Execute_internal():boolean; override;
 public
   constructor Create(id:cardinal; radmin_id:cardinal; time:cardinal; reason:string; reporter:FZAdminCommandInfoReporter);
-  function Execute():boolean; override;
 end;
 
 { FZAdminSinglePlayerAction }
@@ -65,14 +83,14 @@ FZAdminSinglePlayerAction = class(FZAdminCommand)
   _id:cardinal;
 protected
   function DoAction(player:pxrClientData):boolean; virtual; abstract;
+
+  function Execute_internal():boolean; override;
 public
   constructor Create(id:cardinal; reporter:FZAdminCommandInfoReporter);
-  function Execute():boolean; override;
 end;
 
 { FZAdminRankChangeCommand }
 FZAdminRankChangeCommand = class (FZAdminSinglePlayerAction)
-  _id:cardinal;
   _delta:integer;
 protected
   function DoAction(player:pxrClientData):boolean; override;
@@ -147,10 +165,31 @@ end;
 { FZAdminChangeTeamCommand }
 FZAdminChangeTeamCommand = class(FZAdminSinglePlayerAction)
   _team:integer;
+  _printstatus:boolean;
 protected
   function DoAction(player:pxrClientData):boolean; override;
 public
-  constructor Create(id:cardinal; team:integer; reporter:FZAdminCommandInfoReporter);
+  constructor Create(id:cardinal; team:integer; printstatus:boolean; reporter:FZAdminCommandInfoReporter);
+end;
+
+{ FZAdminBlockChangeTeamCommand }
+FZAdminBlockChangeTeamCommand = class(FZAdminSinglePlayerAction)
+  _time:integer;
+  _printstatus:boolean;
+protected
+  function DoAction(player:pxrClientData):boolean; override;
+public
+  constructor Create(id:cardinal; time:integer; printstatus:boolean; reporter:FZAdminCommandInfoReporter);
+end;
+
+{ FZAdminForceInvincibilityCommand }
+FZAdminForceInvincibilityCommand = class(FZAdminSinglePlayerAction)
+  _status:integer;
+  _printhelp:boolean;
+protected
+  function DoAction(player:pxrClientData):boolean; override;
+public
+  constructor Create(id:cardinal; status:integer; printhelp:boolean; reporter:FZAdminCommandInfoReporter);
 end;
 
 function Init():boolean;
@@ -285,6 +324,8 @@ constructor FZAdminCommand.Create(reporter: FZAdminCommandInfoReporter);
 begin
   inherited Create();
   _reporter:=reporter;
+  _previous_command_failed:=false;
+  _next_command:=nil;
 end;
 
 procedure FZAdminCommand.Report(s: string; iserror: boolean);
@@ -293,15 +334,45 @@ begin
   _reporter.Report(s, iserror);
 end;
 
+procedure FZAdminCommand.OnCommandFailed();
+begin
+  if _next_command<>nil then begin
+    _next_command._previous_command_failed:=true;
+  end;
+end;
+
 destructor FZAdminCommand.Destroy();
 begin
   _reporter.Free();
   inherited;
 end;
 
+function FZAdminCommand.Execute(): boolean;
+begin
+  result:=true;
+
+  if _previous_command_failed then begin
+    FZLogMgr.Get().Write('Admin cmd '+GetName()+' cancelled - previous stage failed', FZ_LOG_DBG);
+    result:=false;
+  end;
+
+  if result then begin
+    result:=Execute_internal();
+  end;
+
+  if not result then begin
+    OnCommandFailed();
+  end;
+end;
+
 function FZAdminCommand.GetName(): string;
 begin
   result:=_name;
+end;
+
+procedure FZAdminCommand.SetNextStageCommand(cmd: FZAdminCommand);
+begin
+  _next_command:=cmd;
 end;
 
 { FZSimpleConsoleCmd }
@@ -311,7 +382,7 @@ begin
   _name:='CONSOLE_CMD';
 end;
 
-function FZSimpleConsoleCmd.Execute(): boolean;
+function FZSimpleConsoleCmd.Execute_internal(): boolean;
 begin
   ExecuteConsoleCommand(PAnsiChar(_cmd));
   result:=true;
@@ -346,7 +417,7 @@ begin
   _name:='REPORT_PLAYERS';
 end;
 
-function FZReportPlayersCommand.Execute(): boolean;
+function FZReportPlayersCommand.Execute_internal(): boolean;
 begin
   Report('--- FZ players list start ---', false);
   ForEachClientDo(@PrintID_callback, nil, PAnsiChar(_first_symbs), self);
@@ -365,7 +436,7 @@ begin
   _name:='BAN_HWID';
 end;
 
-function FZAdminBanHwidCommand.Execute(): boolean;
+function FZAdminBanHwidCommand.Execute_internal(): boolean;
 var
   client, radmin:pxrClientData;
   hwid, tmp:string;
@@ -421,7 +492,7 @@ begin
   _id:=id;
 end;
 
-function FZAdminSinglePlayerAction.Execute():boolean;
+function FZAdminSinglePlayerAction.Execute_internal():boolean;
 var
   cld:pxrClientData;
 begin
@@ -581,24 +652,135 @@ begin
 end;
 
 { FZAdminChangeTeamCommand }
-constructor FZAdminChangeTeamCommand.Create(id: cardinal; team: integer; reporter: FZAdminCommandInfoReporter);
+constructor FZAdminChangeTeamCommand.Create(id: cardinal; team: integer; printstatus:boolean; reporter: FZAdminCommandInfoReporter);
 begin
   inherited Create(id, reporter);
   _team:=team;
+  _printstatus:=printstatus;
   _name:='CHANGE_TEAM';
 end;
 
 function FZAdminChangeTeamCommand.DoAction(player: pxrClientData): boolean;
 var
   game:pgame_sv_mp;
+  curteam:integer;
 begin
   result:=false;
   game:=GetCurrentGame();
+  if _printstatus then begin
+    curteam:=player.ps.team;
+    //В CTA команды имеют номера 0 и 1 - учитываем это
+    if dynamic_cast(game, 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_CaptureTheArtefact, false) <> nil then begin
+      curteam:=curteam+1;
+    end;
 
-  if (_team < 1) or (_team > 2) then begin
+    Report(GenerateMessageForClientId(_id, 'is currently member of team '+inttostr(curteam)), false);
+    result:=true;
+  end else if (_team < 1) or (_team > 2) then begin
     Report('Invalid team index '+inttostr(_team), true);
+  end else if IsLocalServerClient(@player.base_IClient) then begin
+    Report('Can''t change team for local server client '+inttostr(player.base_IClient.ID.id), true);
+  end else if (player.net_Ready=0) or IsSlotsBlocked(player) then begin
+    Report('Can''t change team for this player now, try to do it later', true);
   end else if game<>nil then begin
-    game_OnPlayerSelectTeam(game, player.base_IClient.ID.id, _team);
+    //В CTA команды имеют номера 0 и 1 - учитываем это
+    if dynamic_cast(game, 0, xrGame+RTTI_game_sv_mp, xrGame+RTTI_game_sv_CaptureTheArtefact, false) <> nil then begin
+      _team:=_team - 1;
+    end;
+
+    if (player.ps.team <> _team) then begin
+      game_OnPlayerSelectTeam(game, player.base_IClient.ID.id, _team);
+      //Выберем скин, чтобы не беспокоить игрока лишними экранами
+      game_OnPlayerSelectSkin(game, player.base_IClient.ID.id, player.ps.skin);
+      result:=true;
+    end else begin
+      Report('Player is a member of the specified team!', true);
+    end;
+  end;
+end;
+
+{ FZAdminBlockChangeTeamCommand }
+constructor FZAdminBlockChangeTeamCommand.Create(id: cardinal; time: integer; printstatus:boolean; reporter: FZAdminCommandInfoReporter);
+begin
+  inherited Create(id, reporter);
+  _time:=time;
+  _printstatus:=printstatus;
+  _name:='BLOCK_TEAMCHANGE';
+end;
+
+function FZAdminBlockChangeTeamCommand.DoAction(player: pxrClientData): boolean;
+begin
+  if _printstatus then begin
+    if IsPlayerTeamChangeBlocked(player) then begin
+      Report(GenerateMessageForClientId(_id, 'is currently NOT allowed to change team'), false);
+    end else begin
+      Report(GenerateMessageForClientId(_id, 'is currently ALLOWED to change team'), false);
+    end;
+    result:=true;
+  end else if _time > 0 then begin
+    result:=BlockPlayerTeamChange(player, _time);
+    if not result then begin
+      Report('Error while blocking team change for client '+inttostr(_id), true);
+    end else begin
+      Report('Team successfully locked for client '+inttostr(_id), false);
+    end;
+  end else if _time < 0 then begin
+    result:=UnBlockPlayerTeamChange(player);
+    if not result then begin
+      Report('Error while unblocking team change for client '+inttostr(_id), true);
+    end else begin
+      Report('Team successfully unlocked for client '+inttostr(_id), false);
+    end;
+  end else begin
+    result:=false;
+    Report('0 is invalid time for blocking team change', true);
+  end;
+end;
+
+{ FZAdminForceInvincibilityCommand }
+constructor FZAdminForceInvincibilityCommand.Create(id: cardinal; status: integer; printhelp:boolean; reporter: FZAdminCommandInfoReporter);
+begin
+  inherited Create(id, reporter);
+  _status:=status;
+  _printhelp:=printhelp;
+  _name:='FORCE_INVINCIBILITY';
+end;
+
+function FZAdminForceInvincibilityCommand.DoAction(player: pxrClientData): boolean;
+var
+  transformed_status:FZPlayerInvincibleStatus;
+  str:string;
+begin
+  if _printhelp then begin
+    str:=GenerateMessageForClientId(player.base_IClient.ID.id, 'has invincibility status ');
+    case GetForceInvincibilityStatus(player) of
+      FZ_INVINCIBLE_DEFAULT:       str:=str+'-1 (original behavior)';
+      FZ_INVINCIBLE_FORCE_DISABLE: str:=str+'0 (always disabled)';
+      FZ_INVINCIBLE_FORCE_ENABLE:  str:=str+'1 (always enabled)';
+    else
+      str:=str+'(unknown)';
+    end;
+
+    Report(str, false);
+    result:=true
+  end else begin
+    result:=true;
+    case _status of
+      -1: transformed_status:=FZ_INVINCIBLE_DEFAULT;
+       0: transformed_status:=FZ_INVINCIBLE_FORCE_DISABLE;
+       1: transformed_status:=FZ_INVINCIBLE_FORCE_ENABLE;
+    else
+      Report('Invalid argument "'+inttostr(_status)+'" - expected 1, 0 or -1', true);
+      result:=false;
+    end;
+
+    if result then begin
+      result:=SetForceInvincibilityStatus(player, transformed_status);
+    end;
+
+    if not result then begin
+      Report('Can''t change force invincibility status for player '+inttostr(_id)+' to '+inttostr(_status), true);
+    end;
   end;
 end;
 

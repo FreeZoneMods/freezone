@@ -101,6 +101,7 @@ var
   dest_teamid, msg_type, from_teamid:word;
   pNick, pMsg:PAnsiChar;
   len_nick, len_message, time:cardinal;
+  cfg:FZCacheData;
   msg_struct:FZChatMsg;
   gui_str:string;
   buf:FZPlayerStateAdditionalInfo;
@@ -165,14 +166,17 @@ begin
   end;
 
   //манипул€ци€ цветами чата
-  if dest_teamid = $FFFF then begin
-    from_teamid:=0;
-  end else begin
-    from_teamid := sender.ps.team;
+  cfg:=FZConfigCache.Get().GetDataCopy();
+  if cfg.new_chat_color_scheme then begin
+    if dest_teamid = $FFFF then begin
+      from_teamid:=0;
+    end else begin
+      from_teamid := sender.ps.team;
+    end;
+    pWord(pData)^:=from_teamid;
   end;
-  pWord(pData)^:=from_teamid;
 
-  if (pMsg[0] ='\') or (pMsg[0] ='/') then begin
+  if (cfg.enable_chat_commands) and ((pMsg[0] ='\') or (pMsg[0] ='/')) then begin
     result:=OnChatCommand(srv, pMsg, p, sender)
   end else begin
     gui_str:=pMsg;

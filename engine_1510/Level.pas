@@ -1,5 +1,6 @@
 unit Level;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses BaseClasses, Objects, vector, Cameras, HUD, PureClient, Physics, xrstrings, Servers, Battleye, games, NET_Common, AnticheatStuff, xr_configs;
 
@@ -218,7 +219,7 @@ function ObjectById(lvl:pIGame_Level; id:word):pCObject;
 function GetLevel():pCLevel;
 
 implementation
-uses basedefs, windows, xr_debug;
+uses basedefs, xr_debug;
 
 function ObjectById(lvl:pIGame_Level; id:word):pCObject;
 begin
@@ -234,8 +235,9 @@ end;
 
 function Init():boolean; stdcall;
 begin
-  g_ppGameLevel:=GetProcAddress(xrEngine, '?g_pGameLevel@@3PAVIGame_Level@@A');
-  result:=(g_ppGameLevel<>nil);
+  result:=false;
+  if not InitSymbol(g_ppGameLevel, xrEngine, '?g_pGameLevel@@3PAVIGame_Level@@A') then exit;
+  result:=true;
 end;
 
 end.

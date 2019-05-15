@@ -17,6 +17,7 @@ function IsSharedPatches(cmdline: PAnsiChar):boolean;
 function GetLogSeverity(cmdline: PAnsiChar):FZLogMessageSeverity;
 function IsCmdLineNameNameNeeded(cmdline:PAnsiChar):boolean;
 function ForceShowMessage(cmdline:PAnsiChar):boolean;
+function IsMirrorsDisabled(cmdline:PAnsiChar):boolean;
 
 implementation
 uses sysutils,JwaWinDNS;
@@ -204,6 +205,13 @@ const
   MESSAGEKEY: string = ' -preservemessage ';
 begin
   result:=Pos(MESSAGEKEY, ' '+cmdline+' ') > 0;
+end;
+
+function IsMirrorsDisabled(cmdline: PAnsiChar): boolean;
+const
+  NOMIRRORS: string = ' -nomirrors ';
+begin
+  result:=Pos(NOMIRRORS, ' '+cmdline+' ') > 0;
 end;
 
 function IsFullInstallMode(cmdline: PAnsiChar): boolean;

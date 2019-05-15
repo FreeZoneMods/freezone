@@ -1,5 +1,7 @@
 unit Clients;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 uses Packets, xr_time, xrstrings, PureServer, CSE, Vector, GameMessages;
 
@@ -96,18 +98,9 @@ ppgame_PlayerState=^pgame_PlayerState;
 xrClientData = packed record
   base_IClient:IClient;
   owner:pCSE_Abstract;
-  net_Ready:boolean;
-  _unused1:byte;
-  _unused2:word;
-
-  net_Accepted:boolean;
-  _unused3:byte;
-  _unused4:word;
-
-  net_PassUpdates:boolean;
-  _unused5:byte;
-  _unused6:word;
-
+  net_Ready:cardinal;
+  net_Accepted:cardinal;
+  net_PassUpdates:cardinal;
   net_LastMoveUpdateTime:cardinal;
 
   ps:pgame_PlayerState;
@@ -147,6 +140,7 @@ const
   GAME_PLAYER_FLAG_LOCAL:cardinal=1;
   GAME_PLAYER_FLAG_VERY_VERY_DEAD:cardinal=4;
   GAME_PLAYER_FLAG_SPECTATOR:cardinal = 8;
+  GAME_PLAYER_FLAG_INVINCIBLE:cardinal=32;
   GAME_PLAYER_FLAG_ONBASE:cardinal = 64;
 
 function Init():boolean; stdcall;

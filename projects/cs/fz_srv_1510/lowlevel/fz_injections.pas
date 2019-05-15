@@ -1,5 +1,6 @@
 unit fz_injections;
 {$mode delphi}
+
 interface
 function Init():boolean; stdcall;
 
@@ -267,6 +268,85 @@ begin
     srcBaseInjection.Create(pointer(xrGame+$38C164), @xrGameSpyServer_constructor_reserve_zerogameid, 6, [F_PUSH_ESI], false, false);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     srcBaseInjection.Create(pointer(xrGame+$3A2674), @xrGameSpyServer_constructor_reserve_zerogameid, 6, [F_PUSH_ESI], false, false);
+  end;
+
+  //Блокировка самостоятельной смены команды игроком
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$30e239),@game_sv_mp__OnPlayerGameMenu_isteamchangeblocked,6,[F_RMEM+F_PUSH_ESP+$10, F_PUSH_EDI], pointer(xrGame+$30e24b), JUMP_IF_TRUE, false, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$3240d9),@game_sv_mp__OnPlayerGameMenu_isteamchangeblocked,6,[F_RMEM+F_PUSH_ESP+$10, F_PUSH_EDI], pointer(xrGame+$3240eb), JUMP_IF_TRUE, false, false);
+  end;
+
+  //Обработка тимкиллов
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    //game_sv_TeamDeathmatch::OnPlayerKillPlayer
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$308604),@OnTeamKill, 44,[F_PUSH_ESI, F_PUSH_EBX], pointer(xrGame+$3086e1), JUMP_IF_FALSE, false, true);
+    //game_sv_CaptureTheArtefact::OnKillResult (берем из стекового фрейма вышележащей функции, так как аргумент затирается)
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$3177ec),@OnTeamKill, 38,[F_PUSH_ESI, F_RMEM+F_PUSH_EBP+$10], pointer(xrGame+$3178ac), JUMP_IF_FALSE, false, true);
+    //В game_sv_TeamDeathmatch::OnPlayerConnectFinished убираем обнуление m_iTeamKills в стате игрока
+    srcKit.Get().nop_code(pointer(xrGame+$308324), 6);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    //game_sv_TeamDeathmatch::OnPlayerKillPlayer
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$31e484),@OnTeamKill, 44,[F_PUSH_ESI, F_PUSH_EBX], pointer(xrGame+$31e561), JUMP_IF_FALSE, false, true);
+    //game_sv_CaptureTheArtefact::OnKillResult (берем из стекового фрейма вышележащей функции, так как аргумент затирается)
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$32d64c),@OnTeamKill, 38,[F_PUSH_ESI, F_RMEM+F_PUSH_EBP+$10], pointer(xrGame+$32d70c), JUMP_IF_FALSE, false, true);
+    //В game_sv_TeamDeathmatch::OnPlayerConnectFinished убираем обнуление m_iTeamKills в стате игрока
+    srcKit.Get().nop_code(pointer(xrGame+$31e1a4), 6);
+  end;
+
+  //[bug] баг - когда игрок должен быть неуязвим (или защищен от огня союзников), то иногда урон все-таки проходит.
+  //Происходит это тогда, когда игрок в броне. Причина, судя по всему, в том, что параметры хита armor_piercing и power_critical не обнуляются в обработчике хитов в геймах,
+  //что ведет к инициированию урона ими.
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    //game_sv_TeamDeathmatch::OnPlayerHitPlayer_Case - огонь союзников (friendly fire)
+    srcBaseInjection.Create(pointer(xrGame+$30889f), @OnTeamHit_FriendlyFire, 82, [F_PUSH_EAX, F_PUSH_EBX, F_PUSH_EDI], false, true);
+    //game_sv_CaptureTheArtefact::OnPlayerHitPlayer_Case - огонь союзников (friendly fire)
+    srcBaseInjection.Create(pointer(xrGame+$317e07), @OnTeamHit_FriendlyFire, 46, [F_PUSH_EAX, F_PUSH_ECX, F_PUSH_ESI], false, true);
+    //game_sv_TeamDeathmatch::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков (оптимизация компилятора - заинлайнен метод из game_sv_Deathmatch)
+    srcBaseInjection.Create(pointer(xrGame+$308902), @OnHitInvincible, 13, [F_PUSH_EDI], false, true);
+    //game_sv_Deathmatch::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков
+    srcBaseInjection.Create(pointer(xrGame+$3014c9), @OnHitInvincible, 13, [F_PUSH_EAX], false, true);
+    //game_sv_CaptureTheArtefact::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков
+    srcBaseInjection.Create(pointer(xrGame+$317e3f), @OnHitInvincible, 13, [F_PUSH_ESI], false, true);
+    //game_sv_ArtefactHunt::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков
+    srcBaseInjection.Create(pointer(xrGame+$2FDEFB), @OnHitInvincible, 13, [F_PUSH_EDI], false, true);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    //game_sv_TeamDeathmatch::OnPlayerHitPlayer_Case - огонь союзников (friendly fire)
+    srcBaseInjection.Create(pointer(xrGame+$31e71f), @OnTeamHit_FriendlyFire, 82, [F_PUSH_EAX, F_PUSH_EBX, F_PUSH_EDI], false, true);
+    //game_sv_CaptureTheArtefact::OnPlayerHitPlayer_Case - огонь союзников (friendly fire)
+    srcBaseInjection.Create(pointer(xrGame+$32DC67), @OnTeamHit_FriendlyFire, 46, [F_PUSH_EAX, F_PUSH_ECX, F_PUSH_ESI], false, true);
+    //game_sv_TeamDeathmatch::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков (оптимизация компилятора - заинлайнен метод из game_sv_Deathmatch)
+    srcBaseInjection.Create(pointer(xrGame+$31e782), @OnHitInvincible, 13, [F_PUSH_EDI], false, true);
+    //game_sv_Deathmatch::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков
+    srcBaseInjection.Create(pointer(xrGame+$316629), @OnHitInvincible, 13, [F_PUSH_EAX], false, true);
+    //game_sv_CaptureTheArtefact::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков
+    srcBaseInjection.Create(pointer(xrGame+$32DC9F), @OnHitInvincible, 13, [F_PUSH_ESI], false, true);
+    //game_sv_ArtefactHunt::OnPlayerHitPlayer_Case - обработка попаданий в неуязвимых игроков
+    srcBaseInjection.Create(pointer(xrGame+$312FDB), @OnHitInvincible, 13, [F_PUSH_EDI], false, true);
+  end;
+
+  //Скорость роста опыта
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$30e7b0), @game_sv_mp__Player_AddExperience_expspeed, 5, [F_PUSH_ESP+$8], true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$324650), @game_sv_mp__Player_AddExperience_expspeed, 5, [F_PUSH_ESP+$8], true, false);
+  end;
+
+  //неуязвимость игроков
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    //в operator() из функтора в game_sv_Deathmatch::check_InvinciblePlayers пропускаем стандартные проверки на неуязвимость, если она контролируется нами
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$304DD8),@IsInvincibilityControlledByFZ, 6,[F_PUSH_ESI], pointer(xrGame+$304E02), JUMP_IF_TRUE, true, false);
+    //в game_sv_ArtefactHunt::OnPlayerHitPlayer_Case добавляем проверку на отключенную неуязвимость, чтобы хит не обнулялся на базах
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$2fdee3),@IsInvincibilityControlledByFZ, 6,[F_PUSH_EBX], pointer(xrGame+$2fdf08), JUMP_IF_TRUE, true, false);
+    //проверка на необходимость сбросить неуязвимость в game_sv_Deathmatch::OnPlayerFire (в CTA выстрел и так не сбрасывает флаг неуязвимости)
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$303ca1),@IsInvinciblePersistAfterShot, 6,[F_PUSH_EAX], pointer(xrGame+$303ccf), JUMP_IF_TRUE, true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    //в operator() из функтора в game_sv_Deathmatch::check_InvinciblePlayers пропускаем стандартные проверки на неуязвимость, если она контролируется нами
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$319f38),@IsInvincibilityControlledByFZ, 6,[F_PUSH_ESI], pointer(xrGame+$319f62), JUMP_IF_TRUE, true, false);
+    //в game_sv_ArtefactHunt::OnPlayerHitPlayer_Case добавляем проверку на отключенную неуязвимость, чтобы хит не обнулялся на базах
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$312fc3),@IsInvincibilityControlledByFZ, 6,[F_PUSH_EBX], pointer(xrGame+$312fe8), JUMP_IF_TRUE, true, false);
+    //проверка на необходимость сбросить неуязвимость в game_sv_Deathmatch::OnPlayerFire (в CTA выстрел и так не сбрасывает флаг неуязвимости)
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$318e01),@IsInvinciblePersistAfterShot, 6,[F_PUSH_EAX], pointer(xrGame+$318e2f), JUMP_IF_TRUE, true, false);
   end;
 
   result:=true;
@@ -805,6 +885,45 @@ begin
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     srcBaseInjection.Create(pointer(xrGame+$320310),@game_sv_mp__Update_additionals,6,[], true, false);
   end;
+
+  //Назначение предыдущей команды при реконнекте игрока, смена команды для которого заблокирована
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcEAXReturnerInjection.Create(pointer(xrGame+$30822c), @game_sv_TeamDeathmatch__OnPlayerConnect_selectteam, 6, [F_PUSH_EBX, F_PUSH_EAX], true, false, 0);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcEAXReturnerInjection.Create(pointer(xrGame+$31e0ac), @game_sv_TeamDeathmatch__OnPlayerConnect_selectteam, 6, [F_PUSH_EBX, F_PUSH_EAX], true, false, 0);
+  end;
+
+  //Отслеживание пакетов GEG_PLAYER_WEAPON_HIDE_STATE игрока с целью выявления моментов, когда у него открыты меню. Смена команды игрока в эти моменты чревата багами.
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$38a6fc),@xrServer__Process_event_onweaponhide,5,[F_PUSH_EDX, F_RMEM+F_PUSH_EBP+$8, F_PUSH_ESI], true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$3a0b3c),@xrServer__Process_event_onweaponhide,5,[F_PUSH_EDX, F_RMEM+F_PUSH_EBP+$8, F_PUSH_ESI], true, false);
+  end;
+
+  //Отслеживание спавна игрока
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$30b440),@game_sv_mp_OnSpawnPlayer,7,[F_RMEM+F_PUSH_ESP+$8, F_RMEM+F_PUSH_ESP+$C], true, false);
+    //на всякий - из game_sv_mp_script::SpawnPlayer
+    srcBaseInjection.Create(pointer(xrGame+$311350),@game_sv_mp_OnSpawnPlayer,5,[F_RMEM+F_PUSH_ESP+$4, F_RMEM+F_PUSH_ESP+$8], true, false);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcBaseInjection.Create(pointer(xrGame+$321290),@game_sv_mp_OnSpawnPlayer,7,[F_RMEM+F_PUSH_ESP+$8, F_RMEM+F_PUSH_ESP+$C], true, false);
+    //на всякий - из game_sv_mp_script::SpawnPlayer
+    srcBaseInjection.Create(pointer(xrGame+$3271b0),@game_sv_mp_OnSpawnPlayer,5,[F_RMEM+F_PUSH_ESP+$4, F_RMEM+F_PUSH_ESP+$8], true, false);
+  end;
+
+  //нормальные сообщения при выкидывании с сервера
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    //game_sv_TeamDeathmatch::OnPlayerKillPlayer - тимкиллы
+    srcBaseInjection.Create(pointer(xrGame+$3086da), @DisconnectPlayerWithMessage, 7, [F_PUSH_EAX, F_PUSHCONST+0], false, true);
+    //game_sv_CaptureTheArtefact::OnKillResult - тимкиллы
+    srcBaseInjection.Create(pointer(xrGame+$3178a5), @DisconnectPlayerWithMessage, 7, [F_PUSH_EAX, F_PUSHCONST+0], false, true);
+   end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    //game_sv_TeamDeathmatch::OnPlayerKillPlayer - тимкиллы
+    srcBaseInjection.Create(pointer(xrGame+$31e55a), @DisconnectPlayerWithMessage, 7, [F_PUSH_EAX, F_PUSHCONST+0], false, true);
+    //game_sv_CaptureTheArtefact::OnKillResult - тимкиллы
+    srcBaseInjection.Create(pointer(xrGame+$32d705), @DisconnectPlayerWithMessage, 7, [F_PUSH_EAX, F_PUSHCONST+0], false, true);
+  end;
+
 
   //Cars:
   //client CActorMP::net_Relevant	 - xrgame.dll+1f61d0

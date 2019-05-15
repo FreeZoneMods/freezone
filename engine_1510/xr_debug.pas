@@ -1,6 +1,7 @@
 unit xr_debug;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 
@@ -11,7 +12,7 @@ procedure R_ASSERT(e:boolean; description:string; function_name:string = ''; fil
 function Init():boolean; stdcall;
 
 implementation
-uses srcCalls, windows, basedefs;
+uses srcCalls, basedefs;
 
 var
   xrDebug__fail:srcECXCallFunction;
@@ -39,12 +40,17 @@ begin
 end;
 
 function Init():boolean; stdcall;
+var
+  tmp:pointer;
 begin
   result:=false;
-  pxrDebug := GetProcAddress(xrCore, '?Debug@@3VxrDebug@@A');
-  xrDebug__fail:=srcECXCallFunction.Create(GetProcAddress(xrCore, '?fail@xrDebug@@QAEXPBD0H0AA_N@Z'), [vtPointer, vtPChar, vtPChar, vtInteger, vtPChar, vtPointer], 'fail', 'xrDebug');
+  tmp:=nil;
 
-  if (pxrDebug=nil) or (xrDebug__fail.GetMyAddress()=nil) then exit;
+  if not InitSymbol(pxrDebug, xrCore, '?Debug@@3VxrDebug@@A') then exit;
+
+  if not InitSymbol(tmp, xrCore, '?fail@xrDebug@@QAEXPBD0H0AA_N@Z') then exit;
+  xrDebug__fail:=srcECXCallFunction.Create(tmp, [vtPointer, vtPChar, vtPChar, vtInteger, vtPChar, vtPointer], 'fail', 'xrDebug');
+
   result:=true;
 end;
 

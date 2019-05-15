@@ -1,6 +1,7 @@
 unit BuyWnd;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 

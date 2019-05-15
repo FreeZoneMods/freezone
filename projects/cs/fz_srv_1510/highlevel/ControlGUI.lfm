@@ -1,12 +1,12 @@
 object FZControlGUI: TFZControlGUI
-  Left = 730
+  Left = 736
   Height = 542
   Top = 134
-  Width = 788
+  Width = 791
   BorderStyle = bsNone
   Caption = 'FreeZone - Server Control'
   ClientHeight = 542
-  ClientWidth = 788
+  ClientWidth = 791
   Color = clBtnFace
   Font.Color = clWindowText
   Font.Height = -11
@@ -23,17 +23,17 @@ object FZControlGUI: TFZControlGUI
     Left = 0
     Height = 542
     Top = 0
-    Width = 789
+    Width = 792
     Anchors = [akTop, akLeft, akRight, akBottom]
     BevelInner = bvLowered
     Caption = 'Panel1'
     ClientHeight = 542
-    ClientWidth = 789
+    ClientWidth = 792
     TabOrder = 5
     OnMouseDown = FormMouseDown
     OnMouseMove = FormMouseMove
     OnMouseUp = FormMouseUp
-    object Label3: TLabel
+    object lbl_fz_caption: TLabel
       Left = 300
       Height = 20
       Top = 2
@@ -46,13 +46,13 @@ object FZControlGUI: TFZControlGUI
       ParentFont = False
     end
     object group_chat: TGroupBox
-      Left = 460
-      Height = 513
-      Top = 20
+      Left = 464
+      Height = 509
+      Top = 27
       Width = 322
       Anchors = [akTop, akRight, akBottom]
       Caption = 'Chat'
-      ClientHeight = 495
+      ClientHeight = 491
       ClientWidth = 318
       TabOrder = 0
       OnMouseDown = FormMouseDown
@@ -61,7 +61,7 @@ object FZControlGUI: TFZControlGUI
       object edit_chatmsg: TEdit
         Left = 10
         Height = 21
-        Top = 12
+        Top = 4
         Width = 257
         Font.Color = clWindowText
         Font.Height = -11
@@ -71,9 +71,9 @@ object FZControlGUI: TFZControlGUI
         TabOrder = 0
       end
       object btn_sendmsg: TButton
-        Left = 272
+        Left = 280
         Height = 25
-        Top = 12
+        Top = 1
         Width = 33
         Caption = 'Send'
         OnClick = btn_sendmsgClick
@@ -81,8 +81,8 @@ object FZControlGUI: TFZControlGUI
       end
       object chatlog: TMemo
         Left = 10
-        Height = 422
-        Top = 40
+        Height = 426
+        Top = 32
         Width = 306
         Anchors = [akTop, akLeft, akBottom]
         Font.Color = clWindowText
@@ -125,8 +125,8 @@ object FZControlGUI: TFZControlGUI
       end
       object TrackChat: TTrackBar
         Left = 280
-        Height = 429
-        Top = 39
+        Height = 425
+        Top = 32
         Width = 33
         LineSize = 10
         Max = 0
@@ -140,22 +140,54 @@ object FZControlGUI: TFZControlGUI
         Visible = False
       end
       object btn_clear_chat: TButton
-        Left = 104
+        Left = 228
         Height = 25
-        Top = 466
-        Width = 75
+        Top = 460
+        Width = 88
         Anchors = [akRight, akBottom]
         Caption = 'Clear chatbox'
         OnClick = btn_clear_chatClick
         TabOrder = 4
       end
+      object btn_inverse_chat: TButton
+        Left = 10
+        Height = 25
+        Top = 460
+        Width = 88
+        Anchors = [akRight, akBottom]
+        Caption = 'Inverse chatbox'
+        OnClick = btn_inverse_chatClick
+        TabOrder = 5
+      end
+      object btn_options_chat: TButton
+        Left = 120
+        Height = 25
+        Top = 460
+        Width = 88
+        Anchors = [akRight, akBottom]
+        Caption = 'Options'
+        OnClick = btn_options_chatClick
+        TabOrder = 6
+      end
+    end
+    object check_autorefresh: TCheckBox
+      Left = 14
+      Height = 19
+      Top = 516
+      Width = 131
+      Anchors = [akLeft, akBottom]
+      Caption = ' Autorefresh information'
+      Checked = True
+      OnClick = check_autorefreshClick
+      State = cbChecked
+      TabOrder = 1
     end
   end
   object ListPlayers: TListBox
     Left = 14
-    Height = 509
-    Top = 27
-    Width = 189
+    Height = 480
+    Top = 32
+    Width = 192
     Anchors = [akTop, akLeft, akRight, akBottom]
     ItemHeight = 13
     OnClick = ListPlayersClick
@@ -167,7 +199,7 @@ object FZControlGUI: TFZControlGUI
     TabOrder = 0
   end
   object group_options: TGroupBox
-    Left = 209
+    Left = 212
     Height = 108
     Top = 428
     Width = 237
@@ -248,7 +280,7 @@ object FZControlGUI: TFZControlGUI
     end
   end
   object group_info: TGroupBox
-    Left = 209
+    Left = 212
     Height = 395
     Top = 27
     Width = 245
@@ -263,7 +295,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_id: TLabel
       Left = 8
       Height = 13
-      Top = 16
+      Top = 0
       Width = 11
       Caption = 'ID'
       Font.Color = clWindowText
@@ -279,7 +311,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_chatmute: TLabel
       Left = 8
       Height = 13
-      Top = 144
+      Top = 128
       Width = 57
       Caption = 'Muted chat:'
       Font.Color = clWindowText
@@ -294,7 +326,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_mutedvotings: TLabel
       Left = 8
       Height = 13
-      Top = 160
+      Top = 144
       Width = 70
       Caption = 'Muted votings:'
       Font.Color = clWindowText
@@ -309,7 +341,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_mutedradio: TLabel
       Left = 8
       Height = 13
-      Top = 176
+      Top = 160
       Width = 59
       Caption = 'Muted radio:'
       Font.Color = clWindowText
@@ -324,7 +356,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_bps: TLabel
       Left = 8
       Height = 13
-      Top = 290
+      Top = 344
       Width = 24
       Anchors = [akLeft, akBottom]
       Caption = 'BPS:'
@@ -334,9 +366,9 @@ object FZControlGUI: TFZControlGUI
       OnMouseUp = FormMouseUp
     end
     object lbl_retry: TLabel
-      Left = 8
+      Left = 140
       Height = 13
-      Top = 322
+      Top = 344
       Width = 40
       Anchors = [akLeft, akBottom]
       Caption = 'Retried: '
@@ -346,9 +378,9 @@ object FZControlGUI: TFZControlGUI
       OnMouseUp = FormMouseUp
     end
     object lbl_drop: TLabel
-      Left = 8
+      Left = 140
       Height = 13
-      Top = 338
+      Top = 360
       Width = 47
       Anchors = [akLeft, akBottom]
       Caption = 'Dropped: '
@@ -360,7 +392,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_sent: TLabel
       Left = 8
       Height = 13
-      Top = 306
+      Top = 360
       Width = 25
       Anchors = [akLeft, akBottom]
       Caption = 'Sent:'
@@ -372,7 +404,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_updrate: TLabel
       Left = 8
       Height = 13
-      Top = 192
+      Top = 176
       Width = 41
       Caption = 'Updrate:'
       Font.Color = clWindowText
@@ -387,7 +419,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_money: TLabel
       Left = 8
       Height = 13
-      Top = 32
+      Top = 16
       Width = 38
       Caption = 'Money: '
       Font.Color = clWindowText
@@ -399,7 +431,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_rank: TLabel
       Left = 8
       Height = 13
-      Top = 48
+      Top = 32
       Width = 32
       Caption = 'Rank: '
       Font.Color = clWindowText
@@ -411,7 +443,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_team: TLabel
       Left = 8
       Height = 13
-      Top = 64
+      Top = 48
       Width = 33
       Caption = 'Team: '
       Font.Color = clWindowText
@@ -423,7 +455,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_frags: TLabel
       Left = 8
       Height = 13
-      Top = 80
+      Top = 64
       Width = 32
       Caption = 'Frags: '
       Font.Color = clWindowText
@@ -435,7 +467,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_selfkills: TLabel
       Left = 8
       Height = 13
-      Top = 96
+      Top = 80
       Width = 41
       Caption = 'Selfkills: '
       Font.Color = clWindowText
@@ -447,7 +479,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_teamkills: TLabel
       Left = 8
       Height = 13
-      Top = 112
+      Top = 96
       Width = 50
       Caption = 'Teamkills: '
       Font.Color = clWindowText
@@ -459,7 +491,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_deathes: TLabel
       Left = 8
       Height = 13
-      Top = 128
+      Top = 112
       Width = 46
       Caption = 'Deathes: '
       Font.Color = clWindowText
@@ -468,20 +500,10 @@ object FZControlGUI: TFZControlGUI
       ParentColor = False
       ParentFont = False
     end
-    object check_autorefresh: TCheckBox
-      Left = 8
-      Height = 19
-      Top = 354
-      Width = 74
-      Anchors = [akLeft, akBottom]
-      Caption = 'Autorefresh'
-      OnClick = check_autorefreshClick
-      TabOrder = 0
-    end
     object lbl_hwid: TLabel
       Left = 8
       Height = 13
-      Top = 208
+      Top = 296
       Width = 33
       Caption = 'HWID:'
       Font.Color = clWindowText
@@ -498,7 +520,7 @@ object FZControlGUI: TFZControlGUI
     object lbl_sace: TLabel
       Left = 8
       Height = 13
-      Top = 224
+      Top = 280
       Width = 31
       Caption = 'SACE:'
       Font.Color = clWindowText
@@ -514,9 +536,9 @@ object FZControlGUI: TFZControlGUI
     object lbl_orig_cdkey: TLabel
       Left = 8
       Height = 13
-      Top = 240
-      Width = 39
-      Caption = 'CDKEY:'
+      Top = 312
+      Width = 24
+      Caption = 'KEY:'
       Font.Color = clWindowText
       Font.Height = -11
       Font.Name = 'MS Sans Serif'
@@ -524,6 +546,36 @@ object FZControlGUI: TFZControlGUI
       ParentFont = False
       Visible = False
       OnDblClick = SelectOnDblClick
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_invincibility: TLabel
+      Left = 9
+      Height = 13
+      Top = 192
+      Width = 54
+      Caption = 'Invincibility:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
+      OnMouseDown = FormMouseDown
+      OnMouseMove = FormMouseMove
+      OnMouseUp = FormMouseUp
+    end
+    object lbl_teamchangeblock: TLabel
+      Left = 8
+      Height = 13
+      Top = 208
+      Width = 66
+      Caption = 'Teamchange:'
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      ParentColor = False
+      ParentFont = False
       OnMouseDown = FormMouseDown
       OnMouseMove = FormMouseMove
       OnMouseUp = FormMouseUp
@@ -544,7 +596,7 @@ object FZControlGUI: TFZControlGUI
     TabOrder = 4
   end
   object btn_close: TButton
-    Left = 767
+    Left = 770
     Height = 17
     Top = 3
     Width = 19
@@ -653,6 +705,14 @@ object FZControlGUI: TFZControlGUI
     object ActSetTeam: TAction
       Caption = 'ActSetTeam'
       OnExecute = ActSetTeamExecute
+    end
+    object ActBlockTeamchange: TAction
+      Caption = 'ActBlockTeamchange'
+      OnExecute = ActBlockTeamchangeExecute
+    end
+    object ActInvincibility: TAction
+      Caption = 'ActInvincibility'
+      OnExecute = ActInvincibilityExecute
     end
   end
   object RefreshTimer: TTimer

@@ -1,5 +1,6 @@
 unit misc_stuff;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses Clients, Packets;
 function Init():boolean; stdcall;

@@ -1,5 +1,6 @@
 unit CSE;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses xrstrings, vector, BaseClasses, MatVectors, srcCalls, xr_configs;
 

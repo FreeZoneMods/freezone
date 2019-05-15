@@ -180,12 +180,23 @@ begin
     end else if (length(args[0])>0) and (args[0][1]='$') then begin
       //[bug] ¬ game_sv_mp::OnVoteStart при активации текстового голосовани€ в отправл€емую клиенту строку копируетс€ все, кроме первого символа $.
       //ѕоэтому при старте голосовани€ вида 'cl_votestart $changemap stalker_story_8' клиенту отправитс€ 'changemap stalker_story_8', он попытаетс€ начать голосование на смену карты, отработает трансл€тор и все развалитс€
-      if (args[0] = '$kick') or (args[0] = '$ban') or (args[0] = '$fraglimit') or (args[0] = '$timelimit') or (args[0] = '$changeweather') or (args[0] = '$changemap') or (args[0] = '$changegametype') or (args[0] = '$restart') or (args[0] = '$restart_fast') then begin
+      //“акже необходимо пропускать пробелы после $
+      if length(args[0]) > 1 then begin
+        //ѕосле $ пробелов нет, используем сам аргумент
+        tmpstr:=trim(rightstr(args[0], length(args[0])-1));
+      end else if args_cnt > 1 then begin
+        //ѕробел после $, команда в следующем аргументе
+        tmpstr:=args[1];
+      end else begin
+        tmpstr:='';
+      end;
+
+      if (tmpstr = 'kick') or (tmpstr = 'ban') or (tmpstr = 'fraglimit') or (tmpstr = 'timelimit') or (tmpstr = 'changeweather') or (tmpstr = 'changemap') or (tmpstr = 'changegametype') or (tmpstr = 'restart') or (tmpstr = 'restart_fast') then begin
         result:=false;
       end else begin
         result:=true;
       end;
-    end
+    end;
   end else begin
     pVoteStr[MAX_VOTE_STRING_SIZE]:=chr(0);
   end;

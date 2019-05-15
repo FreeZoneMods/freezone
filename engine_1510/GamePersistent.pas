@@ -1,6 +1,7 @@
 unit GamePersistent;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses BaseClasses, MainMenu;
@@ -34,12 +35,13 @@ var
 function Init():boolean; stdcall;
 
 implementation
-uses basedefs, windows;
+uses basedefs;
 
 function Init():boolean; stdcall;
 begin
-  g_ppGamePersistent:=GetProcAddress(xrEngine, '?g_pGamePersistent@@3PAVIGame_Persistent@@A');
-  result:=(g_ppGamePersistent<>nil);
+  result:=false;
+  if not InitSymbol(g_ppGamePersistent, xrEngine, '?g_pGamePersistent@@3PAVIGame_Persistent@@A') then exit;
+  result:=true;
 end;
 
 end.

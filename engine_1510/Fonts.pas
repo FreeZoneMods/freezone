@@ -1,6 +1,7 @@
 unit Fonts;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 

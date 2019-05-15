@@ -1,5 +1,6 @@
 unit Console;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 uses basedefs, srcCalls;
 
@@ -72,6 +73,9 @@ var
   c_sv_vote_quota:pCCC_SV_Float;
   c_sv_vote_participants:pCCC_SV_Integer;
   c_sv_vote_enabled:pCCC_SV_Integer;
+  c_sv_teamkill_punish:pCCC_SV_Integer;
+  c_sv_teamkill_limit:pCCC_SV_Integer;
+  c_sv_friendlyfire:pCCC_SV_Float;
 
   g_ppConsole:ppCConsole;
 
@@ -85,8 +89,6 @@ var
   procedure SetLastPrintedID(id:cardinal);
 
 implementation
-
-uses windows;
 
 var
   CConsole__ExecuteCommand:srcECXCallFunction;
@@ -156,12 +158,17 @@ var
   ptr:pointer;
 begin
   result:=false;
+  ptr:=nil;
+
   if xrGameDllType()=XRGAME_SV_1510 then begin
     c_sv_timelimit:=pointer(xrGame+$5EB0A0);
     c_sv_fraglimit:=pointer(xrGame+$5EB0B8);
     c_sv_vote_quota:=pointer(xrGame+$5EB100);
     c_sv_vote_participants:=pointer(xrGame+$5EB118);
     c_sv_vote_enabled:=pointer(xrGame+$5EB1AC);
+    c_sv_teamkill_punish:=pointer(xrGame+$5EAF50);
+    c_sv_teamkill_limit:=pointer(xrGame+$5EAF68);
+    c_sv_friendlyfire:=pointer(xrGame+$5EAF80);
     last_printed_id:=pointer(xrGame+$5E98C4);
   end else if  xrGameDllType()=XRGAME_CL_1510 then begin
     c_sv_timelimit:=pointer(xrGame+$6081d0);
@@ -169,21 +176,21 @@ begin
     c_sv_vote_quota:=pointer(xrGame+$608230);
     c_sv_vote_participants:=pointer(xrGame+$608248);
     c_sv_vote_enabled:=pointer(xrGame+$6082DC);
+    c_sv_teamkill_punish:=pointer(xrGame+$608080);
+    c_sv_teamkill_limit:=pointer(xrGame+$608098);
+    c_sv_friendlyfire:=pointer(xrGame+$6080B0);
     last_printed_id:=pointer(xrGame+$6069c4);
   end;
-  g_ppConsole:= GetProcAddress(xrEngine, '?Console@@3PAVCConsole@@A');
-  if g_ppConsole = nil then exit;
 
-  ptr:= GetProcAddress(xrEngine, '?ExecuteCommand@CConsole@@QAEXPBD_N@Z');
-  if ptr = nil then exit;
+  if not InitSymbol(g_ppConsole, xrEngine, '?Console@@3PAVCConsole@@A') then exit;
+
+  if not InitSymbol(ptr, xrEngine, '?ExecuteCommand@CConsole@@QAEXPBD_N@Z') then exit;
   CConsole__ExecuteCommand:=srcECXCallFunction.Create(ptr,[vtPointer, vtPChar, vtBoolean], 'ExecuteCommand', 'CConsole');
 
-  ptr:= GetProcAddress(xrEngine, '?AddCommand@CConsole@@QAEXPAVIConsole_Command@@@Z');
-  if ptr = nil then exit;
+  if not InitSymbol(ptr, xrEngine, '?AddCommand@CConsole@@QAEXPAVIConsole_Command@@@Z') then exit;
   CConsole__AddCommand:=srcECXCallFunction.Create(ptr,[vtPointer, vtPointer], 'AddCommand', 'CConsole');
 
-  ptr:= GetProcAddress(xrEngine, '??0CCC_Integer@@QAE@PBDPAHHH@Z');
-  if ptr = nil then exit;
+  if not InitSymbol(ptr, xrEngine, '??0CCC_Integer@@QAE@PBDPAHHH@Z') then exit;
   CCC_Integer__CCC_Integer:=srcECXCallFunction.Create(ptr,[vtPointer, vtPChar, vtPointer, vtInteger, vtInteger], 'CCC_Integer', 'CCC_Integer');
 
   result:=true;

@@ -1,5 +1,6 @@
 unit HUD;
 {$mode delphi}
+{$I _pathes.inc}
 interface
 type
 CCustomHUD = packed record

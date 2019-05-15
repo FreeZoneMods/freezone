@@ -1,5 +1,7 @@
 unit xrfilesystem;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 type
 CLocatorAPI = packed record
@@ -32,9 +34,18 @@ begin
 end;
 
 function Init():boolean; stdcall;
+var
+  tmp:pointer;
 begin
-  CLocatorApi__xr_FS:=pointer(xrCore+$BE718);
-  CLocatorApi__update_path:=srcECXCallFunction.Create(pointer(xrCore+$128d0), [vtPointer, vtPChar, vtPChar, vtPChar], 'update_path', 'CLocatorAPI');
+  result:=false;
+
+  //1.5.10: expected xrCore+$BE718
+  if not InitSymbol(CLocatorApi__xr_FS, xrCore, '?xr_FS@@3PAVCLocatorAPI@@A') then exit;
+
+  //1.5.10: expected xrCore+$128d0
+  if not InitSymbol(tmp, xrCore, '?update_path@CLocatorAPI@@QAEPBDAAY0CAI@DPBD1@Z') then exit;
+  CLocatorApi__update_path:=srcECXCallFunction.Create(tmp, [vtPointer, vtPChar, vtPChar, vtPChar], 'update_path', 'CLocatorAPI');
+
   result:=true;
 end;
 

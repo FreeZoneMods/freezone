@@ -1,5 +1,7 @@
 unit srcFunctionsMgr;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 uses srcCalls, SysUtils, SyncObjs;
 

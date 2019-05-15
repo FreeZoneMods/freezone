@@ -1,5 +1,7 @@
 unit srcLogging;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 type
   srcLog = class

@@ -1,5 +1,7 @@
 unit xrstrings;
 {$mode delphi}
+{$I _pathes.inc}
+
 interface
 
 function Init():boolean; stdcall;
@@ -86,10 +88,18 @@ begin
 end;
 
 function Init():boolean; stdcall;
+var
+  tmp:pointer;
 begin
   result:=false;
-  g_pStringContainer := pointer(xrCore+$BE784);
-  dock:=srcECXCallFunction.Create(pointer(xrCore+$1DDA0), [vtPointer, vtPChar], 'dock', 'str_container');
+  tmp:=nil;
+
+  //1.5.10: expected xrCore+BE784
+  if not InitSymbol(g_pStringContainer, xrCore, '?g_pStringContainer@@3PAVstr_container@@A') then exit;
+
+  //1.5.10: expected xrCore+1DDA0
+  if not InitSymbol(tmp, xrCore, '?dock@str_container@@QAEPAUstr_value@@PBD@Z') then exit;
+  dock:=srcECXCallFunction.Create(tmp, [vtPointer, vtPChar], 'dock', 'str_container');
 
   global_undocked_empty_shared_str_value.value:=chr(0);
   global_undocked_empty_shared_str_value.dwCRC:=0;
@@ -98,7 +108,6 @@ begin
   global_undocked_empty_shared_str_value.next:=nil;
   global_undocked_empty_shared_str.p_:=@global_undocked_empty_shared_str_value;
 
-  if (g_pStringContainer=nil) or (dock=nil) then exit;
   result:=true;
 end;
 

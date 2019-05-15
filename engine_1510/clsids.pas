@@ -1,6 +1,7 @@
 unit clsids;
 
 {$mode delphi}
+{$I _pathes.inc}
 
 interface
 uses BaseClasses;
