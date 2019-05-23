@@ -3,7 +3,7 @@ unit ServerStuff;
 {$mode delphi}
 
 interface
-uses Servers, Packets, PureServer, Clients,NET_common, CSE, Games, Hits;
+uses Servers, Packets, PureServer, Clients,NET_common, CSE, Games, Hits, Device;
 
 type
 FZServerState = record
@@ -224,12 +224,12 @@ begin
     if check_state=FZ_HIT_BAD then begin
       severity:=FZ_LOG_ERROR;
       msg:=msg+'[BAD] ';
-     end else if check_state=FZ_HIT_BAD then begin
-       severity:=FZ_LOG_IMPORTANT_INFO;
-       msg:=msg+'[IGNORED] ';
-     end else begin
+    end else if check_state=FZ_HIT_IGNORE then begin
       severity:=FZ_LOG_IMPORTANT_INFO;
-     end;
+      msg:=msg+'[IGNORED] ';
+    end else begin
+      severity:=FZ_LOG_IMPORTANT_INFO;
+    end;
 
     msg:= msg+hitter_str+' -> '+victim_str+
           ' (T='+inttostr(hit.hit_type)+
@@ -310,6 +310,8 @@ var
   hit_check_result:FZHitCheckResult;
   new_power:single;
   tmpstr:string;
+  invalid_hitter:boolean;
+  dt:cardinal;
 const
   DEATH_LAG:cardinal = 3000;
 begin
@@ -341,9 +343,28 @@ begin
     victim:=GetClientByGameID(dest_id);
 
     if (local_client.base_IClient.ID.id<>senderid) then begin
-      if ((hitter.ps.flags__ and GAME_PLAYER_FLAG_VERY_VERY_DEAD = 0) or (FZCommonHelper.GetTimeDeltaSafe(hitter.ps.DeathTime) > DEATH_LAG)) and ((hitter = nil) or (hitter.base_IClient.ID.id <> senderid)) and ((victim = nil) or (victim.base_IClient.ID.id <> senderid)) then begin
-        //Если отправитель не является ни жертвой, ни киллером - что-то тут не так.
-        //Однако, если игрок только что умер - это допустимое явление
+      //Проверяем - если отправитель не является ни жертвой, ни киллером - что-то тут не так.
+      //Однако, если игрок только что умер - это допустимое явление
+      invalid_hitter:=false;
+      if (hitter <> nil) and (hitter.ps<>nil) then begin
+        if (hitter.ps.flags__ and GAME_PLAYER_FLAG_VERY_VERY_DEAD <> 0) then begin
+          //Мертвый игрок отправил хит. Это нормально, если он был убит только что.
+          dt:=GetDevice().dwTimeGlobal - hitter.ps.DeathTime;
+          FZLogMgr.Get().Write('Hit sent by dead player, dt='+inttostr(dt), FZ_LOG_DBG);
+          if (dt > DEATH_LAG) then begin
+            invalid_hitter:=true;
+          end;
+        end else if (hitter.base_IClient.ID.id <> senderid) and ((victim = nil) or (victim.base_IClient.ID.id <> senderid)) then begin
+          //отправитель не является ни жертвой, ни киллером - что-то тут не так.
+          invalid_hitter:=true;
+        end;
+      end else begin
+        // TODO: проверять исторические ID игроков
+        HitLogger(victim, hitter, @hit, FZ_HIT_IGNORE);
+        exit;
+      end;
+  
+      if invalid_hitter then begin
         HitLogger(victim, hitter, @hit, FZ_HIT_BAD);
         BadEventsProcessor(FZ_SEC_EVENT_INFO, GenerateMessageForClientId(senderid, 'suspected in sending not own hits'));
         exit;
