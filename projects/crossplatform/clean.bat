@@ -1,3 +1,6 @@
+cd log_hooker
+start clean.bat
+cd ..
 
 cd sysmsgs
 start clean.bat
