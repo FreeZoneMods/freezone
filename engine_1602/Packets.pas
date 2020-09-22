@@ -142,7 +142,9 @@ var
 
 
   //Packet IDs
+  M_EVENT_PACK:word = 20;
   M_CLIENT_CONNECT_RESULT:word=23;
+  M_CHAT_MESSAGE: word = 25;
 
   PACKET_MAX_SIZE:cardinal = 16384;
 
@@ -218,13 +220,10 @@ end;
 
 function WriteToPacket(p:pNET_Packet; buf:pointer; size:cardinal):boolean; stdcall;
 begin
-  if (PACKET_MAX_SIZE - p^.B.count < size) then begin
-    //осталось слишком мало места, данные не влезут
-    result:=false;
-    exit;
-  end;
+  result:=false;
 
-  srcKit.CopyBuf(buf, @p^.B.data[p^.B.count], size);
+  if (PACKET_MAX_SIZE - p^.B.count < size) then exit; //осталось слишком мало места, данные не влезут  
+  if not srcKit.CopyBuf(buf, @p^.B.data[p^.B.count], size) then exit;
 
   p^.B.count:=p^.B.count+size;
   result:=true;

@@ -3,14 +3,431 @@ unit Players;
 {$mode delphi}
 
 interface
-uses Servers, Clients;
+uses Servers, Clients, windows;
+
+type
+
+{ FZPlayerStateAdditionalInfo }
+
+FZPlayerStateAdditionalInfo = class
+protected
+  _lock:TRtlCriticalSection;
+  _valid:boolean;
+  _connected_and_ready:boolean;
+
+  _mute_start_time:cardinal;
+  _mute_time_period:cardinal;
+
+  _votes_mute_start_time:cardinal;
+  _votes_mute_time_period:cardinal;
+  _last_started_voted_time:cardinal;
+  {_last_vote_time:cardinal;
+  _last_vote_series:cardinal;
+  _votemutes_count:cardinal;}
+  _last_chat_message_time:cardinal;
+  _chat_messages_series:cardinal;
+  _chatmutes_count:cardinal;
+
+  {_last_speech_message_time:cardinal;
+  _speech_messages_series:cardinal;
+  _speechmutes_count:cardinal;
+  _speechmute_start_time:cardinal;
+  _speechmute_time_period:cardinal;
+
+  _teamchangeblock_start_time:cardinal;
+  _teamchangeblock_time_period:cardinal;}
+
+  _badwords_counter:cardinal;
+
+  _my_player:pgame_PlayerState;
+  {_updrate:cardinal;}
+
+  _last_ready_time:cardinal;
+
+  {_last_ping_warning_time:cardinal;
+
+  _slots_block_counter:cardinal;
+
+  _hwid:string;
+  _hwhash:string;
+  _orig_cdkey_hash:string;
+  _hwid_received:boolean;
+
+  _force_invincibility_cur:FZPlayerInvincibleStatus;
+  _force_invincibility_next:FZPlayerInvincibleStatus;}
+
+  {%H-}constructor Create(ps:pgame_PlayerState);
+public
+  {procedure SetUpdrate(d:cardinal);
+  procedure SetHwId(hwid:string; hwhash:string);
+  function GetHwId(allow_old:boolean):string;
+  function GetHwHash(allow_old:boolean):string;
+  procedure SetOrigCdkeyHash(hash:string);
+  function GetOrigCdkeyHash():string;
+
+  function GetHwhashSaceStatus():integer;
+
+  property updrate:cardinal read _updrate write SetUpdrate; }
+  property last_ready:cardinal read _last_ready_time write _last_ready_time;
+  {property valid:boolean read _valid write _valid;
+  property connected_and_ready: boolean read _connected_and_ready write _connected_and_ready;}
+
+  function IsAllowedStartingVoting():boolean;
+  procedure OnVoteStarted();
+  {procedure OnVote();}
+  function IsPlayerVoteMuted():boolean;
+  procedure AssignVoteMute(time:cardinal);
+  {procedure AssignSpeechMute(time:cardinal);
+
+  procedure OnDisconnected();
+
+  function GetForceInvincibilityStatus():FZPlayerInvincibleStatus;
+  function SetForceInvincibilityStatus(status:FZPlayerInvincibleStatus):boolean;
+  function UpdateForceInvincibilityStatus():FZPlayerInvincibleStatus;}
+
+  function IsMuted():boolean;
+  procedure UnMute();
+  procedure AssignMute(time:cardinal);
+
+  {function IsSpeechMuted():boolean;}
+
+  function OnChatMessage():cardinal;
+  {function OnSpeechMessage():cardinal;
+
+  function IsTeamChangeBlocked():boolean;
+  procedure BlockTeamChange(time:cardinal);
+  procedure UnBlockTeamChange();
+  function OnTeamChange():boolean;
+
+  function SlotsBlockCount(delta:integer = 0):cardinal;
+  procedure ResetSlotsBlockCount();    }
+
+  function OnBadWordsInChat():cardinal;
+  destructor Destroy; override;
+end;
+
+
+procedure FromPlayerStateConstructor(ps:pgame_PlayerState); stdcall;
+procedure FromPlayerStateDestructor(ps:pgame_PlayerState); stdcall;
+procedure FromPlayerStateClear({%H-}ps:pgame_PlayerState); stdcall;
+
+function MutePlayer(cl: pxrClientData; time:cardinal):boolean; stdcall;
+function UnMutePlayer(cl: pxrClientData):boolean; stdcall;
 
 procedure OnAttachNewClient(srv:pxrServer; cl:pIClient); stdcall;
 
+function CheckPlayerReadySignalValidity(cl:pxrClientData):boolean; stdcall;
+
 function GenerateMessageForClientId(id:cardinal; message: string):string;
 
+function GetFZBuffer(ps:pgame_PlayerState):FZPlayerStateAdditionalInfo;
+
+function Init():boolean;
+procedure Clean();
+
 implementation
-uses Packets, xrstrings, sysutils, PureServer, sysmsgs, MapList, LogMgr, TranslationMgr, ConfigCache, Synchro, DownloadMgr, ServerStuff;
+uses Packets, xrstrings, sysutils, PureServer, sysmsgs, MapList, LogMgr, TranslationMgr, ConfigCache, Synchro, DownloadMgr, ServerStuff, srcBase, xr_debug, CommonHelper;
+
+var
+  _ps_buffers:array of FZPlayerStateAdditionalInfo;
+  _ps_lock:TRtlCriticalSection;
+
+function UnMutePlayer(cl: pxrClientData): boolean; stdcall;
+begin
+  R_ASSERT(cl <> nil, 'client is nil',  'UnMutePlayer');
+  result:=GetFZBuffer(cl.ps).IsMuted();
+    if result then begin
+    GetFZBuffer(cl.ps).UnMute();
+  end;
+end;
+
+function MutePlayer(cl: pxrClientData; time: cardinal): boolean; stdcall;
+var
+  newtime:int64;
+begin
+  R_ASSERT(cl <> nil, 'client is nil',  'MutePlayer');
+    result:=false;
+  if time>0 then begin
+    newtime:= int64(time) * MSecsPerSec;
+    if newtime > $FFFFFFFF then begin
+      time:=$FFFFFFFF;
+    end else begin
+      time:=cardinal(newtime);
+    end;
+    GetFZBuffer(cl.ps).AssignMute(time);
+    result:=true;
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.AssignMute(time: cardinal);
+var
+  new_period:cardinal;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if not IsMuted() then begin
+      self._mute_start_time:=FZCommonHelper.GetGameTickCount();
+      self._mute_time_period:=0;
+    end;
+
+    new_period:=self._mute_time_period+time;
+
+    if new_period<self._mute_time_period then begin
+      self._mute_time_period:=$FFFFFFFF;
+    end else begin;
+      self._mute_time_period:=new_period
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.AssignVoteMute(time: cardinal);
+var
+  new_period:cardinal;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if not IsPlayerVoteMuted() then begin
+      self._votes_mute_start_time:=FZCommonHelper.GetGameTickCount();
+      self._votes_mute_time_period:=0;
+    end;
+
+    new_period:=self._votes_mute_time_period+time;
+
+    if new_period<self._votes_mute_time_period then begin
+      self._votes_mute_time_period:=$FFFFFFFF;
+    end else begin;
+      self._votes_mute_time_period:=new_period
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+constructor FZPlayerStateAdditionalInfo.Create(ps:pgame_PlayerState);
+begin
+  srcKit.Get.DbgLog('New buffer, '+inttohex(cardinal(self),8));
+  InitializeCriticalSection(_lock);
+  _valid:=false;
+  _connected_and_ready:=false;
+  _mute_start_time:=0;
+  _mute_time_period:=0;
+  _my_player:=ps;
+  _last_started_voted_time:=0;
+  _votes_mute_start_time:=0;
+  _votes_mute_time_period:=0;
+  {_last_vote_time:=0;
+  _last_vote_series:=0;
+  _votemutes_count:=0;}
+  _badwords_counter:=0;
+  _last_chat_message_time:=0;
+  _chat_messages_series:=0;
+  _chatmutes_count:=0;
+  {_last_speech_message_time:=0;
+  _speech_messages_series:=0;
+  _speechmutes_count:=0;
+  _speechmute_start_time:=0;
+  _speechmute_time_period:=0;
+  _teamchangeblock_start_time:=0;
+  _teamchangeblock_time_period:=0;
+  _slots_block_counter:=0;
+  _updrate:=0;}
+  _last_ready_time:=0;
+  {_last_ping_warning_time:=0;
+  _hwid:='';
+  _hwhash:='';
+  _orig_cdkey_hash:='';
+  _hwid_received:=false;
+  _force_invincibility_cur:=FZ_INVINCIBLE_DEFAULT;
+  _force_invincibility_next:=FZ_INVINCIBLE_DEFAULT; }
+end;
+
+destructor FZPlayerStateAdditionalInfo.Destroy;
+begin
+  inherited;
+  srcKit.Get.DbgLog('Del buffer, '+inttohex(cardinal(self),8));
+  DeleteCriticalSection(_lock);
+end;
+
+procedure FromPlayerStateClear(ps:pgame_PlayerState); stdcall;
+begin
+end;
+
+procedure FromPlayerStateConstructor(ps:pgame_PlayerState); stdcall;
+var
+  i:integer;
+begin
+  R_ASSERT(ps<>nil, 'ps is nil', 'FromPlayerStateConstructor');
+  EnterCriticalSection(_ps_lock);
+  try
+    i:=length(_ps_buffers);
+    setlength(_ps_buffers, i+1);
+    _ps_buffers[i] :=FZPlayerStateAdditionalInfo.Create(ps);
+  finally
+    LeaveCriticalSection(_ps_lock);
+  end;
+
+  if FZLogMgr.Get.IsSeverityLogged(FZ_LOG_DBG) then begin
+    FZLogMgr.Get.Write('PS created for '+inttohex(cardinal(ps), 8)+': '+inttohex(cardinal(@_ps_buffers[i]), 8)+', cnt = '+inttostr(i+1), FZ_LOG_IMPORTANT_INFO);
+  end;
+end;
+
+procedure FromPlayerStateDestructor(ps:pgame_PlayerState); stdcall;
+var
+  i, idx:integer;
+begin
+  R_ASSERT(ps<>nil, 'ps is nil', 'FromPlayerStateDestructor');
+
+  if FZLogMgr.Get.IsSeverityLogged(FZ_LOG_DBG) then begin
+    FZLogMgr.Get.Write('PS destroying for '+inttohex(cardinal(ps), 8)+': '+inttohex(cardinal(@_ps_buffers[i]), 8)+', cnt = '+inttostr(length(_ps_buffers)-1), FZ_LOG_DBG);
+  end;
+
+  EnterCriticalSection(_ps_lock);
+  try
+    idx:=-1;
+    for i:=0 to length(_ps_buffers)-1 do begin
+      if _ps_buffers[i]._my_player = ps then begin
+        idx:=i;
+        break;
+      end;
+    end;
+    R_ASSERT(idx >= 0, 'cannot find ps for FZ buffer', 'FromPlayerStateDestructor');
+
+    _ps_buffers[i].Free;
+
+    if length(_ps_buffers) > 1 then begin
+      _ps_buffers[i]:=_ps_buffers[length(_ps_buffers)-1]
+    end;
+    setlength(_ps_buffers, length(_ps_buffers)-1);
+  finally
+    LeaveCriticalSection(_ps_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.IsAllowedStartingVoting(): boolean;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if IsPlayerVoteMuted then begin
+      //Если игроку запрещено даже просто голосовать - то и про способность начать голосование можно забыть
+      result:=false;
+    end else begin
+      //если игрок один на сервере - пусть делает, что хочет
+      result:= (CurPlayersCount()<=2) or (self._last_started_voted_time=0) or (FZConfigCache.Get.GetDataCopy.vote_mute_time_ms=0) or (FZCommonHelper.GetTimeDeltaSafe(self._last_started_voted_time)>=FZConfigCache.Get.GetDataCopy.vote_mute_time_ms);
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.IsMuted(): boolean;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if self._mute_time_period = 0 then begin
+      result:=false;
+    end else begin
+      result:=FZCommonHelper.GetTimeDeltaSafe(self._mute_start_time)<self._mute_time_period;
+      if not result then begin
+        FZLogMgr.Get.Write('Chat mute of player '+GetPlayerName(_my_player)+' is expired.', FZ_LOG_IMPORTANT_INFO);
+        self._mute_time_period:=0;
+      end;
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.IsPlayerVoteMuted(): boolean;
+begin
+  EnterCriticalSection(_lock);
+  try
+    if self._votes_mute_time_period = 0 then begin
+      result:=false;
+    end else begin
+      result:=FZCommonHelper.GetTimeDeltaSafe(self._votes_mute_start_time)<self._votes_mute_time_period;
+      if not result then begin
+        FZLogMgr.Get.Write('Vote mute of player '+GetPlayerName(_my_player)+' is expired.', FZ_LOG_IMPORTANT_INFO);
+        self._votes_mute_time_period:=0;
+      end;
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.OnBadWordsInChat(): cardinal;
+begin
+  EnterCriticalSection(_lock);
+  try
+    self._badwords_counter:=self._badwords_counter+1;
+    if FZConfigCache.Get.GetDataCopy.chat_badwords_treasure<self._badwords_counter then begin
+      result:=FZConfigCache.Get.GetDataCopy.mutetime_per_badword*self._badwords_counter;
+      AssignMute(result);
+    end else begin
+      result:=0;
+    end;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function FZPlayerStateAdditionalInfo.OnChatMessage(): cardinal;
+var
+  _data:FZCacheData;
+begin
+  _data:=FZConfigCache.Get.GetDataCopy();
+  result:=0;
+  EnterCriticalSection(_lock);
+  try
+    if not IsMuted() and (_data.chat_series_for_mute<>0) and  (_data.chat_series_interval<>0) then begin
+      if (self._last_chat_message_time=0) or (FZCommonHelper.GetTimeDeltaSafe(self._last_chat_message_time)>_data.chat_series_interval) then begin
+        self._chat_messages_series:=0;
+      end;
+      self._chat_messages_series:=self._chat_messages_series+1;
+      if self._chat_messages_series>_data.chat_series_for_mute then begin
+        self._chatmutes_count:=self._chatmutes_count+1;
+        result:=self._chatmutes_count*_data.chat_mute_time;
+        AssignMute(result);
+        FZLogMgr.Get.Write('Player '+GetPlayerName(_my_player)+' chat muted for '+inttostr(_chatmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
+      end;
+    end;
+    self._last_chat_message_time:=FZCommonHelper.GetGameTickCount();
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.OnVoteStarted();
+begin
+  EnterCriticalSection(_lock);
+  try
+    self._last_started_voted_time:=FZCommonHelper.GetGameTickCount();
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+procedure FZPlayerStateAdditionalInfo.UnMute();
+begin
+  EnterCriticalSection(_lock);
+  try
+    self._mute_time_period:=0;
+  finally
+    LeaveCriticalSection(_lock);
+  end;
+end;
+
+function CheckPlayerReadySignalValidity(cl:pxrClientData):boolean; stdcall;
+begin
+  if FZCommonHelper.GetTimeDeltaSafe(GetFZBuffer(cl.ps).last_ready)>FZConfigCache.Get.GetDataCopy.player_ready_signal_interval then begin
+    result:=true;
+    GetFZBuffer(cl.ps).last_ready:=FZCommonHelper.GetGameTickCount();
+  end else begin
+    result:=false;
+  end;
+end;
 
 //Callback for sending SYSMSGS
 type FZSysMsgSendCallbackData = record
@@ -252,6 +669,37 @@ begin
   ip:='';
   name:=GetNameAndIpByClientId(id, ip);
   result:='Player "'+name+'" (ID='+inttostr(id)+', IP='+ip+') '+message;
+end;
+
+function GetFZBuffer(ps: pgame_PlayerState): FZPlayerStateAdditionalInfo;
+var
+  i:integer;
+begin
+  R_ASSERT(ps<>nil, 'ps is nil', 'GetFZBuffer');
+  EnterCriticalSection(_ps_lock);
+  try
+    for i:=0 to length(_ps_buffers)-1 do begin
+      if _ps_buffers[i]._my_player = ps then begin
+        result:=_ps_buffers[i];
+        break;
+      end;
+    end;
+  finally
+    LeaveCriticalSection(_ps_lock);
+  end;
+end;
+
+function Init(): boolean;
+begin
+  setlength(_ps_buffers, 0);
+  InitializeCriticalSection(_ps_lock);
+  result:=true;
+end;
+
+procedure Clean();
+begin
+  setlength(_ps_buffers, 0);
+  DeleteCriticalSection(_ps_lock);
 end;
 
 end.

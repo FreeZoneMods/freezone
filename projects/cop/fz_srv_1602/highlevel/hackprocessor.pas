@@ -13,7 +13,7 @@ procedure BadEventsProcessor(t: FZSecurityEventType; description: string); stdca
 function ActiveDefence(ps:pgame_PlayerState):boolean;
 
 implementation
-uses Servers, LogMgr, ConfigCache, dynamic_caster, basedefs{, Chat, Games};
+uses Servers, LogMgr, ConfigCache, dynamic_caster, basedefs, Chat{, Games};
 
 const
   ANTIHACKER_GROUP:string='[ACTDEF] ';
@@ -25,11 +25,11 @@ function NotifyRadmins(player:pointer; pmsg:pointer; psrv:pointer):boolean; stdc
 var
   cld:pxrClientData;
 begin
-{  result:=true;
+  result:=true;
   cld:=dynamic_cast(player, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
   if (cld<>nil) and (cld.m_admin_rights__m_has_admin_rights) then begin
     SendChatMessageByFreeZone(psrv, cld.base_IClient.ID.id, PAnsiChar(pmsg));
-  end;}
+  end;
 end;
 
 procedure BadEventsProcessor(t: FZSecurityEventType; description: string); stdcall;

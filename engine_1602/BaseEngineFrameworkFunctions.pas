@@ -36,6 +36,7 @@ uses
     Physics,
     PureClient,
     PureServer,
+    Readers,
     renderable,
     Schedule,
     Servers,
@@ -81,6 +82,7 @@ begin
   if not Packets.Init() then exit;
   if not PureClient.Init() then exit;
   if not PureServer.Init() then exit;
+  if not Readers.Init() then exit;
   if not Servers.Init() then exit;
 //  if not UI.Init() then exit;
   if not Vector.Init() then exit;

@@ -11,11 +11,17 @@ function xrGameDllType():cardinal;
 
 var
   xrGame:cardinal;
+  xrGame_need_free:boolean;
   xrGameSpy:cardinal;
+  xrGameSpy_need_free:boolean;
   xrEngine:cardinal;
+  xrEngine_need_free:boolean;
   xrCore:cardinal;
+  xrCore_need_free:boolean;
   xrNetServer:cardinal;
+  xrNetServer_need_free:boolean;
   xrAPI:cardinal;
+  xrAPI_need_free:boolean;
 
 const
   difficulty_gdNovice:integer=0;
@@ -47,13 +53,16 @@ begin
   result:=XRGAME_1602;
 end;
 
-function InitModule(var dest:cardinal; name:PAnsiChar; reload:boolean):boolean; stdcall;
+function InitModule(var dest:cardinal; name:PAnsiChar; reload:boolean; var reloaded:boolean):boolean; stdcall;
 begin
   result:=false;
-  if reload then begin
+  reloaded:=false;
+  dest:=GetModuleHandle(name);
+  if (dest = 0) and reload then begin
     dest:=LoadLibrary(name);
-  end else begin
-    dest:=GetModuleHandle(name);
+    if dest <> 0 then begin
+      reloaded:=true;
+    end;
   end;
 
   if dest = 0 then begin
@@ -66,22 +75,22 @@ end;
 function Init():boolean; stdcall;
 begin
   result:=false;
-  if not InitModule(xrEngine, XENGINE_EXE, false) then exit;
-  if not InitModule(xrGame, XRGAME_DLL, true) then exit;
-  if not InitModule(xrGameSpy, XRGAMESPY_DLL, true) then exit;
-  if not InitModule(xrCore, XRCORE_DLL, true) then exit;
-  if not InitModule(xrNetServer, XRNETSERVER_DLL, true) then exit;
-  if not InitModule(xrAPI, XRAPI_DLL, true) then exit;
+  if not InitModule(xrEngine, XENGINE_EXE, false, xrEngine_need_free) then exit;
+  if not InitModule(xrGame, XRGAME_DLL, true, xrGame_need_free) then exit;
+  if not InitModule(xrGameSpy, XRGAMESPY_DLL, true, xrGameSpy_need_free) then exit;
+  if not InitModule(xrCore, XRCORE_DLL, true, xrCore_need_free) then exit;
+  if not InitModule(xrNetServer, XRNETSERVER_DLL, true, xrNetServer_need_free) then exit;
+  if not InitModule(xrAPI, XRAPI_DLL, true, xrAPI_need_free) then exit;
   result:=true;
 end;
 
 procedure Free(); stdcall;
 begin
-  FreeLibrary(xrGame);
-  FreeLibrary(xrGameSpy);
-  FreeLibrary(xrCore);
-  FreeLibrary(xrNetServer);
-  FreeLibrary(xrAPI);  
+  if xrGame_need_free then FreeLibrary(xrGame);
+  if xrGameSpy_need_free then FreeLibrary(xrGameSpy);
+  if xrCore_need_free then FreeLibrary(xrCore);
+  if xrNetServer_need_free then FreeLibrary(xrNetServer);
+  if xrAPI_need_free then FreeLibrary(xrAPI);
 end;
 
 end.

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="10"/>
+    <Version Value="11"/>
     <PathDelim Value="\"/>
     <General>
       <Flags>
@@ -96,18 +96,27 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <FormatVersion Value="1"/>
         <HostApplicationFilename Value="G:\stalker\stcop\freezone\bin\dedicated\xrEngine.exe"/>
         <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_atp/ah/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
         <WorkingDirectory Value="G:\stalker\stcop\freezone\bin"/>
       </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default">
+          <local>
+            <HostApplicationFilename Value="G:\stalker\stcop\freezone\bin\dedicated\xrEngine.exe"/>
+            <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_atp/ah/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
+            <WorkingDirectory Value="G:\stalker\stcop\freezone\bin"/>
+          </local>
+        </Mode0>
+      </Modes>
     </RunParams>
     <RequiredPackages Count="1">
       <Item1>
         <PackageName Value="LazUtils"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="15">
+    <Units Count="20">
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -172,6 +181,28 @@
         <Filename Value="highlevel\GameSpy.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit14>
+      <Unit15>
+        <Filename Value="highlevel\chat.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Chat"/>
+      </Unit15>
+      <Unit16>
+        <Filename Value="highlevel\ChatCommands.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="highlevel\Censor.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit17>
+      <Unit18>
+        <Filename Value="highlevel\Voting.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="highlevel\mapgametypes.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="MapGametypes"/>
+      </Unit19>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

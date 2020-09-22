@@ -72,7 +72,7 @@ type item_respawn_manager = packed record  //sizeof = 0x404C
   m_server:pointer;//pxrServer;
   m_respawns:xr_vector; //spawn_item
   m_respawn_sections_cache:assotiative_vector;
-  level_items_respawn:array[0..$1b] of byte;
+  level_items_respawn:array[0..$17] of byte;
 end;
 
 type async_statistics_collector = packed record

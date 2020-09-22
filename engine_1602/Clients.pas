@@ -76,11 +76,6 @@ end;
 
 game_PlayerState = packed record //sizeof = 0xb9 (Exact! determined by operator new argument!)
   vftable:pointer;  
-  //name:array[0..63] of char; //оригинальное определение
-  //мы тут схитрим - в последние 4 байта запихнем указатель на пристегивающийся буфер
-  //name:array[0..59] of char;
-  //FZBuffer:pointer;
-
   team:byte;
 
   m_iRivalKills:smallint;
@@ -95,11 +90,11 @@ game_PlayerState = packed record //sizeof = 0xb9 (Exact! determined by operator 
   money_for_round:integer;
   experience_Real:single;
   experience_New:single;
-  experience_D:single;
+  //offste:0x1d
   rank:byte;
   af_count:byte;
-  //offste:0x23
   flags__:word;
+  //offste:0x21
   ping:word;
   GameID:word;
   lasthitter:word;
@@ -186,12 +181,22 @@ const
 
 function Init():boolean; stdcall;
 function IsLocalServerClient(client: pIClient): boolean;
+function GetPlayerName(ps:pgame_PlayerState): string;
 
 implementation
 
 function IsLocalServerClient(client: pIClient): boolean;
 begin
   result:=(client.flags and ICLIENT_FLAG_LOCAL) <> 0;
+end;
+
+function GetPlayerName(ps:pgame_PlayerState): string;
+begin
+  if ps<>nil then begin
+    result:=get_string_value(@ps.m_account.m_player_name);
+  end else begin
+    result:='';
+  end;
 end;
 
 function Init():boolean; stdcall;
