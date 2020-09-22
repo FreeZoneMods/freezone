@@ -64,7 +64,7 @@ begin
   try
     hacker:=GetClientByGameID(ps.GameID);
     if (hacker<>nil) and AnswerToHacker(hacker.base_IClient.ID.id) then begin
-      BadEventsProcessor(FZ_SEC_EVENT_INFO, ANTIHACKER_GROUP+PAnsiChar(@ps.name[0])+' - sorry, bro, have a nice day');
+      BadEventsProcessor(FZ_SEC_EVENT_INFO, ANTIHACKER_GROUP+GetPlayerName(ps)+' - sorry, bro, have a nice day');
       result:=true;
     end;
   finally

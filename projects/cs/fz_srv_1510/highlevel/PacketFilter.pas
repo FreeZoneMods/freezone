@@ -86,8 +86,12 @@ begin
       end else if pPacketData.compression_byte=NET_TAG_COMPRESSED then begin;
         //TODO: Из-за ассерта в декомпрессоре могут быть проблемы...
         //TODO: Decompress
+        DPNDestroyClient(pMsg.dpnidSender);
+        exit;
       end else begin
         FZLogMgr.Get.Write('Unknown compression tag value, client id='+inttostr(pMsg.dpnidSender), FZ_LOG_IMPORTANT_INFO);
+        DPNDestroyClient(pMsg.dpnidSender);
+        exit;
       end;
 
       if pPacketData.header.tag=NET_TAG_MERGED then begin

@@ -40,7 +40,7 @@ const
   //Строки для лейблов под комбобоксом
   STR_REASON:PChar = 'Reason:';
   STR_VALUE:PChar = 'Value:';
-  STR_TIME:PChar = 'Time (min.): ';
+  STR_TIME:PChar = 'Time (sec.): ';
   STR_RESULT:PChar='Result: ';
   STR_TEXT:PChar='Text: ';
   STR_INPUT:PChar='Input: ';
@@ -282,7 +282,7 @@ procedure Clean();
 var
   FZControlGUI: TFZControlGUI;
 implementation
-uses Console, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog, MapGametypes, AdminCommands, GameSpy, Games, whitehashes, TeleportMgr, HitMgr;
+uses Console, dynamic_caster, basedefs, SACE_interface, Servers, Players, Keys, TranslationMgr, Censor, badpackets, MatVectors, CommonHelper, ConfigCache, LogMgr, SubnetBanlist, ItemsCfgMgr, DownloadMgr, PlayersConnectionLog, MapGametypes, AdminCommands, GameSpy, Games, whitehashes, TeleportMgr, HitMgr, PeriodicExecutionMgr;
 
 {$R *.lfm}
 
@@ -457,6 +457,7 @@ begin
   FZHashesMgr.Get.Reload;
   FZMapGametypesMgr.Get.Reload;
   FZPlayersConnectionMgr.Get.Reset;
+  FZPeriodicExecutionMgr.Get.Reload();
   GameSpy.OnConfigReloaded();
   FZLogMgr.Get.Write('Configs reloaded.', FZ_LOG_USEROUT);
 end;
@@ -653,23 +654,23 @@ end;
 
 constructor TFZPlayerData.Create(cl: pxrClientData);
 begin
-  self.name:=cl.ps.name;
+  self.name:=GetPlayerName(cl.ps);
   if length(self.name)<1 then begin
     self.name:=STR_PLAYER_LOADING;
   end;
   self.id:=cl.base_IClient.ID;
   self.sace_status:=GetSACEStatus(self.id.id);
 
-  self.chat_muted:= FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsMuted;
-  self.speech_muted:= FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsSpeechMuted;
-  self.votings_muted:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsPlayerVoteMuted;
+  self.chat_muted:= GetFZBuffer(cl.ps).IsMuted();
+  self.speech_muted:= GetFZBuffer(cl.ps).IsSpeechMuted();
+  self.votings_muted:=GetFZBuffer(cl.ps).IsPlayerVoteMuted();
   self.bps:=cl.base_IClient.stats.ci_last.dwThroughputBPS;
 
   self.sent_g:=cl.base_IClient.stats.ci_last.dwBytesSentGuaranteed;
   sent_ng:=cl.base_IClient.stats.ci_last.dwBytesSentNonGuaranteed;
   self.retried:= cl.base_IClient.stats.ci_last.dwBytesRetried;
   self.dropped:= cl.base_IClient.stats.ci_last.dwBytesDropped;
-  self.updrate:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).updrate;
+  self.updrate:= GetFZBuffer(cl.ps).updrate;
   self.game_id:=cl.ps.GameID;
   self.money:=cl.ps.money_for_round;
   self.frags:=cl.ps.m_iRivalKills;
@@ -678,9 +679,9 @@ begin
   self.teamkills:=cl.ps.m_iTeamKills;
   self.rank:=cl.ps.rank;
   self.team:=cl.ps.team;
-  self.hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(false);
-  self.orig_cdkey:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetOrigCdkeyHash();
-  self.teamchange_blocked:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsTeamChangeBlocked();
+  self.hwid:=GetFZBuffer(cl.ps).GetHwId(false);
+  self.orig_cdkey:=GetFZBuffer(cl.ps).GetOrigCdkeyHash();
+  self.teamchange_blocked:=GetFZBuffer(cl.ps).IsTeamChangeBlocked();
 
   if self.sace_status = SACE_NOT_FOUND then begin
     self.item_color:=clRed;
@@ -696,7 +697,7 @@ begin
     self.item_color:=clWhite;
   end;
 
-  case FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetForceInvincibilityStatus() of
+  case GetFZBuffer(cl.ps).GetForceInvincibilityStatus() of
     FZ_INVINCIBLE_DEFAULT: self.invincibility_string:='default';
     FZ_INVINCIBLE_FORCE_DISABLE: self.invincibility_string:='always off';
     FZ_INVINCIBLE_FORCE_ENABLE: self.invincibility_string:='always on';
@@ -796,7 +797,7 @@ begin
   combo_options.AddItem(STR_KILL_PLAYER, FZOptionsItem.Create(ActOptDisableAll, ActKill) as TObject);
   combo_options.AddItem(STR_ADD_MONEY, FZOptionsItem.Create(ActOptValue, ActMoneyAdd) as TObject);
   combo_options.AddItem(STR_SET_TEAM, FZOptionsItem.Create(ActOptValue, ActSetTeam) as TObject);
-  combo_options.AddItem(STR_BLOCK_TEAMCHANGE, FZOptionsItem.Create(ActOptValue, ActBlockTeamchange) as TObject);
+  combo_options.AddItem(STR_BLOCK_TEAMCHANGE, FZOptionsItem.Create(ActOptTime, ActBlockTeamchange) as TObject);
 
   combo_options.AddItem(STR_RANK_UP, FZOptionsItem.Create(ActOptDisableAll, ActRankUp) as TObject);
   combo_options.AddItem(STR_RANK_DOWN, FZOptionsItem.Create(ActOptDisableAll, ActRankDown) as TObject);

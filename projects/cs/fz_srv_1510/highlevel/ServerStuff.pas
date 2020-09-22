@@ -60,11 +60,13 @@ procedure game_sv_mp__Player_AddExperience_expspeed(experience:psingle); stdcall
 
 procedure DisconnectPlayerWithMessage(cl:pIClient; disconnect_type:integer); stdcall;
 
+function NET_Compressor__Decompress_Patch(count:cardinal; sz:pcardinal):boolean; stdcall;
+
 function Init():boolean; stdcall;
 procedure Clean(); stdcall;
 
 implementation
-uses LogMgr, sysutils, ConfigCache, Windows, ItemsCfgMgr, clsids, xrstrings, HackProcessor, Players, CommonHelper, Level, Objects, xr_debug, Voting, sysmsgs, TranslationMgr, AdminCommands, Chat, InventoryItems, Console, dynamic_caster, basedefs, TeleportMgr, HitMgr;
+uses LogMgr, sysutils, ConfigCache, Windows, ItemsCfgMgr, clsids, xrstrings, HackProcessor, Players, CommonHelper, Level, Objects, xr_debug, Voting, sysmsgs, TranslationMgr, AdminCommands, Chat, InventoryItems, Console, dynamic_caster, basedefs, TeleportMgr, HitMgr, Timersmgr;
 
 const
   HITS_GROUP:string='[HIT] ';
@@ -90,7 +92,7 @@ begin
     exit;
   end;
 
-  fzlogmgr.get.write('Player '+PChar(@target.ps.name[0])+' wants to die', FZ_LOG_INFO);
+  fzlogmgr.get.write('Player '+GetPlayerName(target.ps)+' wants to die', FZ_LOG_INFO);
   result:=(target.base_IClient.ID.id = senderid);
 end;
 
@@ -107,7 +109,7 @@ begin
       result:='['+get_string_value(@obj.s_name)+']';
     end;
   end else begin
-    result:= cld.ps.name;
+    result:=GetPlayerName(cld.ps);
   end;
 end;
 
@@ -273,7 +275,7 @@ begin
         hit_factor:=cfg.damage_correction_highscore_speed * (1 + stat_factor-cfg.damage_correction_highscore_treasure);
         if (hit_factor > cfg.damage_correction_highscore_limit) or (hit_factor < 0) then hit_factor:=cfg.damage_correction_highscore_limit;
         if FZLogMgr.Get.IsSeverityLogged(FZ_LOG_DBG) then begin
-          FZLogMgr.Get().Write('Apply damage scaler '+FZCommonHelper.FloatToString(hit_factor, 4, 2)+' to high-score player "'+PAnsiChar(@victim.ps.name[0])+'"', FZ_LOG_DBG);
+          FZLogMgr.Get().Write('Apply damage scaler '+FZCommonHelper.FloatToString(hit_factor, 4, 2)+' to high-score player "'+GetPlayerName(victim.ps)+'"', FZ_LOG_DBG);
         end;
         out_power^ := out_power^ * hit_factor;
         result:=true;
@@ -293,7 +295,7 @@ begin
         hit_factor:=(cfg.hit_correction_highscore_speed * (1 + stat_factor-cfg.hit_correction_highscore_treasure));
         if (hit_factor > cfg.hit_correction_highscore_limit) or (hit_factor < 0) then hit_factor:=cfg.hit_correction_highscore_limit;
         if FZLogMgr.Get.IsSeverityLogged(FZ_LOG_DBG) then begin
-          FZLogMgr.Get().Write('Apply hit scaler '+FZCommonHelper.FloatToString(hit_factor, 4, 2)+' to high-score player "'+PAnsiChar(@hitter.ps.name[0])+'"', FZ_LOG_DBG);
+          FZLogMgr.Get().Write('Apply hit scaler '+FZCommonHelper.FloatToString(hit_factor, 4, 2)+' to high-score player "'+GetPlayerName(hitter.ps)+'"', FZ_LOG_DBG);
         end;
         out_power^:= out_power^ / hit_factor;
         result:=true;
@@ -590,6 +592,7 @@ end;
 procedure game_sv_mp__Update_additionals(); stdcall;
 begin
   AdminCommands.ProcessAdminCommands();
+  FZTimersMgr.Get.Update();
   ForEachClientDo(@UpdatePlayer_cb, nil, nil, nil);
 end;
 
@@ -745,7 +748,7 @@ begin
 
   newteam:=pWord(@p.B.data[p.r_pos])^;
   if newteam <> cld.ps.team then begin
-    result:=not FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).OnTeamChange();
+    result:=not GetFZBuffer(cld.ps).OnTeamChange();
     if result then begin
       SendChatMessageByFreezone(GetPureServer(), clid, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_change_team'));
     end;
@@ -755,14 +758,14 @@ end;
 function game_sv_TeamDeathmatch__OnPlayerConnect_selectteam(ps:pgame_PlayerState; autoteam: integer): integer; stdcall;
 begin
   R_ASSERT(ps<>nil, 'game_sv_TeamDeathmatch__OnPlayerConnect_selectteam got nil in ps');
-  FZLogMgr.Get.Write('Autoteam '+inttostr(autoteam)+', current team '+inttostr(ps.team)+' for player "'+PAnsiChar(@ps.name[0])+'"', FZ_LOG_DBG);
+  FZLogMgr.Get.Write('Autoteam '+inttostr(autoteam)+', current team '+inttostr(ps.team)+' for player "'+GetPlayerName(ps)+'"', FZ_LOG_DBG);
 
-  if (ps.team>0) and FZPlayerStateAdditionalInfo(ps.FZBuffer).IsTeamChangeBlocked() then begin
+  if (ps.team>0) and GetFZBuffer(ps).IsTeamChangeBlocked() then begin
     result:=ps.team;
-    FZLogMgr.Get.Write('Assigning team '+inttostr(result)+' for player "'+PAnsiChar(@ps.name[0])+'" - team changing for this player is blocked', FZ_LOG_INFO);
+    FZLogMgr.Get.Write('Assigning team '+inttostr(result)+' for player "'+GetPlayerName(ps)+'" - team changing for this player is blocked', FZ_LOG_INFO);
   end else if (ps.team > 0) and (autoteam <> ps.team) and FZConfigCache.Get().GetDataCopy().preserve_team_after_reconnect then begin
     result:=ps.team;
-    FZLogMgr.Get.Write('Restoring team '+inttostr(result)+' for player "'+PAnsiChar(@ps.name[0])+'" after reconnect', FZ_LOG_INFO);
+    FZLogMgr.Get.Write('Restoring team '+inttostr(result)+' for player "'+GetPlayerName(ps)+'" after reconnect', FZ_LOG_INFO);
   end else begin
     result:=autoteam;
   end;
@@ -789,11 +792,11 @@ begin
   blockstate:=pInventoryBlockItem(@p.B.data[p.r_pos])^;
   if blockstate.mask = INV_STATE_BLOCK_ALL then begin
     if blockstate.block_activation = 0 then begin
-      cnt:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).SlotsBlockCount(-1);
+      cnt:=GetFZBuffer(cld.ps).SlotsBlockCount(-1);
     end else begin
-      cnt:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).SlotsBlockCount(1);
+      cnt:=GetFZBuffer(cld.ps).SlotsBlockCount(1);
     end;
-    FZLogMgr.Get().Write('block count '+inttostr(cnt)+' for player '+PAnsiChar(@cld.ps.name[0]), FZ_LOG_DBG);
+    FZLogMgr.Get().Write('block count '+inttostr(cnt)+' for player '+GetPlayerName(cld.ps), FZ_LOG_DBG);
   end;
 end;
 
@@ -805,7 +808,7 @@ begin
   cld:=ID_to_client(clid);
   if (cld=nil) or (cld.ps=nil) then exit;
 
-  FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).ResetSlotsBlockCount();
+  GetFZBuffer(cld.ps).ResetSlotsBlockCount();
 end;
 
 function OnTeamKill(killer:pgame_PlayerState; victim:pgame_PlayerState):boolean; stdcall;
@@ -893,6 +896,16 @@ begin
   end;
 
   DisconnectPlayer(cl, FZTranslationMgr.Get.TranslateSingle(reason));
+end;
+
+function NET_Compressor__Decompress_Patch(count: cardinal; sz: pcardinal): boolean; stdcall;
+begin
+  if sz=nil then begin
+    result:=false;
+    exit;
+  end;
+
+  result:= count <= sz^;
 end;
 
 function Init():boolean; stdcall;

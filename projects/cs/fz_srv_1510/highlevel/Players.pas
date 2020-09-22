@@ -168,10 +168,10 @@ function IsWeaponKnife(item:pCSE_Abstract):boolean;stdcall;
 
 procedure UpdatePlayer(cld:pxrClientData);
 
-//function CheckPlayerInvincible(ps:pgame_PlayerState; onshot:cardinal):boolean; stdcall;
-
 function IsInvincibilityControlledByFZ(ps:pgame_PlayerState):boolean; stdcall;
 function IsInvinciblePersistAfterShot(ps:pgame_PlayerState):boolean; stdcall;
+
+function GetFZBuffer(ps:pgame_PlayerState):FZPlayerStateAdditionalInfo;
 
 implementation
 uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug, Banned, xr_time, SACE_interface, whitehashes, TeleportMgr;
@@ -181,27 +181,27 @@ const
 
 procedure SetHwId(cl: pxrClientData; hwid: string; hwhash:string); stdcall;
 begin
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetHwId(hwid, hwhash);
+  GetFZBuffer(cl.ps).SetHwId(hwid, hwhash);
 end;
 
 function GetHwId(cl: pxrClientData; allow_old: boolean): string; stdcall;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(allow_old);
+  result:=GetFZBuffer(cl.ps).GetHwId(allow_old);
 end;
 
 function GetHwHash(cl: pxrClientData; allow_old: boolean): string; stdcall;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwHash(allow_old);
+  result:=GetFZBuffer(cl.ps).GetHwHash(allow_old);
 end;
 
 procedure SetOrigCdkeyHash(cl: pxrClientData; hash: string);
 begin
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetOrigCdkeyHash(hash);
+  GetFZBuffer(cl.ps).SetOrigCdkeyHash(hash);
 end;
 
 function GetOrigCdkeyHash(cl: pxrClientData): string;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetOrigCdkeyHash();
+  result:=GetFZBuffer(cl.ps).GetOrigCdkeyHash();
 end;
 
 procedure modify_player_name (name:PChar; new_name:PChar); stdcall;
@@ -278,44 +278,43 @@ function IsSlotsBlocked(cl: pxrClientData): boolean; stdcall;
 begin
   result:=true;
   if cl.ps = nil then exit;
-
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SlotsBlockCount() > 0;
+  result:=(GetFZBuffer(cl.ps).SlotsBlockCount() > 0);
 end;
 
 function GetForceInvincibilityStatus(cl: pxrClientData): FZPlayerInvincibleStatus; stdcall;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetForceInvincibilityStatus();
+  result:=GetFZBuffer(cl.ps).GetForceInvincibilityStatus();
 end;
 
 function SetForceInvincibilityStatus(cl: pxrClientData; status: FZPlayerInvincibleStatus): boolean;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).SetForceInvincibilityStatus(status);
+  result:=GetFZBuffer(cl.ps).SetForceInvincibilityStatus(status);
 end;
 
 function UpdateForceInvincibilityStatus(cl: pxrClientData):FZPlayerInvincibleStatus;
 begin
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).UpdateForceInvincibilityStatus();
+  result:=GetFZBuffer(cl.ps).UpdateForceInvincibilityStatus();
 end;
 
 function IsPlayerTeamChangeBlocked(cl: pxrClientData): boolean; stdcall;
 begin
   R_ASSERT(cl <> nil, 'client is nil', 'IsPlayerTeamChangeBlocked');
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsTeamChangeBlocked();
+  result:=GetFZBuffer(cl.ps).IsTeamChangeBlocked();
 end;
 
 procedure SetUpdRate(cl: pxrClientData; updrate: cardinal); stdcall;
 begin
   R_ASSERT(cl <> nil, 'client is nil', 'SetUpdRate');
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).updrate:=updrate;
+  GetFZBuffer(cl.ps).updrate:=updrate;
 end;
 
 function UnMutePlayer(cl: pxrClientData): boolean; stdcall;
 begin
   R_ASSERT(cl <> nil, 'client is nil',  'UnMutePlayer');
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsMuted();
+  result:=GetFZBuffer(cl.ps).IsMuted();
 
   if result then begin
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).UnMute();
+    GetFZBuffer(cl.ps).UnMute();
   end;
 end;
 
@@ -333,7 +332,7 @@ begin
     end else begin
       time:=cardinal(newtime);
     end;
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).AssignMute(time);
+    GetFZBuffer(cl.ps).AssignMute(time);
     result:=true;
   end;
 end;
@@ -341,10 +340,10 @@ end;
 function UnBlockPlayerTeamChange(cl: pxrClientData): boolean; stdcall;
 begin
   R_ASSERT(cl <> nil, 'client is nil',  'UnBlockPlayerTeamChange');
-  result:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).IsTeamChangeBlocked();
+  result:=GetFZBuffer(cl.ps).IsTeamChangeBlocked();
 
   if result then begin
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).UnBlockTeamChange();
+    GetFZBuffer(cl.ps).UnBlockTeamChange();
   end;
 end;
 
@@ -362,7 +361,7 @@ begin
     end else begin
       time:=cardinal(newtime);
     end;
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).BlockTeamChange(time);
+    GetFZBuffer(cl.ps).BlockTeamChange(time);
     result:=true;
   end;
 end;
@@ -569,7 +568,7 @@ begin
     end else begin
       result:=FZCommonHelper.GetTimeDeltaSafe(self._mute_start_time)<self._mute_time_period;
       if not result then begin
-        FZLogMgr.Get.Write('Chat mute of player '+PChar(@self._my_player.name)+' is expired.', FZ_LOG_IMPORTANT_INFO);
+        FZLogMgr.Get.Write('Chat mute of player '+GetPlayerName(_my_player)+' is expired.', FZ_LOG_IMPORTANT_INFO);
         self._mute_time_period:=0;
       end;
     end;
@@ -587,7 +586,7 @@ begin
     end else begin
       result:=FZCommonHelper.GetTimeDeltaSafe(self._votes_mute_start_time)<self._votes_mute_time_period;
       if not result then begin
-        FZLogMgr.Get.Write('Vote mute of player '+PChar(@self._my_player.name)+' is expired.', FZ_LOG_IMPORTANT_INFO);
+        FZLogMgr.Get.Write('Vote mute of player '+GetPlayerName(_my_player)+' is expired.', FZ_LOG_IMPORTANT_INFO);
         self._votes_mute_time_period:=0;
       end;
     end;
@@ -698,7 +697,7 @@ begin
     end else begin
       result:=FZCommonHelper.GetTimeDeltaSafe(self._speechmute_start_time)<self._speechmute_time_period;
       if not result then begin
-        FZLogMgr.Get.Write('Speech mute of player '+PChar(@self._my_player.name)+' is expired.', FZ_LOG_IMPORTANT_INFO);
+        FZLogMgr.Get.Write('Speech mute of player '+GetPlayerName(_my_player)+' is expired.', FZ_LOG_IMPORTANT_INFO);
         self._speechmute_time_period:=0;
       end;
     end;
@@ -740,7 +739,7 @@ begin
         self._chatmutes_count:=self._chatmutes_count+1;
         result:=self._chatmutes_count*_data.chat_mute_time;
         AssignMute(result);
-        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' chat muted for '+inttostr(_chatmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
+        FZLogMgr.Get.Write('Player '+GetPlayerName(_my_player)+' chat muted for '+inttostr(_chatmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
       end;
     end;
     self._last_chat_message_time:=FZCommonHelper.GetGameTickCount();
@@ -766,7 +765,7 @@ begin
         self._speechmutes_count:=self._speechmutes_count+1;
         result:=self._speechmutes_count*_data.speech_mute_time;
         AssignSpeechMute(result);
-        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' speech messages muted for '+inttostr(_speechmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
+        FZLogMgr.Get.Write('Player '+GetPlayerName(_my_player)+' speech messages muted for '+inttostr(_speechmutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
       end;
     end;
     self._last_speech_message_time:=FZCommonHelper.GetGameTickCount();
@@ -793,7 +792,7 @@ begin
         //Добби должен быть наказан...
         _votemutes_count:=_votemutes_count+1;
         AssignVoteMute(_votemutes_count*_data.vote_first_mute_time);
-        FZLogMgr.Get.Write('Player '+PChar(@_my_player.name)+' votes muted for '+inttostr(_votemutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
+        FZLogMgr.Get.Write('Player '+GetPlayerName(_my_player)+' votes muted for '+inttostr(_votemutes_count)+' time(s)', FZ_LOG_IMPORTANT_INFO);
       end;
     end;
 
@@ -887,9 +886,9 @@ end;
 
 function CheckPlayerReadySignalValidity(cl:pxrClientData):boolean; stdcall;
 begin
-  if FZCommonHelper.GetTimeDeltaSafe(FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).last_ready)>FZConfigCache.Get.GetDataCopy.player_ready_signal_interval then begin
+  if FZCommonHelper.GetTimeDeltaSafe(GetFZBuffer(cl.ps).last_ready)>FZConfigCache.Get.GetDataCopy.player_ready_signal_interval then begin
     result:=true;
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).last_ready:=FZCommonHelper.GetGameTickCount();
+    GetFZBuffer(cl.ps).last_ready:=FZCommonHelper.GetGameTickCount();
   end else begin
     result:=false;
   end;
@@ -897,10 +896,10 @@ end;
 
 function OnPingWarn(cl:pxrClientData):boolean; stdcall;
 begin
-  if (FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._last_ping_warning_time=0) or (FZCommonHelper.GetTimeDeltaSafe(FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._last_ping_warning_time)>FZConfigCache.Get.GetDataCopy.ping_warnings_max_interval) then begin
+  if (GetFZBuffer(cl.ps)._last_ping_warning_time=0) or (FZCommonHelper.GetTimeDeltaSafe(GetFZBuffer(cl.ps)._last_ping_warning_time)>FZConfigCache.Get.GetDataCopy.ping_warnings_max_interval) then begin
     cl.m_ping_warn__m_maxPingWarnings:=1;
   end;
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._last_ping_warning_time:=FZCommonHelper.GetGameTickCount();
+  GetFZBuffer(cl.ps)._last_ping_warning_time:=FZCommonHelper.GetGameTickCount();
   if cl.m_ping_warn__m_maxPingWarnings>=5 then begin
     DisconnectPlayer(@cl.base_IClient, FZTranslationMgr.Get.TranslateSingle('fz_ping_limit_exceeded'));
   end;
@@ -1175,13 +1174,13 @@ var
   cdkey:string;
 begin
   //Клиент прогрузился и окончательно готов к игре, не путать с сигналами при респавне
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid:=true;
-  FZPlayerStateAdditionalInfo(cl.ps.FZBuffer)._connected_and_ready:=true;
+  GetFZBuffer(cl.ps).valid:=true;
+  GetFZBuffer(cl.ps)._connected_and_ready:=true;
 
   if not IsLocalServerClient(@cl.base_IClient) then begin
     error_message:='';
     cdkey:=PAnsiChar(@cl.base_IClient.m_guid[0]);
-    hwid:=FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).GetHwId(false);
+    hwid:=GetFZBuffer(cl.ps).GetHwId(false);
 
     if length(error_message) = 0 then begin
       cfg:=FZConfigCache.Get().GetDataCopy();
@@ -1236,7 +1235,7 @@ end;
 
 function xrServer__client_Destroy_force_destroy(cl:pxrClientData):boolean; stdcall;
 begin
-  result:=not FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).valid;
+  result:=not GetFZBuffer(cl.ps).valid;
   if result then begin
     FZLogMgr.Get.Write('Force removing player state of disconnected client!', FZ_LOG_INFO);
   end;
@@ -1249,10 +1248,10 @@ begin
   write_empty_name:=true;
 
   if cl<>nil then begin
-    if FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).connected_and_ready then begin
+    if GetFZBuffer(cl.ps).connected_and_ready then begin
       write_empty_name:=false;
     end;
-    FZPlayerStateAdditionalInfo(cl.ps.FZBuffer).OnDisconnected();
+    GetFZBuffer(cl.ps).OnDisconnected();
   end;
 
   if write_empty_name then begin
@@ -1453,7 +1452,7 @@ begin
   R_ASSERT(ps<>nil, 'Checking bought items failed - PlayerState is NIL');
   ps.LastBuyAcount:=0;
 
-  FZLogMgr.Get.Write('Start processing bought items for player '+PAnsiChar(@ps.name[0])+', money = '+ inttostr(ps.money_for_round)+', warmup='+booltostr(warmup), FZ_LOG_DBG);
+  FZLogMgr.Get.Write('Start processing bought items for player '+GetPlayerName(ps)+', money = '+ inttostr(ps.money_for_round)+', warmup='+booltostr(warmup), FZ_LOG_DBG);
 
   //Сначала проверим на DoS для гарантированной раздачи ништяков хакерам
   for i:=0 to items_count_in_vector(@ps.pItemList, sizeof(word))-1 do begin
@@ -1462,7 +1461,7 @@ begin
       if FZConfigCache.Get().GetDataCopy().antihacker then begin
         ActiveDefence(ps);
       end else begin
-        BadEventsProcessor(FZ_SEC_EVENT_ATTACK, SHOP_GROUP+'DoS from player '+PAnsiChar(@ps.name[0]));
+        BadEventsProcessor(FZ_SEC_EVENT_ATTACK, SHOP_GROUP+'DoS from player '+GetPlayerName(ps));
       end;
       result:=false;
       break;
@@ -1475,7 +1474,7 @@ begin
     pidx:=pWord(get_item_from_vector(@ps.pItemList, i, sizeof(word)));
     idx:= pidx^;
 
-    if CheckForShopItemBanned(game, idx, PAnsiChar(@ps.name[0])) then begin
+    if CheckForShopItemBanned(game, idx, PAnsiChar(GetPlayerName(ps))) then begin
       //Предмет запрещено покупать!
       cl:=PS_to_client(ps);
       if cl<>nil then begin
@@ -1483,7 +1482,7 @@ begin
       end;
       remove_item_from_vector(@ps.pItemList, i, sizeof(word));
     end else begin
-      cost:= CouldItemBeBought(PAnsiChar(@ps.name[0]), ps.rank, game, idx, warmup, ps.money_for_round + ps.LastBuyAcount, @ps.pItemList);
+      cost:= CouldItemBeBought(GetPlayerName(ps), ps.rank, game, idx, warmup, ps.money_for_round + ps.LastBuyAcount, @ps.pItemList);
 
       if cost < 0 then begin
         //Предмет купить нельзя. Разбираемся, что нам делать теперь
@@ -1634,7 +1633,7 @@ begin
         pIdOfDesired^:=(smallint(fzBuyItemRenewing) shl 8) or (pIdOfDesired^);
         box_count:=box_count-1;
 
-        FZLogMgr.Get().Write('Player '+PAnsiChar(@ps.name[0])+' re-buys ammo '+_ammos[i].name+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
+        FZLogMgr.Get().Write('Player '+GetPlayerName(ps)+' re-buys ammo '+_ammos[i].name+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
       end;
     end;
   end;
@@ -1683,14 +1682,14 @@ begin
       if (old_addons and eWeaponAddonSilencer) <> 0 then addons_mask:=addons_mask or fzBuyItemOldSilencerStateBit;
       pIdOfDesired^:= smallint((addons_mask shl 8) or idToBuy);
 
-      FZLogMgr.Get().Write('Player '+PAnsiChar(@ps.name[0])+' re-buys (upgrades) '+sect+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
+      FZLogMgr.Get().Write('Player '+GetPlayerName(ps)+' re-buys (upgrades) '+sect+', full mask 0x'+inttohex(word(pIdOfDesired^), 4), FZ_LOG_DBG);
       break;
     end;
   end;
 
   //Посчитаем стоимость удаляемого и вернем сумму игроку
   cost:=cost+GetItemCostForRank('', ps.rank, game.m_strWeaponsData, sect, old_addons, true, true);
-  FZLogMgr.Get().Write('Return '+inttostr(cost)+' credits to player '+PAnsiChar(@ps.name[0])+' for item '+sect+', full mask 0x'+inttohex(word(idToBuy), 4), FZ_LOG_DBG);
+  FZLogMgr.Get().Write('Return '+inttostr(cost)+' credits to player '+GetPlayerName(ps)+' for item '+sect+', full mask 0x'+inttohex(word(idToBuy), 4), FZ_LOG_DBG);
   if cost > 0 then begin
     ps.m_bClearRun:=0;
     game_PlayerAddMoney(game, ps, cost);
@@ -1883,7 +1882,7 @@ begin
  FZLogMgr.Get.Write(GenerateMessageForClientId(cl.base_IClient.ID.id, 'send buy request, flags='+inttostr(cl.ps.flags__)), FZ_LOG_DBG);
  result:=(cl.ps.flags__ and (GAME_PLAYER_FLAG_ONBASE or GAME_PLAYER_FLAG_VERY_VERY_DEAD)<>0);
  if not result then begin
-   FZLogMgr.Get.Write('Buy attempt of "'+PAnsiChar(@cl.ps.name[0])+'" cancelled', FZ_LOG_INFO);
+   FZLogMgr.Get.Write('Buy attempt of "'+GetPlayerName(cl.ps)+'" cancelled', FZ_LOG_INFO);
  end;
 end;
 
@@ -1916,7 +1915,7 @@ begin
   ip:=ip_address_to_str(cld.base_IClient.m_cAddress);
 
   if (cld.ps <> nil) then begin
-    result:=PAnsiChar(@cld.ps.name[0]);
+    result:=GetPlayerName(cld.ps);
   end;
 
   if length(result) = 0 then begin
@@ -1934,19 +1933,21 @@ begin
 end;
 
 function IsInvincibilityControlledByFZ(ps:pgame_PlayerState):boolean; stdcall;
-var
-  buf:FZPlayerStateAdditionalInfo;
 begin
   R_ASSERT(ps<>nil, 'ps is nil', 'IsInvincibilityControlledByFZ');
-
-  buf:=FZPlayerStateAdditionalInfo(ps.FZBuffer);
-  result:=buf.GetForceInvincibilityStatus()<>FZ_INVINCIBLE_DEFAULT;
+  result:=GetFZBuffer(ps).GetForceInvincibilityStatus()<>FZ_INVINCIBLE_DEFAULT;
 end;
 
 function IsInvinciblePersistAfterShot(ps:pgame_PlayerState):boolean; stdcall;
 begin
   R_ASSERT(ps<>nil, 'ps is nil', 'IsInvinciblePersistAfterShot');
   result:=FZConfigCache.Get().GetDataCopy().invincibility_after_shot;
+end;
+
+function GetFZBuffer(ps: pgame_PlayerState): FZPlayerStateAdditionalInfo;
+begin
+  R_ASSERT(ps<>nil, 'ps is nil', 'GetFZBuffer');
+  result:=FZPlayerStateAdditionalInfo(ps.FZBuffer);
 end;
 
 end.

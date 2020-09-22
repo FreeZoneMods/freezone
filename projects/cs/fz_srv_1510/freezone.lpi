@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="10"/>
+    <Version Value="11"/>
     <PathDelim Value="\"/>
     <General>
       <Flags>
@@ -109,11 +109,20 @@
     </PublishOptions>
     <RunParams>
       <local>
-        <FormatVersion Value="1"/>
         <HostApplicationFilename Value="G:\stalker\stcs\freezone\bin\dedicated\xrEngine.exe"/>
         <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_firestation/tdm/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
         <WorkingDirectory Value="G:\stalker\stcs\freezone\bin"/>
       </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default">
+          <local>
+            <HostApplicationFilename Value="G:\stalker\stcs\freezone\bin\dedicated\xrEngine.exe"/>
+            <CommandLineParams Value="-i -nosound -fsltx ..\fsgame.ltx -ltx ..\user.ltx -start server(mp_firestation/tdm/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5449/portgs=5450) client(localhost)"/>
+            <WorkingDirectory Value="G:\stalker\stcs\freezone\bin"/>
+          </local>
+        </Mode0>
+      </Modes>
     </RunParams>
     <RequiredPackages Count="2">
       <Item1>
@@ -123,7 +132,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="37">
+    <Units Count="39">
       <Unit0>
         <Filename Value="freezone.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -283,6 +292,15 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="HitMgr"/>
       </Unit36>
+      <Unit37>
+        <Filename Value="highlevel\timersmgr.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Timersmgr"/>
+      </Unit37>
+      <Unit38>
+        <Filename Value="highlevel\PeriodicExecutionMgr.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit38>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

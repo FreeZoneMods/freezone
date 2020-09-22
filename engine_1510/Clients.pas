@@ -145,12 +145,22 @@ const
 
 function Init():boolean; stdcall;
 function IsLocalServerClient(client: pIClient): boolean;
+function GetPlayerName(ps:pgame_PlayerState): string;
 
 implementation
 
 function IsLocalServerClient(client: pIClient): boolean;
 begin
   result:=(client.flags and ICLIENT_FLAG_LOCAL) <> 0;
+end;
+
+function GetPlayerName(ps:pgame_PlayerState): string;
+begin
+  if ps<>nil then begin
+    result:=PAnsiChar(@ps.name[0]);
+  end else begin
+    result:='';
+  end;
 end;
 
 function Init():boolean; stdcall;

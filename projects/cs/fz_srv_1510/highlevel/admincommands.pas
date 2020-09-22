@@ -450,19 +450,19 @@ begin
     Report('Cannot find client with ID '+inttostr(_id), true);
     exit;
   end else if IsLocalServerClient(@client.base_IClient) or client.m_admin_rights__m_has_admin_rights then begin
-    Report('Cannot ban client "'+PAnsiChar(@client.ps.name[0])+'" with admin rights', true);
+    Report('Cannot ban client "'+GetPlayerName(client.ps)+'" with admin rights', true);
     exit;
   end;
 
   hwid:=GetHwId(client, false);
   if length(hwid) = 0 then begin
-    Report('Client "'+PAnsiChar(@client.ps.name[0])+'" has no HWID', true);
+    Report('Client "'+GetPlayerName(client.ps)+'" has no HWID', true);
     exit;
   end;
 
   banned_cl:=BanPlayerByDigest(@GetCurrentGame.m_cdkey_ban_list, hwid, _time, radmin);
   if banned_cl = nil then begin
-    Report('Error banning client "'+PAnsiChar(@client.ps.name[0])+'" with ID '+inttostr(_id), true);
+    Report('Error banning client "'+GetPlayerName(client.ps)+'" with ID '+inttostr(_id), true);
     exit;
   end;
 
@@ -474,7 +474,7 @@ begin
   end;
   tmp:=tmp+', '+FZTranslationMgr.Get().TranslateSingle('fz_expiration_date')+' '+TimeToString(banned_cl.ban_end_time);
 
-  assign_string(@banned_cl.client_name, @client.ps.name[0]);
+  assign_string(@banned_cl.client_name, PAnsiChar(GetPlayerName(client.ps)));
   if length(_reason) > 0 then begin
     assign_string(@banned_cl.admin_name, PAnsiChar(get_string_value(@banned_cl.admin_name)+'('+FZTranslationMgr.Get().TranslateSingle('fz_ban_for')+':'+_reason+')'));
   end;

@@ -26,11 +26,11 @@ begin
   cld:=dynamic_cast(cl, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
   if (cld=nil) or (cld.ps.ping=0) then exit;
 
-  result:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).updrate;
+  result:=GetFZBuffer(cld.ps).updrate;
   if (result=0) then begin
     //не проинициализирован
-    FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).updrate:=SelectUpdRateByPing(cld.ps.ping);
-    result:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).updrate;
+    GetFZBuffer(cld.ps).updrate:=SelectUpdRateByPing(cld.ps.ping);
+    result:=GetFZBuffer(cld.ps).updrate;
   end;
 
   if result>max_updrate then begin

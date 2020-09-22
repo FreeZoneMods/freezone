@@ -9,6 +9,8 @@ function Free():boolean; stdcall;
 
 implementation
 uses
+  sysutils,
+  windows,
 /////////
   BaseEngineFrameworkFunctions,
   basedefs,
@@ -43,7 +45,9 @@ uses
   Voting,
   PlayersConsole,
   AdminCommands,
-  GameSpy;
+  GameSpy,
+  Timersmgr,
+  PeriodicExecutionMgr;
 
 
 function Init():boolean; stdcall;
@@ -86,9 +90,17 @@ begin
     FZLogMgr.Get.Write('xrGame.dll - UNKNOWN version!', FZ_LOG_ERROR);
   end;
 
+  FZLogMgr.Get.Write('Base addresses of important modules:', FZ_LOG_IMPORTANT_INFO);
+  FZLogMgr.Get.Write('freezone.dll - '+inttohex(GetModuleHandle('freezone'), 8), FZ_LOG_IMPORTANT_INFO);
+  FZLogMgr.Get.Write('xrCore.dll - '+inttohex(xrCore, 8), FZ_LOG_IMPORTANT_INFO);
+  FZLogMgr.Get.Write('xrGame.dll - '+inttohex(xrGame, 8), FZ_LOG_IMPORTANT_INFO);
+  FZLogMgr.Get.Write('xrNetServer.dll - '+inttohex(xrNetServer, 8), FZ_LOG_IMPORTANT_INFO);
+  FZLogMgr.Get.Write('xrApi.dll - '+inttohex(xrAPI, 8), FZ_LOG_IMPORTANT_INFO);
+
   cfg.log_severity:=old_severity;
   FZConfigCache.Get().OverrideConfig(cfg);
 
+  if not TimersMgr.Init() then exit;
   if not ItemsCfgMgr.Init then exit;
   if not TeleportMgr.Init then exit;
   if not HitMgr.Init then exit;
@@ -125,6 +137,7 @@ begin
   if not PlayersConsole.Init then exit;
   if not AdminCommands.Init() then exit;
   if not GameSpy.Init() then exit;
+  if not PeriodicExecutionMgr.Init then exit;
 
   result:=true;
 end;
@@ -133,6 +146,7 @@ function Free():boolean; stdcall;
 begin
   //не нарушать порядок!
   result:=true;
+  PeriodicExecutionMgr.Free();
   AdminCommands.Free();
   ControlGUI.Clean;
   SACE_Hacks.Free();
@@ -147,6 +161,7 @@ begin
   HitMgr.Free();
   TeleportMgr.Free;
   ItemsCfgMgr.Free;
+  TimersMgr.Free();
   FZTranslationMgr.Get.Free;
   FZDownloadMgr.Get.Free;
 

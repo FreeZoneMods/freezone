@@ -924,6 +924,8 @@ begin
     srcBaseInjection.Create(pointer(xrGame+$32d705), @DisconnectPlayerWithMessage, 7, [F_PUSH_EAX, F_PUSHCONST+0], false, true);
   end;
 
+   //NET_Compressor::Decompress - фикс проверки размеров некомпрешеных пакетов
+   srcInjectionWithConditionalJump.Create(pointer(xrNetServer+$8103),@NET_Compressor__Decompress_Patch,5,[F_PUSH_EAX, F_RMEM+F_PUSH_ESP+$3c], pointer(xrNetServer+$8124), JUMP_IF_FALSE, true, false);
 
   //Cars:
   //client CActorMP::net_Relevant	 - xrgame.dll+1f61d0

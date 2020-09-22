@@ -68,7 +68,7 @@ begin
   result:=false;
   cld:=dynamic_cast(pl, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
   if cld<>nil then begin
-    pboolean(pbool_flag)^:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).IsAllowedStartingVoting();
+    pboolean(pbool_flag)^:=GetFZBuffer(cld.ps).IsAllowedStartingVoting();
     if not pboolean(pbool_flag)^ then begin
       SendChatMessageByFreezone(GetPureServer(), pcardinal(pcardinal_id)^, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_start_voting'));
     end;
@@ -280,7 +280,7 @@ begin
     PByte(pbyte_res_ptr)^:=0;
     cld:=dynamic_cast(pl, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
     if cld<>nil then begin
-      FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).OnVoteStarted();
+      GetFZBuffer(cld.ps).OnVoteStarted();
     end;
   end;
 end;
@@ -296,7 +296,7 @@ begin
       //заглушка на случай ЧП
       assign_string(@game.m_voting_string, 'Ooops! Something gone wrong...');
       assign_string(@game.m_pVoteCommand, 'deadbeef');
-      FZLogMgr.Get.Write('Running voting with unitialized m_pVoteCommand!', FZ_LOG_ERROR);
+      FZLogMgr.Get.Write('Running voting with uninitialized m_pVoteCommand!', FZ_LOG_ERROR);
       exit;
     end;
     
@@ -386,8 +386,8 @@ begin
   pboolean(canvote)^:=false;
 
   if pld<>nil then begin
-    FZPlayerStateAdditionalInfo(pld.ps.FZBuffer).OnVote();  
-    pboolean(canvote)^:= not FZPlayerStateAdditionalInfo(pld.ps.FZBuffer).IsPlayerVoteMuted();
+    GetFZBuffer(pld.ps).OnVote();
+    pboolean(canvote)^:= not GetFZBuffer(pld.ps).IsPlayerVoteMuted();
     if not pboolean(canvote)^ then begin
       SendChatMessageByFreezone(GetPureServer(), pcardinal(id)^, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_vote'));
     end;

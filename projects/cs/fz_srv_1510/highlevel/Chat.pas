@@ -13,6 +13,7 @@ function OnChatCommand(srv:pxrServer; msg:PChar; {%H-}p:pNET_packet; sender:pxrC
 procedure SendChatMessage(srv:pIPureServer; cl_id:cardinal; name:string; msg:string; team_id:word=0; channel_id:word=$FFFF); stdcall;
 procedure SendChatMessageByFreeZone(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
 procedure SendChatMessageByFreeZoneWSplitting(srv:pIPureServer; cl_id:cardinal; msg:string); stdcall;
+procedure SendChatMessageToPlayers(sender_name:string; msg:string; team_id:word=0; channel_id:word=$FFFF); stdcall;
 
 function Init():boolean; stdcall;
 
@@ -39,12 +40,12 @@ begin
   cld:=ID_to_client(sender.id);
   if cld=nil then exit;
 
-  t:=FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).OnSpeechMessage();
+  t:=GetFZBuffer(cld.ps).OnSpeechMessage();
   if t<>0 then begin
     result:=false;
     SendChatMessageByFreezone(GetPureServer(), sender.id, FZTranslationMgr.Get.TranslateSingle('fz_speech_have_been_muted_for_you')+' '+inttostr(t div 1000));
   end else begin
-    result:=not FZPlayerStateAdditionalInfo(cld.ps.FZBuffer).IsSpeechMuted();
+    result:=not GetFZBuffer(cld.ps).IsSpeechMuted();
     if not result then begin
       SendChatMessageByFreezone(GetPureServer(), sender.id, FZTranslationMgr.Get.TranslateSingle('fz_you_cant_speech'));
     end;  
@@ -100,6 +101,7 @@ var
   pData:pByte;
   dest_teamid, msg_type, from_teamid:word;
   pNick, pMsg:PAnsiChar;
+  orig_nick:string;
   len_nick, len_message, time:cardinal;
   cfg:FZCacheData;
   msg_struct:FZChatMsg;
@@ -131,7 +133,9 @@ begin
 
   pNick:=PAnsiChar(pData);
   len_nick:=0;
+  orig_nick:='';
   while (pNick[len_nick]<>chr(0)) and (len_nick<MAX_NICK_SIZE) do begin
+    orig_nick:=orig_nick+pNick[len_nick];
     pNick[len_nick]:=CorrectChatSymbol(pNick[len_nick]);
     len_nick:=len_nick+1;
   end;
@@ -140,6 +144,12 @@ begin
     BadEventsProcessor(FZ_SEC_EVENT_ATTACK, CHAT_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent chat message with TOO long name. Dropping!' ));
     exit;
   end;
+
+  if orig_nick<>GetPlayerName(sender.ps) then begin
+    BadEventsProcessor(FZ_SEC_EVENT_WARN, CHAT_GROUP+GenerateMessageForClientId(sender.base_IClient.ID.id, 'sent chat message with not-own nickname ("'+orig_nick+'"). Dropping!' ));
+    exit;
+  end;
+
   pData:=@pData[len_nick+1];
 
   pMsg:=PAnsiChar(pData);
@@ -182,7 +192,7 @@ begin
     gui_str:=pMsg;
     LockServerPlayers();
     try
-      buf:=FZPlayerStateAdditionalInfo(sender.ps.FZBuffer);
+      buf:=GetFZBuffer(sender.ps);
       if (buf=nil) then exit;
 
       //отключение (mute) чата игрока
@@ -297,7 +307,6 @@ begin
   end;
 end;
 
-
 procedure SendChatMessage(srv:pIPureServer; cl_id:cardinal; name:string; msg:string; team_id:word=0; channel_id:word=$FFFF); stdcall;
 var
   p:NET_Packet;
@@ -316,6 +325,36 @@ begin
 
   SendPacketToClient(srv, cl_id, @p);
 
+end;
+
+type
+FZChatSendParams = packed record
+  sender_name: string;
+  msg: string;
+  team_id: word;
+  channel_id: word
+end;
+pFZChatSendParams = ^FZChatSendParams;
+
+function _ChatMessageSenderCb(player:pointer{pIClient}; parameter:pointer=nil; {%H-}parameter2:pointer=nil):boolean stdcall;
+var
+  params:pFZChatSendParams;
+begin
+  params:=pFZChatSendParams(parameter);
+  SendChatMessage(GetPureServer(), pIClient(player).ID.id, params.sender_name, params.msg, params.team_id, params.channel_id);
+  result:=true;
+end;
+
+procedure SendChatMessageToPlayers(sender_name: string; msg: string; team_id: word; channel_id: word); stdcall;
+var
+  params:FZChatSendParams;
+begin
+  params.sender_name:=sender_name;
+  params.msg:=msg;
+  params.team_id:=team_id;
+  params.channel_id:=channel_id;
+
+  ForEachClientDo(@_ChatMessageSenderCb, nil, @params);
 end;
 
 function Init():boolean; stdcall;

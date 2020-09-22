@@ -247,11 +247,11 @@ begin
   if (args<>nil) then begin
     newval:=strtointdef(args, -1);
     if newval>0 then begin
-      FZPlayerStateAdditionalInfo(who.ps.FZBuffer).updrate:=newval;
+      GetFZBuffer(who.ps).updrate:=newval;
     end;
   end;
 
-  SendChatMessageByFreeZoneWSplitting(@srv.base_IPureServer, who.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_your_updrate')+' '+inttostr(FZPlayerStateAdditionalInfo(who.ps.FZBuffer).updrate));
+  SendChatMessageByFreeZoneWSplitting(@srv.base_IPureServer, who.base_IClient.ID.id, FZTranslationMgr.Get.TranslateSingle('fz_your_updrate')+' '+inttostr(GetFZBuffer(who.ps).updrate));
   result:=true;
 end;
 
