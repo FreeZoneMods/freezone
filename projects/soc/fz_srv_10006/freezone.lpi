@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <General>
+      <Flags>
+        <MainUnitHasCreateFormStatements Value="False"/>
+        <MainUnitHasTitleStatement Value="False"/>
+      </Flags>
+      <SessionStorage Value="InProjectDir"/>
+      <MainUnit Value="0"/>
+      <Title Value="freezone"/>
+      <UseAppBundle Value="False"/>
+      <ResourceType Value="res"/>
+    </General>
+    <i18n>
+      <EnableI18N LFM="False"/>
+    </i18n>
+    <BuildModes Count="3">
+      <Item1 Name="Default" Default="True"/>
+      <Item2 Name="Debug">
+        <CompilerOptions>
+          <Version Value="11"/>
+          <PathDelim Value="\"/>
+          <Target>
+            <Filename Value="..\..\..\release\soc_1006\bins\freezone.dll" ApplyConventions="False"/>
+          </Target>
+          <SearchPaths>
+            <IncludeFiles Value="$(ProjOutDir)"/>
+            <OtherUnitFiles Value="highlevel;lowlevel;..\..\..\shared;..\..\..\engine_10006;..\..\crossplatform\sysmsgs;..\..\..\shared\3rdparty;..\..\..\shared\SourceKit"/>
+            <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+          </SearchPaths>
+          <Parsing>
+            <SyntaxOptions>
+              <SyntaxMode Value="Delphi"/>
+              <IncludeAssertionCode Value="True"/>
+            </SyntaxOptions>
+          </Parsing>
+          <CodeGeneration>
+            <RelocatableUnit Value="True"/>
+            <Checks>
+              <IOChecks Value="True"/>
+              <RangeChecks Value="True"/>
+              <OverflowChecks Value="True"/>
+              <StackChecks Value="True"/>
+            </Checks>
+          </CodeGeneration>
+          <Linking>
+            <Debugging>
+              <DebugInfoType Value="dsDwarf2Set"/>
+              <UseHeaptrc Value="True"/>
+              <UseExternalDbgSyms Value="True"/>
+            </Debugging>
+            <Options>
+              <ExecutableType Value="Library"/>
+            </Options>
+          </Linking>
+          <Other>
+            <OtherDefines Count="1">
+              <Define0 Value="RELEASE_BUILD"/>
+            </OtherDefines>
+          </Other>
+        </CompilerOptions>
+      </Item2>
+      <Item3 Name="Release">
+        <CompilerOptions>
+          <Version Value="11"/>
+          <PathDelim Value="\"/>
+          <Target>
+            <Filename Value="..\..\..\release\soc_1006\bins\freezone.dll" ApplyConventions="False"/>
+          </Target>
+          <SearchPaths>
+            <IncludeFiles Value="$(ProjOutDir)"/>
+            <OtherUnitFiles Value="highlevel;lowlevel;..\..\..\shared;..\..\..\engine_10006;..\..\crossplatform\sysmsgs;..\..\..\shared\3rdparty;..\..\..\shared\SourceKit"/>
+            <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+          </SearchPaths>
+          <Parsing>
+            <SyntaxOptions>
+              <SyntaxMode Value="Delphi"/>
+            </SyntaxOptions>
+          </Parsing>
+          <CodeGeneration>
+            <SmartLinkUnit Value="True"/>
+            <RelocatableUnit Value="True"/>
+            <Optimizations>
+              <OptimizationLevel Value="3"/>
+            </Optimizations>
+          </CodeGeneration>
+          <Linking>
+            <Debugging>
+              <GenerateDebugInfo Value="False"/>
+            </Debugging>
+            <LinkSmart Value="True"/>
+            <Options>
+              <ExecutableType Value="Library"/>
+            </Options>
+          </Linking>
+          <Other>
+            <CustomOptions Value="-dRELEASE_BUILD"/>
+            <OtherDefines Count="1">
+              <Define0 Value="RELEASE_BUILD"/>
+            </OtherDefines>
+          </Other>
+        </CompilerOptions>
+      </Item3>
+    </BuildModes>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <HostApplicationFilename Value="G:\stalker\stsoc\freezone\bin\dedicated\XR_3DA.exe"/>
+        <CommandLineParams Value="-i -nosound -start server(testers_mp_atp/artefacthunt/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5457/portgs=5458) client(localhost/portcl=5459)"/>
+        <WorkingDirectory Value="G:\stalker\stsoc\freezone\bin"/>
+      </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default">
+          <local>
+            <HostApplicationFilename Value="G:\stalker\stsoc\freezone\bin\dedicated\XR_3DA.exe"/>
+            <CommandLineParams Value="-i -nosound -start server(testers_mp_atp/artefacthunt/ver=1.0/public=0/hname=first_tdm_server/battleye=1/estime=9:00/spectrmds=30/fraglimit=0/timelimit=30/dmgblock=3/dmbi=0/ans=1/anslen=3/warmup=60/pdahunt=1/abalance=0/aswap=1/fn=1/ffire=1.0/portsv=5457/portgs=5458) client(localhost/portcl=5459)"/>
+            <WorkingDirectory Value="G:\stalker\stsoc\freezone\bin"/>
+          </local>
+        </Mode0>
+      </Modes>
+    </RunParams>
+    <RequiredPackages Count="1">
+      <Item1>
+        <PackageName Value="LazUtils"/>
+      </Item1>
+    </RequiredPackages>
+    <Units Count="34">
+      <Unit0>
+        <Filename Value="freezone.lpr"/>
+        <IsPartOfProject Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="highlevel\ConfigCache.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="highlevel\ConfigMgr.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="highlevel\DownloadMgr.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="highlevel\GameSpy.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="highlevel\LogMgr.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="highlevel\Players.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="highlevel\ServerStuff.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="lowlevel\appinit.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit8>
+      <Unit9>
+        <Filename Value="lowlevel\fz_injections.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="highlevel\administration.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="lowlevel\Compressor.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="..\..\crossplatform\sysmsgs\sysmsgs.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit12>
+      <Unit13>
+        <Filename Value="..\..\..\shared\3rdparty\FastMd5.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit13>
+      <Unit14>
+        <Filename Value="highlevel\chat.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Chat"/>
+      </Unit14>
+      <Unit15>
+        <Filename Value="highlevel\voting.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Voting"/>
+      </Unit15>
+      <Unit16>
+        <Filename Value="highlevel\hackprocessor.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="HackProcessor"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="highlevel\reloadcmd.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ReloadCmd"/>
+      </Unit17>
+      <Unit18>
+        <Filename Value="highlevel\playersconsole.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="PlayersConsole"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="highlevel\itemscfgmgr.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ItemsCfgMgr"/>
+      </Unit19>
+      <Unit20>
+        <Filename Value="highlevel\BasicProtection.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit20>
+      <Unit21>
+        <Filename Value="highlevel\playersconnectionlog.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="PlayersConnectionLog"/>
+      </Unit21>
+      <Unit22>
+        <Filename Value="highlevel\Bans.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit22>
+      <Unit23>
+        <Filename Value="highlevel\SubnetBanList.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit23>
+      <Unit24>
+        <Filename Value="highlevel\ge_filter.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit24>
+      <Unit25>
+        <Filename Value="highlevel\mapgametypes.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="MapGametypes"/>
+      </Unit25>
+      <Unit26>
+        <Filename Value="highlevel\admincommands.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="AdminCommands"/>
+      </Unit26>
+      <Unit27>
+        <Filename Value="highlevel\UpdateRate.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit27>
+      <Unit28>
+        <Filename Value="highlevel\ChatCommands.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit28>
+      <Unit29>
+        <Filename Value="highlevel\Censor.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit29>
+      <Unit30>
+        <Filename Value="highlevel\teleportmgr.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TeleportMgr"/>
+      </Unit30>
+      <Unit31>
+        <Filename Value="highlevel\hitmgr.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="HitMgr"/>
+      </Unit31>
+      <Unit32>
+        <Filename Value="highlevel\PeriodicExecutionMgr.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit32>
+      <Unit33>
+        <Filename Value="highlevel\timersmgr.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="Timersmgr"/>
+      </Unit33>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="..\..\..\release\soc_1006\bins\freezone.dll" ApplyConventions="False"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir)"/>
+      <OtherUnitFiles Value="highlevel;lowlevel;..\..\..\shared;..\..\..\engine_10006;..\..\crossplatform\sysmsgs;..\..\..\shared\3rdparty;..\..\..\shared\SourceKit"/>
+      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <SyntaxMode Value="Delphi"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <RelocatableUnit Value="True"/>
+    </CodeGeneration>
+    <Linking>
+      <Options>
+        <ExecutableType Value="Library"/>
+      </Options>
+    </Linking>
+  </CompilerOptions>
+  <Debugging>
+    <Exceptions Count="3">
+      <Item1>
+        <Name Value="EAbort"/>
+      </Item1>
+      <Item2>
+        <Name Value="ECodetoolError"/>
+      </Item2>
+      <Item3>
+        <Name Value="EFOpenError"/>
+      </Item3>
+    </Exceptions>
+  </Debugging>
+</CONFIG>
