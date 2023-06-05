@@ -38,6 +38,9 @@ end;
 
 FZPeriodicCommandsBlock = class(FZPeriodicItem)
 protected
+  _default_period:cardinal;
+  _last_cmd_idx:integer;
+
   _commands:TStringList;
 
   procedure _PerformAction(); override;
@@ -154,6 +157,7 @@ begin
   inherited Create(nil, period, false);
   R_ASSERT(commands<>nil, 'No commands in block', 'FZPeriodicCommandsBlock.Create');
   _commands:=commands;
+  _default_period:=period;
   _Activate();
 end;
 
@@ -165,13 +169,46 @@ end;
 
 procedure FZPeriodicCommandsBlock._PerformAction();
 var
-  i:integer;
+  cmd:string;
+  sleep_period:integer;
+  paused:boolean;
+const
+  SLEEP_COMMAND:string = 'fz_sleep';
 begin
-  FZLogMgr.Get.Write('Start executing block of console commands', FZ_LOG_DBG);
-  for i:=0 to _commands.Count - 1 do begin
-    AddAdminCommandToQueue(FZSimpleConsoleCmd.Create(_commands.Strings[i], FZConsoleReporter.Create(0)));
+  if _last_cmd_idx = 0 then begin
+    FZLogMgr.Get.Write('Start executing block of console commands', FZ_LOG_DBG);
+  end else begin
+    FZLogMgr.Get.Write('Continue executing block of console commands', FZ_LOG_DBG);
   end;
-  FZLogMgr.Get.Write('End executing block of console commands', FZ_LOG_DBG);
+
+  paused:=false;
+  while _last_cmd_idx < _commands.Count do begin
+    cmd:=_commands.Strings[_last_cmd_idx];
+    _last_cmd_idx:=_last_cmd_idx+1;
+
+    if (leftstr(cmd, length(SLEEP_COMMAND)) = SLEEP_COMMAND) and ((length(cmd) = length(SLEEP_COMMAND)) or (cmd[length(SLEEP_COMMAND)+1] = ' ')) then begin
+      sleep_period:=strtointdef(trim(rightstr(cmd, length(cmd)-length(SLEEP_COMMAND))), -1);
+      if sleep_period <= 0 then begin
+        FZLogMgr.Get.Write('Invalid sleep interval in command "'+cmd+'"', FZ_LOG_ERROR);
+      end else begin
+        _my_timer.SetPeriod(sleep_period);
+        FZLogMgr.Get.Write('Sleep command found in block of console commands, time '+inttostr(sleep_period)+' ms', FZ_LOG_DBG);
+        paused:=true;
+        break;
+      end;
+    end else begin
+      AddAdminCommandToQueue(FZSimpleConsoleCmd.Create(cmd, FZConsoleReporter.Create(0)));
+    end;
+  end;
+
+  if paused then begin
+    FZLogMgr.Get.Write('Pause executing block of console commands', FZ_LOG_DBG);
+  end else begin
+    FZLogMgr.Get.Write('End executing block of console commands', FZ_LOG_DBG);
+    _last_cmd_idx:=0;
+    _my_timer.SetPeriod(_default_period);
+  end;
+
 end;
 
 { FZPeriodicExecutionMgr }

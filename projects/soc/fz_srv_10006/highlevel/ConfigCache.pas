@@ -25,6 +25,7 @@ FZCacheData = record
   vote_series_for_mute:cardinal;
   vote_mute_interval:cardinal;
   vote_first_mute_time:cardinal;
+  vote_ban_by_ip:boolean;
 
   censor_chat:boolean;
   chat_badwords_treasure:cardinal;
@@ -224,6 +225,7 @@ begin
   self._data.vote_mute_interval:=FZConfigMgr.Get.GetInt('vote_mute_interval', 0);
   self._data.vote_series_for_mute:=FZConfigMgr.Get.GetInt('vote_series_for_mute', 0);
   self._data.vote_first_mute_time:=FZConfigMgr.Get.GetInt('vote_first_mute_time', 0);
+  self._data.vote_ban_by_ip:=FZConfigMgr.Get.GetBool('vote_ban_by_ip', false);
   self._data.censor_chat:=FZConfigMgr.Get.GetBool('censor_chat', true);
   self._data.chat_badwords_treasure:=FZConfigMgr.Get.GetInt('chat_badwords_treasure', 0);
   self._data.mutetime_per_badword:=FZConfigMgr.Get.GetInt('mutetime_per_badword', 0);

@@ -184,6 +184,7 @@ end;
 procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PAnsiChar; resVoteCommand:PAnsiChar); stdcall;
 var
   total_command, console_command, arg1, arg2, descr, name, par:string;
+  cld:pxrClientData;
   time:cardinal;
 begin
   if game.m_bVotingReal<>0 then begin
@@ -221,7 +222,37 @@ begin
 
       //анализируем инфу и составляем на ее основе команду и описалово
       descr:='ban '+name+' '+arg2+' '+FZTranslationMgr.Get.TranslateSingle('minutes');
-      console_command:='sv_banplayer '+ arg1 +' ' + inttostr(time);
+
+      cld:=ID_to_client(strtoint64def(arg1, 0));
+      if (cld = nil) then begin
+        FZLogMgr.Get.Write('Can''t approve ban vote string - banned client not found', FZ_LOG_ERROR);
+
+        cld:=ID_to_client(senderid.id);
+        if (cld = nil) or (cld.ps = nil) then begin
+          name:='(null)';
+        end else begin
+          name:=GetPlayerName(cld.ps);
+        end;
+        descr:='ban '+name+' '+arg2+' '+FZTranslationMgr.Get.TranslateSingle('minutes');
+        console_command:='';
+      end else if IsLocalServerClient(@cld.base_IClient) then begin
+        FZLogMgr.Get.Write('Can''t approve ban vote string - attempt to ban server client', FZ_LOG_IMPORTANT_INFO);
+
+        cld:=ID_to_client(senderid.id);
+        if (cld = nil) or (cld.ps = nil) then begin
+          name:='(null)';
+        end else begin
+          name:=GetPlayerName(cld.ps);
+        end;
+        descr:='ban '+name+' '+arg2+' '+FZTranslationMgr.Get.TranslateSingle('minutes');
+        console_command:='';
+      end else begin
+        if (FZConfigCache.Get().GetDataCopy().vote_ban_by_ip) and (GetServerClient()<>nil) and (not ip_address_equal(GetServerClient().base_IClient.m_cAddress, cld.base_IClient.m_cAddress)) then begin
+          console_command:='sv_banplayer_ip '+ ip_address_to_str(cld.base_IClient.m_cAddress) +' ' + inttostr(time);
+        end else begin
+          console_command:='sv_banplayer '+ arg1 +' ' + inttostr(time);
+        end;
+      end;
 
       assign_string(@game.m_pVoteCommand, PAnsiChar(console_command));
       assign_string(@game.m_voting_string, PAnsiChar(descr));

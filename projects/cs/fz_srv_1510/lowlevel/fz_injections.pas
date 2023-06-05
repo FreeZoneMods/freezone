@@ -124,7 +124,7 @@ begin
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$322AFC),@OnVoteStartIncorrectPlayerName,12,[F_PUSH_EBX],pointer(xrGame+$322D33), JUMP_IF_FALSE, true, true);
   end;
 
-  //обработка нестандартных голосований+ FZ'шный транслятор строк
+  //обработка нестандартных голосований+ FZ'шный транслятор строк + бан по IP в голосовании
   if xrGameDllType()=XRGAME_SV_1510 then begin
     srcKit.nop_code(pointer(xrGame+$30CDC7), 2);
     srcBaseInjection.Create(pointer(xrGame+$30CDCF), @OnVoteStart, 13,[F_PUSH_EBX, F_RMEM+F_PUSH_EBP+$C, F_RMEM+F_PUSH_EBP+8, F_PUSH_EAX],true, true);
@@ -175,6 +175,14 @@ begin
 
   //...и отключаем отправку пакета с запросом
   srcInjectionWithConditionalJump.Create(pointer(xrGameSpy+$B2B7),@OnAuthSend,8,[F_PUSH_ESI],pointer(xrGameSpy+$B2CA), JUMP_IF_TRUE, true, false);
+
+  // [bug] баг в callback_playerkey - в index_searcher забыли инкремент индекса, из-за этого вписок игроков показывает фигню
+  // так как компилятор оптимизировал наш предикат чуть ли не в ноль - заменяем вызов FindClient на свой
+  if xrGameDllType()=XRGAME_SV_1510 then begin
+    srcEAXReturnerInjection.Create(pointer(xrGame+$32259C), @index_searcher_client_finder, 5, [F_RMEM+F_PUSH_EAX], true, true);
+  end else if xrGameDllType()=XRGAME_CL_1510 then begin
+    srcEAXReturnerInjection.Create(pointer(xrGame+$33870C), @index_searcher_client_finder, 5, [F_RMEM+F_PUSH_EAX], true, true);
+  end;
 
   result:=true;
 end;
@@ -417,7 +425,7 @@ begin
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$31c87a),@CanPlayerBuyNow,6,[F_PUSH_EAX],pointer(xrGame+$31c88a), JUMP_IF_FALSE, true, false);
   end else if xrGameDllType()=XRGAME_CL_1510 then begin
     //DM - game_sv_Deathmatch::OnEvent
-    srcInjectionWithConditionalJump.Create(pointer(xrGame+$31B0B2),@CanPlayerBuyNow,6,[F_PUSH_EAX],pointer(xrGame+$305fca), JUMP_IF_FALSE, true, false);
+    srcInjectionWithConditionalJump.Create(pointer(xrGame+$31B0B2),@CanPlayerBuyNow,6,[F_PUSH_EAX],pointer(xrGame+$31b0ca), JUMP_IF_FALSE, true, false);
     //CTA - game_sv_CaptureTheArtefact::OnEvent
     srcInjectionWithConditionalJump.Create(pointer(xrGame+$33259a),@CanPlayerBuyNow,6,[F_PUSH_EAX],pointer(xrGame+$3325aa), JUMP_IF_FALSE, true, false);
   end;

@@ -196,10 +196,16 @@ end;
 
 class function srcKit.CopyBuf(src, dst: pointer; cnt: cardinal): boolean;
 var
-  rb:cardinal;
+  rb, oldprot, oldprot2:cardinal;
 begin
   rb:=0; //suppress warning
+  oldprot:=0;
+  result:=false;
+
+  if not VirtualProtect(dst, cnt, PAGE_EXECUTE_READWRITE, oldprot) then exit;
   WriteProcessMemory(GetCurrentProcess, dst, src, cnt, rb);
+  if not VirtualProtect(dst, cnt, oldprot, oldprot2) then exit;
+
   result:=(cnt=rb);
 end;
 

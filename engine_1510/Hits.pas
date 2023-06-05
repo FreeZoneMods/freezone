@@ -6,6 +6,9 @@ unit Hits;
 interface
 uses MatVectors, Objects, Packets;
 
+const
+  EHitType__eHitTypeMax:cardinal=11;
+
 type
   SHit = packed record
     Time:cardinal;

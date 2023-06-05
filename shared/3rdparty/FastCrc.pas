@@ -23,25 +23,19 @@ var
   CRC32table: array[0..255] of cardinal;
 
 function GetNewCRC32(OldCRC: cardinal; StPtr: pointer; StLen: integer): cardinal;
-asm
-  test edx,edx;
-  jz @ret;
-  neg ecx;
-  jz @ret;
-  sub edx,ecx; // Address after last element
+var
+  i:integer;
+  bl:byte;
+begin
+  if (StPtr = nil) or (StLen=0) then exit;
 
-  push ebx;
-  xor ebx,ebx; // Set ebx=0 & align @next
-@next:
-  mov bl,al;
-  xor bl,byte [edx+ecx];
-  shr eax,8;
-  xor eax,cardinal [CRC32table+ebx*4];
-  inc ecx;
-  jnz @next;
-  pop ebx;
-
-@ret:
+  result:=OldCRC;
+  for i:=0 to StLen-1 do begin
+    bl:=Byte(result);
+    bl:=bl xor (PByte(StPtr))[i];
+    result:=result shr 8;
+    result:=result xor CRC32table[bl];
+  end;
 end;
 
 function CRC32Start: TCRC32Context;

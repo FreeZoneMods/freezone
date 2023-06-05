@@ -31,6 +31,7 @@ var
   tmp:string;
   f:textfile;
   usemd5:boolean;
+  start_idx:integer;
 begin
   if ParamCount<2 then begin
     WriteHelp;
@@ -42,6 +43,7 @@ begin
   outfile:='list.ini';
   root_link:='';
   usemd5:=false;
+  start_idx:=0;
 
   i:=1;
   while (i<=ParamCount) do begin
@@ -79,6 +81,16 @@ begin
         WriteLn('Set root URL '+Params[i]);
         root_link:=Params[i];
       end;
+    end else if Params[i]='-i' then begin
+      i:=i+1;
+      if i > ParamCount then begin
+        WriteLn('-i option requires an argument!');
+        Terminate;
+        Exit;
+      end else begin
+        start_idx:=strtointdef(Params[i], 0);
+        WriteLn('Set start index '+inttostr(start_idx));
+      end;
     end else if Params[i]='-md5' then begin
       WriteLn('Force using MD5 checksum');
       usemd5:=true;
@@ -102,7 +114,7 @@ begin
 
     //File entries
     for i:=0 to lister.Count()-1 do begin
-      WriteLn(f, '[file_',i,']');
+      WriteLn(f, '[file_',i+start_idx,']');
       tmp:=lister.Get(i).RelativePath();
       WriteLn(f, 'path=',tmp);
       for j:=1 to length(tmp) do begin
@@ -145,6 +157,7 @@ begin
   writeln('-d [directory] Scan specified directory');
   writeln('-o [file] Output file name');
   writeln('-l [link] Beginning of URL');
+  writeln('-i [index] Start index');
   writeln('-md5 Enable MD5 checksum');
 end;
 

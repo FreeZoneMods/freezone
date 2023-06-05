@@ -5,6 +5,8 @@ unit Voting;
 interface
 uses Packets, Games, Clients, xrstrings;
 
+procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PChar; resVoteCommand:PChar); stdcall;
+
 function CanSafeStartVoting(game:pgame_sv_mp; p:pNET_Packet; sender_id:ClientID):boolean; stdcall;
 
 procedure ProvideDefaultGameTypeForMapchangeVoting(); stdcall;
@@ -14,7 +16,7 @@ procedure OnMapChanged(); stdcall;
 function Init():boolean;
 
 implementation
-uses LogMgr, SysUtils, CommonHelper, MapList, Players, HackProcessor, ConfigBase, ConfigCache, Chat, TranslationMgr, Servers, MapGametypes;
+uses LogMgr, SysUtils, CommonHelper, MapList, Players, HackProcessor, ConfigBase, ConfigCache, Chat, TranslationMgr, Servers, MapGametypes, dynamic_caster, basedefs, misc_stuff, PureServer;
 
 var
   _last_map_change_time:cardinal;
@@ -137,6 +139,97 @@ begin
   end;
 
   setlength(args, 0);
+end;
+
+function OnPlayerStartVote(pl:pointer; {%H-}id_ptr:pointer; pbyte_res_ptr:pointer):boolean; stdcall;
+var
+  cld:pxrClientData;
+begin
+  result:=false;
+  if IsLocalServerClient(pl) then
+    PByte(pbyte_res_ptr)^:=1
+  else begin
+    PByte(pbyte_res_ptr)^:=0;
+    cld:=dynamic_cast(pl, 0, xrGame+RTTI_IClient, xrGame+RTTI_xrClientData, false);
+    if cld<>nil then begin
+      GetFZBuffer(cld.ps).OnVoteStarted();
+    end;
+  end;
+end;
+
+
+procedure OnVoteStart(game:pgame_sv_mp; senderid:ClientID; VoteCommand:PAnsiChar; resVoteCommand:PAnsiChar); stdcall;
+var
+  total_command, console_command, arg1, arg2, descr, name, par:string;
+  cld:pxrClientData;
+  time:cardinal;
+begin
+  if game.m_bVotingReal<>0 then begin
+    total_command:=get_string_value(@game.m_pVoteCommand);
+    if not FZCommonHelper.GetNextParam(total_command, console_command, ' ') then begin
+      console_command:=total_command;
+      total_command:='';
+    end;
+    total_command:=trim(total_command);
+
+    if console_command='sv_banplayer' then begin
+      //на это же голосование повешено и onlysace
+      //формат голосования: cl_votestart ban PlayerName onlysace
+      FZCommonHelper.GetNextParam(total_command, arg1, ' '); //имя игрока
+      arg2:=trim(total_command);                             //время бана
+      //модифицируем время бана на поминутное :)
+      time:=strtointdef(arg2, 0);
+      time:=BanTimeFromMinToSec(time);
+
+      //распарсим строку голосования - нам нужен ник и реальный аргумент на месте времени бана
+      name:=VoteCommand;
+      name:=trim(name);
+      FZCommonHelper.GetLastParam(name, par, ' ');
+      name:=trim(name);
+      FZCommonHelper.GetNextParam(name, descr, ' ');
+      name:=trim(name);
+
+      //анализируем инфу и составляем на ее основе команду и описалово
+      descr:='ban '+name+' '+arg2+' '+FZTranslationMgr.Get.TranslateSingle('minutes');
+
+      cld:=GetServerClient();
+      if (cld <> nil) and (cld.ps<>nil) and (lowercase(GetPlayerName(cld.ps)) = lowercase(name)) then begin
+        FZLogMgr.Get.Write('Can''t approve ban vote string - attempt to ban server client', FZ_LOG_IMPORTANT_INFO);
+
+        cld:=ID_to_client(senderid.id);
+        if (cld = nil) or (cld.ps = nil) then begin
+          name:='(null)';
+        end else begin
+          name:=GetPlayerName(cld.ps);
+        end;
+
+        descr:='ban '+name+' '+arg2+' '+FZTranslationMgr.Get.TranslateSingle('minutes');
+        console_command:='';
+      end else begin
+        if (FZConfigCache.Get().GetDataCopy().vote_ban_by_ip) and (GetServerClient()<>nil) and (not ip_address_equal(GetServerClient().base_IClient.m_cAddress, cld.base_IClient.m_cAddress)) then begin
+          console_command:='sv_banplayer_ip '+ ip_address_to_str(cld.base_IClient.m_cAddress) +' ' + inttostr(time);
+        end else begin
+          console_command:='sv_banplayer '+ arg1 +' ' + inttostr(time);
+        end;
+      end;
+
+      assign_string(@game.m_pVoteCommand, PAnsiChar(console_command));
+      strpcopy(resVoteCommand, descr);
+    end else begin
+      descr:= FZTranslationMgr.Get.Translate_NoSpaces(resVoteCommand);
+      strpcopy(resVoteCommand, descr);
+    end;
+
+  end else begin
+    //Это просто строка без какой-либо команды, начинающаяся с $
+    VoteCommand:=PAnsiChar(cardinal(VoteCommand)+1);
+    strpcopy(resVoteCommand, VoteCommand);
+  end;
+
+  game.fz_vote_started_by_admin:=0;
+  ForEachClientDo(OnPlayerStartVote, OneIDSearcher, @senderid.id, @game.fz_vote_started_by_admin);
+
+  FZLogMgr.Get.Write('Voting "'+resVoteCommand+'" is started', FZ_LOG_INFO);
 end;
 
 procedure ProvideDefaultGameTypeForMapchangeVoting(); stdcall;

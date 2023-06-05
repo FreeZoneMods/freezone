@@ -641,24 +641,31 @@ begin
   end;
 end;
 
-function GetNameAndIpByClientId(id:cardinal; var ip:string):string;
+function GetNameAndIpByClientId(id:cardinal; var ip:string; var name:string):boolean; stdcall;
 var
   cld:pxrClientData;
 begin
   ip:='0.0.0.0';
-  result:='(null)';
+  name:='';
+  result:=false;
 
   cld:=ID_to_client(id);
-  if (cld=nil) then exit;
+  if (cld<>nil) then begin
+    ip:=ip_address_to_str(cld.base_IClient.m_cAddress);
 
-  ip:=ip_address_to_str(cld.base_IClient.m_cAddress);
+    if (cld.ps <> nil) then begin
+      name:=GetPlayerName(cld.ps);
+    end;
 
-  if (cld.ps <> nil) then begin
-    result:=get_string_value(@cld.ps.m_account.m_player_name);
+    if length(name) = 0 then begin
+      name:=get_string_value(@cld.base_IClient.name);
+    end;
   end;
 
-  if length(result) = 0 then begin
-    result:=get_string_value(@cld.base_IClient.name);
+  if length(name) = 0 then begin
+    name:='(null)';
+  end else begin
+    result:=true;
   end;
 end;
 
@@ -667,7 +674,8 @@ var
   name, ip:string;
 begin
   ip:='';
-  name:=GetNameAndIpByClientId(id, ip);
+  name:='';
+  GetNameAndIpByClientId(id, ip, name);
   result:='Player "'+name+'" (ID='+inttostr(id)+', IP='+ip+') '+message;
 end;
 

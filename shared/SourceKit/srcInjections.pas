@@ -368,10 +368,12 @@ end;
 function srcBaseInjection._WriteRegisterArgs(pos: pointer; args:array of cardinal): pointer;
 var
   i:integer;
-  tmp:cardinal;
-  tmpw:smallint;
+  tmp:cardinal;  
   tmpi:integer;
   esp_add:cardinal;
+const
+  MASK_POSITIVE_SIGN:cardinal = $00800000;
+  
 begin
   esp_add:=0; //если в стек будем запихивать аргументы из стека - после каждого придется скорректировать значение смещения 
   for i:=high(args) downto low(args) do begin
@@ -379,14 +381,12 @@ begin
     //смотрим, не выставлен ли флаг операции с памятью
     if (args[i] and $0F000000)=0 then begin
       //с памятью и смещениями не работаем
-      tmp:=(args[i]+$32767) shr 29;
+      tmp:=args[i] shr 29;
       PByte(pos)^:=PUSH_EAX+tmp;
       pos:=PAnsiChar(pos)+1;
 
-      //Инкремент/декремент значения аргумента из регистра (+/-32767 max)
-      tmpw:=(args[i] and $FFFF);
-      tmpi:=tmpw;
-      srcKit.Get.DbgLog('tmpw='+inttostr(tmpw));
+      //Инкремент/декремент значения аргумента из регистра
+      tmpi:=(args[i] and $00FFFFFF)-MASK_POSITIVE_SIGN;
       if (tmp{%H-}{%H-}=PUSH_ESP-PUSH_EAX) then tmpi:=tmpi{%H-}+_GetSavedInStackBytesCount()+esp_add;
       srcKit.Get.DbgLog('tmpi='+inttostr(tmpi));
       if tmpi<>0 then begin
@@ -405,7 +405,7 @@ begin
         srcKit.Get.DbgLog('not esp');
         PWord(pos)^:=$B0FF+(tmp shl 8);
         pos:=PAnsiChar(pos)+2;
-        PCardinal(pos)^:= (args[i] and $00FFFFFF)-$800000;
+        PCardinal(pos)^:= (args[i] and $00FFFFFF)-MASK_POSITIVE_SIGN;
         pos:=PAnsiChar(pos)+4;
         esp_add:=esp_add+4;
 
@@ -413,7 +413,7 @@ begin
         srcKit.Get.DbgLog('esp');
         PCardinal(pos)^:=$0024B4FF;
         pos:=PAnsiChar(pos)+3;
-        PCardinal(pos)^:= (args[i] and $00FFFFFF)-$800000+_GetSavedInStackBytesCount()+esp_add; //не забываем про pushad
+        PCardinal(pos)^:= (args[i] and $00FFFFFF)-MASK_POSITIVE_SIGN+_GetSavedInStackBytesCount()+esp_add; //не забываем про pushad
         pos:=PAnsiChar(pos)+4;
         esp_add:=esp_add+4;
       end;

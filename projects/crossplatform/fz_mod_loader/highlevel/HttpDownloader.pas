@@ -329,6 +329,7 @@ var
   useragent:PAnsiChar;
 begin
   dl.Lock();
+  result:=false;
   try
     if not _good then begin
       FZLogMgr.Get.Write(TH_LBL+'Thread is not in a good state', FZ_LOG_ERROR);
@@ -1006,7 +1007,10 @@ begin
       case command.cmd of
         FZDownloaderAdd:begin
               FZLogMgr.Get.Write(TH_LBL+'Command "Add" for downloader '+command.downloader.GetFilename(), FZ_LOG_INFO);
-              StartDownload(command.downloader);
+              if not StartDownload(command.downloader) then begin
+                 FZLogMgr.Get.Write(TH_LBL+'Couldn''t start download for '+command.downloader.GetFilename(), FZ_LOG_ERROR);
+                 command.downloader.Release();
+              end;
         end;
         FZDownloaderStop: begin
               FZLogMgr.Get.Write(TH_LBL+'Command "Stop" for downloader '+command.downloader.GetFilename(), FZ_LOG_INFO);

@@ -292,6 +292,11 @@ begin
 
   ReadHitFromPacket(packet, @hit);
 
+  if hit.hit_type >= EHitType__eHitTypeMax then begin
+    BadEventsProcessor(FZ_SEC_EVENT_ATTACK, GenerateMessageForClientId(senderid, 'send hit of invalid type'));
+    exit;
+  end;
+
   LockServerPlayers();
   try
     local_client:=GetServerClient();

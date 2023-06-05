@@ -62,6 +62,7 @@ function AssignFoundClientDataAction(player:pointer; {%H-}id:pointer; res:pointe
 function LocalClientSearcher(player:pointer; {%H-}id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
 function OneGameIDSearcher(player:pointer; id:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
 function OnePlayerStateSearcher(player:pointer; ps:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
+function OnePlayerIndexSearcher({%H-}player:pointer; skip_count:pointer; {%H-}parameter2:pointer=nil):boolean; stdcall;
 
 function CheckForClientOnline_LL(pm:pPlayersMonitor; cl:pointer{pIClient}):boolean; stdcall; //doesn't enter critical section! You MUST enter it manually before calls!
 
@@ -121,6 +122,18 @@ begin
   if cld=nil then exit;
 
   result:= (cld.ps = ppgame_PlayerState(ps)^) ;
+end;
+
+function OnePlayerIndexSearcher(player: pointer; skip_count: pointer; parameter2: pointer): boolean; stdcall;
+var
+  cnt:pcardinal;
+begin
+  cnt:=pcardinal(skip_count);
+  result:=(cnt^ = 0);
+
+  if (cnt^ > 0) then begin
+    cnt^:=cnt^-1;
+  end;
 end;
 
 function AssignFoundClientDataAction(player:pointer; id:pointer; res:pointer):boolean; stdcall;

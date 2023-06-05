@@ -94,6 +94,44 @@ uses sysutils, windows, HttpDownloader, FastMd5, FastCrc;
 const
   FM_LBL:string='[FM]';
 
+function DirExists(dir:string):boolean;
+var
+  ftyp:cardinal;
+begin
+  ftyp := GetFileAttributes(PAnsiChar(dir));
+  result:=false;
+  if (ftyp = $FFFFFFFF ) then exit;
+
+  result:=(ftyp and FILE_ATTRIBUTE_DIRECTORY) <> 0;
+end;
+
+function ProvideDirPath(path:string):boolean;
+var
+  processed_part:string;
+  i:integer;
+  status:boolean;
+begin
+  result:=true;
+  processed_part:='';
+  for i:=1 to length(path) do begin
+    if (path[i]='\') or (path[i] = '/') then begin
+      if (length(processed_part) > 2) or ((length(processed_part)=2) and (processed_part[2] <> ':')) then begin
+        if not DirExists(processed_part) then begin
+          status:=CreateDirectory(PAnsiChar(processed_part), nil);
+          if not status then begin
+             result:=false;
+             break;
+          end;
+        end;
+      end;
+    end;
+    processed_part := processed_part+path[i];
+  end;
+  if result and (path[length(path)]<>'/') and (path[length(path)]<>'\') then begin
+    result:=CreateDirectory(PAnsiChar(processed_part), nil);
+  end;
+end;
+
 function GetDummyChecks():FZCheckParams;
 begin
   result.crc32:=0;
@@ -380,7 +418,7 @@ begin
     if filedata.required_action=FZ_FILE_ACTION_UNDEFINED then begin
       //такого файла не было в списке. Сносим.
       FZLogMgr.Get.Write(FM_LBL+'Deleting file '+filedata.name, FZ_LOG_INFO);
-      if not SysUtils.DeleteFile(_parent_path+filedata.name)then begin
+      if not Windows.DeleteFile(PAnsiChar(_parent_path+filedata.name)) then begin
         FZLogMgr.Get.Write(FM_LBL+'Failed to delete '+filedata.name, FZ_LOG_ERROR);
         exit;
       end;
@@ -392,7 +430,7 @@ begin
       while (str[length(str)]<>'\') and (str[length(str)]<>'/') do begin
         str:=leftstr(str,length(str)-1);
       end;
-      if not ForceDirectories(str) then begin
+      if not ProvideDirPath(str) then begin
         FZLogMgr.Get.Write(FM_LBL+'Cannot create directory '+str, FZ_LOG_ERROR);
         exit;
       end;

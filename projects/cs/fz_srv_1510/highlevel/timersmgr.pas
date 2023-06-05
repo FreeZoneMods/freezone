@@ -33,6 +33,7 @@ public
 
   function GetOverdue():cardinal;
   function GetPeriod():cardinal;
+  procedure SetPeriod(new_period:cardinal);
   function Trigger(force:boolean):boolean;
   procedure SetActive(status:boolean);
 end;
@@ -118,6 +119,11 @@ end;
 function FZTimer.GetPeriod(): cardinal;
 begin
   result:=_cfg.period;
+end;
+
+procedure FZTimer.SetPeriod(new_period: cardinal);
+begin
+  _cfg.period:=new_period;
 end;
 
 function FZTimer.Trigger(force: boolean): boolean;

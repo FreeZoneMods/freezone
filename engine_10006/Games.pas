@@ -68,7 +68,8 @@ type game_sv_mp = packed record //sizeof = 0x170
   m_strWeaponsData:pCItemMgr;
   m_bVotingActive:byte; {boolean}
   m_bVotingReal:byte; {boolean}
-  _unused3:word;
+  fz_vote_started_by_admin:byte;
+  _unused3:byte;
   m_uVoteStartTime:cardinal;
   m_pVoteCommand:shared_str;
   m_u8SpectatorModes:byte;

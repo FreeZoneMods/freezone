@@ -129,6 +129,12 @@ begin
     srcBaseInjection.Create(pointer(xrGame+$2D9AAD),@ProvideDefaultGameTypeForMapchangeVoting,9,[], false, false);
   end;
 
+  //обработка нестандартных голосований+ FZ'шный транслятор строк + бан по IP в голосовании
+  if xrGameDllType()=XRGAME_SV_10006 then begin
+    srcKit.nop_code(pointer(xrGame+$2d9b62), 2);
+    srcBaseInjection.Create(pointer(xrGame+$2d9b6b), @OnVoteStart, 5,[F_PUSH_EBP, F_RMEM+F_PUSH_ESP+$2830, F_RMEM+F_PUSH_ESP+$282C, F_PUSH_EAX], true, false);
+  end;
+
   result:=true;
 end;
 

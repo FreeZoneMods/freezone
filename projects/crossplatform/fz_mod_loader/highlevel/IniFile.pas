@@ -43,7 +43,7 @@ begin
     GetMem(arr, i);
     if arr=nil then exit;
     res:=GetPrivateProfileString(nil, nil, nil, @arr[0], i, PAnsiChar(_filename));
-    flag:= (res=i-1);
+    flag:= (res<=i-2);
     if flag then FreeMem(arr, i);
   until not flag;
 

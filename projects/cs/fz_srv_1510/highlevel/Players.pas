@@ -173,6 +173,8 @@ function IsInvinciblePersistAfterShot(ps:pgame_PlayerState):boolean; stdcall;
 
 function GetFZBuffer(ps:pgame_PlayerState):FZPlayerStateAdditionalInfo;
 
+function index_searcher_client_finder(index:cardinal):pIClient; stdcall;
+
 implementation
 uses LogMgr, sysutils, srcBase, Level, CommonHelper, dynamic_caster, basedefs, ConfigCache, TranslationMgr, Chat, sysmsgs, DownloadMgr, Synchro, ServerStuff, MapList, Censor, BuyWnd, Weapons, xr_configs, HackProcessor, Objects, Device, NET_Common, PureClient, ItemsCfgMgr, BaseClasses, BasicProtection, xr_debug, Banned, xr_time, SACE_interface, whitehashes, TeleportMgr;
 
@@ -1902,24 +1904,31 @@ begin
   result:=item.m_tClassID = GetClassId('W_KNIFE');
 end;
 
-function GetNameAndIpByClientId(id:cardinal; var ip:string):string;
+function GetNameAndIpByClientId(id:cardinal; var ip:string; var name:string):boolean; stdcall;
 var
   cld:pxrClientData;
 begin
   ip:='0.0.0.0';
-  result:='(null)';
+  name:='';
+  result:=false;
 
   cld:=ID_to_client(id);
-  if (cld=nil) then exit;
+  if (cld<>nil) then begin
+    ip:=ip_address_to_str(cld.base_IClient.m_cAddress);
 
-  ip:=ip_address_to_str(cld.base_IClient.m_cAddress);
+    if (cld.ps <> nil) then begin
+      name:=GetPlayerName(cld.ps);
+    end;
 
-  if (cld.ps <> nil) then begin
-    result:=GetPlayerName(cld.ps);
+    if length(name) = 0 then begin
+      name:=get_string_value(@cld.base_IClient.name);
+    end;
   end;
 
-  if length(result) = 0 then begin
-    result:=get_string_value(@cld.base_IClient.name);
+  if length(name) = 0 then begin
+    name:='(null)';
+  end else begin
+    result:=true;
   end;
 end;
 
@@ -1928,7 +1937,8 @@ var
   name, ip:string;
 begin
   ip:='';
-  name:=GetNameAndIpByClientId(id, ip);
+  name:='';
+  GetNameAndIpByClientId(id, ip, name);
   result:='Player "'+name+'" (ID='+inttostr(id)+', IP='+ip+') '+message;
 end;
 
@@ -1948,6 +1958,12 @@ function GetFZBuffer(ps: pgame_PlayerState): FZPlayerStateAdditionalInfo;
 begin
   R_ASSERT(ps<>nil, 'ps is nil', 'GetFZBuffer');
   result:=FZPlayerStateAdditionalInfo(ps.FZBuffer);
+end;
+
+function index_searcher_client_finder(index: cardinal): pIClient; stdcall;
+begin
+  result:=nil;
+  ForEachClientDo(AssignFoundClientAction, OnePlayerIndexSearcher, @index, @result);
 end;
 
 end.

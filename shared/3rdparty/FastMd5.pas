@@ -44,7 +44,7 @@ begin
   B := pDWORD(Hash)[1];
   C := pDWORD(Hash)[2];
   D := pDWORD(Hash)[3];
-  Buffer := Pointer(DWORD(Buffer) + IV);
+  Buffer := Pointer(uintptr(Buffer) + IV);
   //
   A := B + LRot32(A + (D xor (B and (C xor D))) + pDWORD(Buffer)[ 0] + $D76AA478,  7);
   D := A + LRot32(D + (C xor (A and (B xor C))) + pDWORD(Buffer)[ 1] + $E8C7B756, 12);

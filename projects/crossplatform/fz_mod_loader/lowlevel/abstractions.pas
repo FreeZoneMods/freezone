@@ -916,7 +916,7 @@ begin
   gsFull:=puintptr(mm+get_CMainMenu__m_pGameSpyFull_offset())^;
   uniassert(gsFull<>0, 'm_pGameSpyFull is 0');
   gsHttp:=puintptr(gsFull+get_CGameSpy_Full__m_pGS_HTTP_offset())^;
-  uniassert(gsFull<>0, 'm_pGS_HTTP is 0');
+  uniassert(gsHttp<>0, 'm_pGS_HTTP is 0');
   pcardinal(gsHttp+get_CGameSpy_HTTP__m_LastRequest_offset())^:=cardinal(-1);
 
   //Включим главное меню на вкладке мультиплеера(ползунок загрузки есть только там)
@@ -1601,7 +1601,7 @@ end;
 ////////////////////////////////////////////////////////////////////////////////////
 class function FZGameVersionCreator.GetGameVersion: FZ_GAME_VERSION;
 var
-  xrGS_GetGameVersion: function():PAnsiChar; stdcall;
+  xrGS_GetGameVersion: function(pBuf:pointer):PAnsiChar; cdecl;
   xrGS:HMODULE;
   xr3DA:HMODULE;
   ptimestamp:pcardinal;
@@ -1614,7 +1614,7 @@ begin
   xrGS_GetGameVersion:=GetProcAddress(xrGS, 'xrGS_GetGameVersion');
   if @xrGS_GetGameVersion = nil then exit;
 
-  ver:=xrGS_GetGameVersion();
+  ver:=xrGS_GetGameVersion(nil);
 
   if ver = '1.5.10' then begin
     result:=FZ_VER_CS_1510;
