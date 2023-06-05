@@ -148,10 +148,6 @@ begin
   result:=FZ_MASTERLIST_NOT_APPROVED;
 
   PushToArray(master_links, 'https://raw.githubusercontent.com/FreeZoneMods/modmasterlinks/master/links.ini');
-  PushToArray(master_links, 'http://www.gwrmod.tk/files/mods_links.ini');
-  PushToArray(master_links, 'http://www.stalker-life.ru/mods_links/links.ini');
-  PushToArray(master_links, 'http://stalker.stagila.ru:8080/stcs_emergency/mods_links.ini');
-  PushToArray(master_links, 'http://www.gwrmod.tk/files/mods_links_low_priority.ini');
 
   list_downloaded:=false;
   full_path:= settings.root_dir+master_mods_list_name;

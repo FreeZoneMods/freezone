@@ -33,19 +33,19 @@ constructor FZIniFile.Create(filename: string);
 var
   i, j, res:cardinal;
   arr, start:PAnsiChar;
-  flag:boolean;
+  need_bigger_buffer:boolean;
 begin
   _filename:=filename;
 
-  i:=128;
+  i:=32;
   repeat
     i:=i*2;
     GetMem(arr, i);
     if arr=nil then exit;
     res:=GetPrivateProfileString(nil, nil, nil, @arr[0], i, PAnsiChar(_filename));
-    flag:= (res<=i-2);
-    if flag then FreeMem(arr, i);
-  until not flag;
+    need_bigger_buffer:=(res>=i-2);
+    if need_bigger_buffer then FreeMem(arr, i);
+  until not need_bigger_buffer;
 
   j:=0;
   start:=arr;
